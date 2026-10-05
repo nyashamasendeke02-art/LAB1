@@ -222,3 +222,10 @@ def test_design_and_review_prompts_state_the_fixed_analysis():
     assert ANALYSIS_METHOD in STAGES["design"]
     assert ENTRYPOINT_CONTRACT in STAGES["scientific_review"]
     assert "Welch" in ANALYSIS_METHOD and "non-inferiority" in ANALYSIS_METHOD.lower()
+
+
+def test_prompts_define_status_so_negative_verdicts_are_not_stage_failures():
+    """robolab G0-3: the verifier reported a real defect as status=failed, which the
+    controller treats as a stage error (retry) instead of a failing review (patch)."""
+    from autolab.prompts import COMMON
+    assert 'status="complete" whenever you performed the task' in COMMON

@@ -690,7 +690,11 @@ class Controller:
             return "halted"
         cur = self._cur(pid)
         ctx = self._context(pid)
-        ctx.pop("protocol", None)
+        prev = ctx.pop("protocol", None)
+        if prev and self.store.get(prev["id"]).reason.startswith("rejected by"):
+            # Revise the rejected protocol rather than redesign from scratch: fresh
+            # designs add new mechanisms (and new conflicts) instead of converging.
+            ctx["rejected_protocol"] = prev
         ctx["previous_failures"] = [
             f.data["summary"] for f in self.store.query("failure", project=pid)
             if f.data["category"] != "stage_error"][-6:]

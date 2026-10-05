@@ -210,3 +210,11 @@ def test_non_inferiority_and_co_primary_rules_validate():
     errs = validate_protocol(p)
     assert any("margin" in e for e in errs)
     assert any("ghost" in e for e in errs) and any("nobody" in e for e in errs)
+
+
+def test_design_and_review_prompts_state_the_fixed_analysis():
+    from autolab.prompts import ANALYSIS_METHOD, ENTRYPOINT_CONTRACT, STAGES
+    assert ANALYSIS_METHOD in STAGES["scientific_review"]
+    assert ANALYSIS_METHOD in STAGES["design"]
+    assert ENTRYPOINT_CONTRACT in STAGES["scientific_review"]
+    assert "Welch" in ANALYSIS_METHOD and "non-inferiority" in ANALYSIS_METHOD.lower()

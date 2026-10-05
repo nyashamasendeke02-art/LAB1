@@ -5,7 +5,8 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** 0.3.0 (P0 lab upgrades), 99 tests passing (~17 min on Windows).
+- **Version:** 0.3.0 + L4/L5 statistics (e0f95d4, 2026-10-05); full suite re-run pending
+  (~17 min on Windows).
 - **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). pilot-002 ran the first
   full live pass (RUN-0001: INCONCLUSIVE, paired effect -0.00008 MSE, CI [-0.00075, 0.00059]),
   then redesigned twice; the review exposed lab gaps that are now fixed (D11-D13).
@@ -44,9 +45,12 @@ and `project_state/` (decisions, failures, open questions)._
 
 ### Next (priority order)
 0. [x] Plan adopted under delegation (D21). P0 upgrades L1-L3, L6-L9 DONE (v0.3.0, da94322);
-       L4 + L5 due before the first confirmatory study / E3; L10 deferred (D22).
+       L4 + L5 DONE (e0f95d4): non-inferiority rules, co-primary endpoints (intersection-union),
+       p-values, Holm on secondary contrasts, power check that refuses underpowered confirmatory
+       designs (paired pilot SD, 80% power). L10 deferred (D22).
 0b. [~] Lab validation run: labs/pilot-003, positive control (heavy-ball momentum vs GD,
-       expected 'supported'), exploratory, RUNNING since 2026-10-05 00:12.
+       expected 'supported'), exploratory. Started 00:12, interrupted at DESIGN 00:15 (the
+       machine went down; two test files were NUL-padded), RESUMED 2026-10-05 on e0f95d4.
 0c. [ ] Then: scripts/init_robolab.py -> labs/robolab; submit docs/gates/GATE0_GATE1_TASKS.md
        (G0-1..G0-4, G1-1, G1-2) through the engineering track.
 
@@ -56,8 +60,7 @@ and `project_state/` (decisions, failures, open questions)._
        collection auto-downgrades confirmatory to exploratory.
 3. [x] Progress visibility: `autolab watch` / per-step log lines with the agent
        and elapsed time.
-4. [~] Statistics: paired bootstrap DONE; still to do: (shared seeds), power/sample-size check at
-       scientific review, Holm correction for multiple contrasts.
+4. [x] Statistics: paired t intervals, non-inferiority, co-primary endpoints, Holm, power check.
 5. [x] Ledger anchoring: commit the ledger head hash into the research repo
        at each merge/run.
 6. [ ] Citation verification step for background research (mark as verified
@@ -107,7 +110,7 @@ Residual risks the fixes do NOT remove:
   mechanical or prompt rules, but reviewer depth remains an open question.
 - The verifier sandbox (codex workspace-write) can read outside its worktree.
 - The ledger is anchored in git commit trailers; rewriting both the DB and git is still possible.
-- No power analysis or multiple-comparison correction yet.
+- Power check uses the noisiest paired pilot only; unpaired pilots give no SD estimate.
 - Background-research citations are unverified (`sources_verified: false`).
 - The full test suite takes ~5 min on Windows (subprocess/git heavy); there is no fast subset marker.
 - The `project_state/*.md` written by hand in LAB1 and the generated per-lab

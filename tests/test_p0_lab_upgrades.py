@@ -282,3 +282,21 @@ def test_confirmatory_can_require_a_pilot(tmp_path):
     lab, ctl = make(tmp_path, config=cfg, sci__design=scenario.design(kind="confirmatory"))
     pid = ctl.new_project("confirm without pilot")
     assert run_until_design_fails(lab, ctl, pid, "exploratory pilot")
+
+
+def test_redesign_after_review_revises_the_rejected_protocol(tmp_path):
+    """pilot-003: designs written from scratch after each review added new conflicts and
+    never converged; the designer now receives the rejected protocol to revise."""
+    seen = []
+    inner = scenario.design()
+
+    def design(t):
+        seen.append(t.context.get("rejected_protocol"))
+        return inner(t)
+
+    lab, ctl = make(tmp_path, sci__design=design, sci__scientific_review=[
+        scenario.demo.review_revise, scenario.demo.review_approve])
+    pid = ctl.new_project("revise")
+    ctl.run(pid, max_steps=9)
+    assert len(seen) >= 2 and seen[0] is None
+    assert seen[1]["id"] == "PROT-0001" and seen[1]["seeds"] == [1, 2, 3, 4]

@@ -5,8 +5,8 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** 0.3.0 + L4/L5 statistics (e0f95d4, 2026-10-05); full suite re-run pending
-  (~17 min on Windows).
+- **Version:** 0.3.0 + L4/L5 statistics + design-convergence fixes; 108/108 passed on e0f95d4
+  (15 min); re-run on 4c37a2b in progress.
 - **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). pilot-002 ran the first
   full live pass (RUN-0001: INCONCLUSIVE, paired effect -0.00008 MSE, CI [-0.00075, 0.00059]),
   then redesigned twice; the review exposed lab gaps that are now fixed (D11-D13).
@@ -54,8 +54,9 @@ and `project_state/` (decisions, failures, open questions)._
        the rejected one), over-specified mechanisms, and the reviewer did not know the fixed
        analysis method / run contract. pilot-003 is kept HALTED as a record (resume is a
        human-only action). pilot-004 = same objective on 615d476, RUNNING since 2026-10-05.
-0c. [ ] Then: scripts/init_robolab.py -> labs/robolab; submit docs/gates/GATE0_GATE1_TASKS.md
-       (G0-1..G0-4, G1-1, G1-2) through the engineering track.
+0c. [~] robolab initialised 2026-10-05 (labs/robolab, main eec7f0c). G0-1 (contracts) submitted
+       as PRJ-0001 and RUNNING on the engineering track, in parallel with pilot-004. Then G0-2,
+       G0-3, G0-4, G1-1, G1-2 (docs/gates/GATE0_GATE1_TASKS.md), in order.
 
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
@@ -120,6 +121,13 @@ Residual risks the fixes do NOT remove:
   `project_state/` share a name; the per-lab files are generated, the LAB1 ones are not.
 
 ## Human tasks (only what Claude cannot do)
+
+- **BLOCKER (2026-10-05 10:45): the Codex verifier cannot write or run commands.** Hermetic mode
+  (D19, `--ignore-user-config`) drops `[windows] sandbox = "elevated"` from ~/.codex/config.toml,
+  so `--sandbox workspace-write` degrades to read-only with shell commands rejected. robolab G0-1
+  is stuck at verify (pilot-004 will hit it at its verify stage too). Proposed fix: pass
+  `-c windows.sandbox="elevated"` explicitly in CodexCLIBackend for writable tasks. Claude's tool
+  permission classifier blocked launching Codex to test it; the human must allow that.
 
 - Decide when to resume experiments. pilot-002 was designed under the old rules; recommended:
   start a fresh lab (pilot-003) with the same objective rather than resuming pilot-002.

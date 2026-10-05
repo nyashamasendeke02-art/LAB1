@@ -738,7 +738,7 @@ class Controller:
         sha = self.repo.commit_all(
             wt, f"[{eng.id}] {stage}: {payload['summary'][:72]}", IDENTITIES[Role.ENGINEER],
             {"Autolab-Task": tid, "Autolab-Eng": eng.id, "Autolab-Role": "engineer",
-             "Autolab-Backend": f"{backend['backend']}/{backend['model']}",
+             "Autolab-Backend": f"{backend['backend']}/{backend['model'] or 'default'}",
              "Autolab-Protocol": f"{prot.id}@{prot.data.get('_freeze_hash', '')[:16]}"})
         if sha is None:
             # No diff: the engineer may be disputing a finding, or main may already
@@ -817,7 +817,7 @@ class Controller:
             vsha = self.repo.commit_all(
                 vwt, f"[{eng.id}] verification round {rnd}", IDENTITIES[Role.VERIFIER],
                 {"Autolab-Task": tid, "Autolab-Eng": eng.id, "Autolab-Role": "verifier",
-                 "Autolab-Backend": f"{backend['backend']}/{backend['model']}"})
+                 "Autolab-Backend": f"{backend['backend']}/{backend['model'] or 'default'}"})
             findings = list(payload["findings"])
             if vsha:
                 bad = path_violations(self.repo.changed_files(base_v, vsha),
@@ -827,9 +827,18 @@ class Controller:
                     self._failure(pid, "verifier_policy_violation",
                                   f"verifier modified {bad}; reverted", {"task": tid})
             head_v = self.repo.rev("HEAD", cwd=vwt)
+            has_vtests = any((vwt / "tests" / "verification").glob("test_*.py"))
             ok, out, art = self._run_tests(vwt)
         finally:
             self.repo.remove_worktree(vwt)
+        if not has_vtests:
+            # The verifier's omission, not the engineer's: retried via the stage-retry
+            # path (then HALTED), never counted against the engineer's patch budget.
+            self._failure(pid, "verifier_no_tests",
+                          f"verification round {rnd} added no tests/verification/test_*.py",
+                          {"eng_task": eng.id, "task": tid})
+            raise StageError(f"verifier added no independent tests in round {rnd}; "
+                             f"independent tests are required before merge")
         blocking = [f for f in findings if f["severity"] in ("critical", "major")]
         passed = (payload["verdict"] == "pass" and ok and not blocking
                   and payload["reproducibility_ok"] and payload["protocol_compliance_ok"])

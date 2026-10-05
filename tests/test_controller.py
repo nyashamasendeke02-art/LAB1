@@ -348,3 +348,22 @@ def test_ledger_head_anchored_in_git_and_verified(tmp_path):
     forged.store.append_event("controller", "forged", "X", {})
     checked, missing = forged.verify_anchors()
     assert checked >= 2 and len(missing) == checked
+
+
+def test_merge_requires_independent_verification_tests(tmp_path):
+    def lazy_verifier(t):  # passes everything, writes no tests
+        return ok({"verdict": "pass", "findings": [], "reproducibility_ok": True,
+                   "protocol_compliance_ok": True})
+
+    lab, ctl = make(tmp_path, ver__verify=lazy_verifier)
+    pid = ctl.new_project("lazy verifier")
+    steps = ctl.run(pid)
+    assert steps[-1].after == "HALTED"
+    assert lab.store.query("failure", category="verifier_no_tests")
+    eng = lab.store.query("eng_task")[0]
+    assert eng.data["state"] == "ADVERSARIAL_REVIEW" and eng.data["patch_attempts"] == 0
+    assert not lab.store.query("run")
+    # once the verifier does its job, the project completes
+    ctl2 = Controller(lab, agents())
+    ctl2.resume(pid, "verifier fixed")
+    assert ctl2.run(pid)[-1].after == "COMPLETE"

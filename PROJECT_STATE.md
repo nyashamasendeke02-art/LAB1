@@ -58,8 +58,11 @@ and `project_state/` (decisions, failures, open questions)._
 0c. [~] robolab initialised 2026-10-05 (labs/robolab). G0-1 contracts DONE: PRJ-0002 merged
        09ef14d (DLV-0001); verifier caught 2 defects, fixed; APR-0001 approved by claude-code.
        (PRJ-0001 HALTED: verifier sandbox bug, fixed 7ea88b2.) G0-2 telemetry DONE: PRJ-0003
-       merged 3bf4a43 (DLV-0002; verifier caught a size-cap bypass, fixed). G0-3 Safety Kernel
-       RUNNING as PRJ-0004. Then G0-4, G1-1, G1-2 (docs/gates/GATE0_GATE1_TASKS.md), in order.
+       merged 3bf4a43 (DLV-0002; verifier caught a size-cap bypass, fixed). G0-3 Safety Kernel DONE:
+       PRJ-0004 merged 4087f5b (DLV-0003; verifier caught e-stop reset + tamper defects;
+       APR-0002 safety review by claude-code with fault injection). G0-4 runner RUNNING as
+       PRJ-0005. Then G1-1, G1-2, then G1-3 (stopping-distance check, added from the
+       safety review: v1 is one-step lookahead with a zero-force safe action) (docs/gates/GATE0_GATE1_TASKS.md), in order.
 
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
@@ -95,6 +98,11 @@ and `project_state/` (decisions, failures, open questions)._
 - [x] Git repository initialised and v0.1.0 committed.
 
 ## Known bugs / technical debt
+
+- robolab Safety Kernel v1: one-step workspace lookahead + zero-force safe action, so a fast
+  body can coast out of the workspace. Fix specified as G1-3 (docs/gates/GATE0_GATE1_TASKS.md).
+- FIXED d7f8c70: agents answered status=failed for negative verdicts (stage error/retry
+  instead of patch); COMMON prompt now defines status.
 
 - FIXED 2026-10-05: hermetic Codex dropped [windows] sandbox = "elevated", so the verifier
   was read-only (robolab G0-1 PRJ-0001 HALTED at verify). Writable Codex tasks now pass

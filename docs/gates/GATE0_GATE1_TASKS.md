@@ -125,3 +125,23 @@ as JSON.
 2. The PD controller reaches the goal in the no-disturbance, no-obstacle case.
 3. The random policy mostly fails (sanity of the instrument).
 4. Evaluation sets round-trip through JSON unchanged.
+
+## G1-3 Safety Kernel v1.1: stopping-distance workspace check
+**Refs:** Gate 1, REQ-SAFE, ADR-003. Added 2026-10-05 from the G0-3 safety review (APR-0002).
+**Why:** v1 checks only the next control step and its safe action is zero force, so a fast
+body is approved two steps from a wall and then coasts through it (reproduced in review:
+x = 9, v = 50 m/s, wall at 10, dt = 0.01 -> approved).
+**Spec:** In `src/safety/kernel.py`, reject (or, in clamp mode, replace with a braking
+action) any command after which the body could not stop inside the workspace: per axis,
+with the predicted next position p' and velocity v', require that the stopping distance
+v'^2 / (2 * a_brake) in the direction of motion fits between p' and the workspace bound,
+where a_brake = max |action| on that axis / mass_kg (configured; conservative: ignore
+friction and damping). Replace "zero force" as the only safe action with a braking safe
+action (opposing velocity, at the action limit, clamped to zero once stopped). Bump
+KERNEL_VERSION. Keep every G0-3 behaviour and test.
+**Acceptance:**
+1. The review case (x = 9, v = 50, wall 10) is rejected or braked.
+2. In Puck2D (G1-1), random high-speed commands through the kernel never leave the
+   workspace over many seeded episodes (property test).
+3. Commands that can still stop in time are approved unchanged.
+4. All G0-3 tests still pass.

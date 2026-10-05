@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import sys
 import tempfile
 import urllib.request
 from abc import ABC, abstractmethod
@@ -175,6 +176,10 @@ class CodexCLIBackend(AgentBackend):
         sandbox = self.sandbox_when_writable if task.writable else "read-only"
         cmd = ["codex", "exec", "--sandbox", sandbox, "--skip-git-repo-check",
                "--ephemeral", "--color", "never", *self.HERMETIC, "-o", out_file]
+        if task.writable and sys.platform == "win32":
+            # --ignore-user-config also drops [windows] sandbox; without it Windows
+            # degrades workspace-write to read-only with shell commands rejected.
+            cmd += ["-c", 'windows.sandbox="elevated"']
         if task.workdir:
             cmd += ["-C", task.workdir]
         if self.model:

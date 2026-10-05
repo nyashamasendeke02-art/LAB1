@@ -1,4 +1,5 @@
 import json
+import sys
 
 import pytest
 
@@ -108,6 +109,9 @@ def test_cli_backend_commands_are_sandboxed():
     rw = codex.command(t_rw, "out.txt")
     assert rw[rw.index("--sandbox") + 1] == "workspace-write"
     assert "--dangerously-bypass-approvals-and-sandbox" not in rw
+    # Hermetic mode drops the user's [windows] sandbox setting; restore only that.
+    elevated = 'windows.sandbox="elevated"'
+    assert (elevated in rw) == (sys.platform == "win32") and elevated not in ro
     claude = ClaudeCLIBackend()
     cmd = claude.command(TaskPacket("T", Role.ENGINEER, "implement", "o", writable=True))
     assert "--dangerously-skip-permissions" not in cmd

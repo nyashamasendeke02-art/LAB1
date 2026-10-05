@@ -93,6 +93,10 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Known bugs / technical debt
 
+- FIXED 2026-10-05: hermetic Codex dropped [windows] sandbox = "elevated", so the verifier
+  was read-only (robolab G0-1 PRJ-0001 HALTED at verify). Writable Codex tasks now pass
+  -c windows.sandbox="elevated" (human chose this option; live probe passed).
+
 ### Code review 2026-10-04: R1-R12 fixed (details in DECISIONS D14-D19, FAILURES F6)
 Residual risks the fixes do NOT remove:
 - Engineer-written code still runs unsandboxed (tests, trials). Tampering with the main checkout,
@@ -122,12 +126,6 @@ Residual risks the fixes do NOT remove:
 
 ## Human tasks (only what Claude cannot do)
 
-- **BLOCKER (2026-10-05 10:45): the Codex verifier cannot write or run commands.** Hermetic mode
-  (D19, `--ignore-user-config`) drops `[windows] sandbox = "elevated"` from ~/.codex/config.toml,
-  so `--sandbox workspace-write` degrades to read-only with shell commands rejected. robolab G0-1
-  is stuck at verify (pilot-004 will hit it at its verify stage too). Proposed fix: pass
-  `-c windows.sandbox="elevated"` explicitly in CodexCLIBackend for writable tasks. Claude's tool
-  permission classifier blocked launching Codex to test it; the human must allow that.
 
 - Decide when to resume experiments. pilot-002 was designed under the old rules; recommended:
   start a fresh lab (pilot-003) with the same objective rather than resuming pilot-002.

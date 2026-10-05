@@ -6,12 +6,12 @@ and `project_state/` (decisions, failures, open questions)._
 ## Status
 
 - **Version:** 0.1.0 (commit `e4a1398`), 56/56 tests passing.
-- **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). **pilot-002 completed its
-  first full live pass through every stage**: ChatGPT design → review → freeze → Claude
-  implementation → controller tests → Codex review → merge → validation → RUN-0001
-  (80 trials) → analysis → challenge. The result was INCONCLUSIVE (paired effect -0.00008 MSE,
-  95% CI [-0.00075, 0.00059], 20 seeds), so it looped to DESIGN as specified. It was restarted
-  with the D11/D12 rules and is redesigning. Log: `labs/pilot-002-run.log`.
+- **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). pilot-002 ran the first
+  full live pass (RUN-0001: INCONCLUSIVE, paired effect -0.00008 MSE, CI [-0.00075, 0.00059]),
+  then redesigned twice; the review exposed lab gaps that are now fixed (D11-D13).
+  **pilot-002 is resumed in DESIGN but NOT running**: Claude Code stopped its background
+  run because the system was critically low on memory. No work was lost and no processes
+  were orphaned.
 - **Agents:** ChatGPT scientist via `codex exec --sandbox read-only`; Claude engineer
   via `claude -p`; Codex verifier via `codex exec --sandbox workspace-write`.
 
@@ -29,7 +29,7 @@ and `project_state/` (decisions, failures, open questions)._
 ### In Progress
 - [ ] pilot-002: check the outcome (`autolab status labs/pilot-002`, the log, the report);
       fix and record anything it exposes.
-- [ ] Full suite run after the D11/D12 changes.
+- [ ] Full suite run after D13 (68/68 passed up to D12; D13's targeted tests pass).
 
 ### Next (priority order)
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
@@ -74,5 +74,6 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Human tasks (only what Claude cannot do)
 
-- None right now. If the pilot blocks on an approval gate, it will appear here
-  with the exact command.
+- When the machine has free memory, restart pilot-002 (or ask Claude to), from `LAB1`:
+  `PYTHONPATH=src python -m autolab.cli run labs/pilot-002 PRJ-0001`
+  Closing other heavy apps first helps: each live step runs a codex/claude CLI process.

@@ -31,8 +31,10 @@ plan.
 ## Quick start
 
 ```bash
+python -m venv .venv             # project environment (git-ignored)
+.\.venv\Scripts\Activate.ps1     # PowerShell; Git Bash: source .venv/Scripts/activate
 pip install -e .[dev]            # or: set PYTHONPATH=src
-python -m pytest                 # full test suite
+python -m pytest                 # full test suite (~10 min on Windows)
 
 # Offline demo with scripted agents (no LLM calls): full loop incl. a
 # review-requested redesign and a verifier-caught bug that gets patched.

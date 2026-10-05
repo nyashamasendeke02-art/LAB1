@@ -48,12 +48,13 @@ and `project_state/` (decisions, failures, open questions)._
        L4 + L5 DONE (e0f95d4): non-inferiority rules, co-primary endpoints (intersection-union),
        p-values, Holm on secondary contrasts, power check that refuses underpowered confirmatory
        designs (paired pilot SD, 80% power). L10 deferred (D22).
-0b. [~] Lab validation (positive control: heavy-ball momentum vs GD, expected 'supported').
-       pilot-003 HALTED 2026-10-05 10:37: 4 designs rejected by scientific review. Causes
-       (lab gaps, fixed in 615d476): designer rewrote each protocol from scratch (it never saw
-       the rejected one), over-specified mechanisms, and the reviewer did not know the fixed
-       analysis method / run contract. pilot-003 is kept HALTED as a record (resume is a
-       human-only action). pilot-004 = same objective on 615d476, RUNNING since 2026-10-05.
+0b. [x] Lab validation PASSED 2026-10-05 (labs/pilot-004, COMPLETE): first fully live cycle.
+       Positive control heavy-ball (beta 0.9) vs GD: SUPPORTED, paired effect 265 fewer
+       iterations, 95% CI [229, 302], p 6e-9, 12/12 seeds converged in both arms, all 8
+       validity checks passed; report labs/pilot-004/reports/PRJ-0001-cycle1.md; ledger verified.
+       Design approved on the 3rd attempt (convergence fixes 615d476 worked); verifier wrote
+       independent tests; scientific validation caught a hard-coded parameter, fixed.
+       pilot-003 HALTED at design (4 rejections; lab gaps, fixed) is kept as a record.
 0c. [~] robolab initialised 2026-10-05 (labs/robolab). G0-1 contracts DONE: PRJ-0002 merged
        09ef14d (DLV-0001); verifier caught 2 defects, fixed; APR-0001 approved by claude-code.
        (PRJ-0001 HALTED: verifier sandbox bug, fixed 7ea88b2.) G0-2 telemetry submitted as
@@ -113,7 +114,6 @@ Residual risks the fixes do NOT remove:
 
 ### Older items
 
-- No live cycle has reached COMMUNICATE yet; every real-agent stage has worked at least once.
 - Killing the controller orphans agent subprocesses (codex/claude are not killed with it).
 - The scientific review missed min_effect=0 and an under-trained baseline. These are now
   mechanical or prompt rules, but reviewer depth remains an open question.

@@ -127,9 +127,6 @@ Residual risks the fixes do NOT remove:
 
 ## Human tasks (only what Claude cannot do)
 
-- **Run robolab G0-2 (PRJ-0003)**, or allow Claude to run `autolab.exe run` (Bash permission
-  rule); the permission classifier blocks Claude from driving robolab runs:
-  `! .venv/Scripts/autolab.exe run labs/robolab PRJ-0003`
 
 
 - Decide when to resume experiments. pilot-002 was designed under the old rules; recommended:

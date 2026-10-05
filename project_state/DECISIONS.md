@@ -75,3 +75,22 @@
   refs + lab charter in scientist context, L8 output cap, L9 dependency lock check. L4
   (non-inferiority / co-primary / Holm) and L5 (power) come before the first confirmatory study or
   E3. L10 (citation verification) is deferred: sources stay `sources_verified: false`.
+- D23 (2026-10-05, claude-code): L4/L5 implemented before any confirmatory study (e0f95d4):
+  non-inferiority rules, co-primary endpoints by intersection-union, p-values, Holm on secondary
+  contrasts, and a power check that refuses underpowered confirmatory designs.
+- D24 (2026-10-05, claude-code): design convergence (615d476). pilot-003 HALTED after 4 rejected
+  designs because the designer rewrote each protocol from scratch and the reviewer did not know
+  the fixed analysis method or run contract. The designer now revises the rejected protocol;
+  both prompts state the analysis method; review 'revise' is limited to validity threats.
+  pilot-003 stays HALTED as a record: `autolab resume` records the human, so under delegation a
+  fresh lab (pilot-004) was used instead.
+- D25 (2026-10-05, human): Codex verifier gets `-c windows.sandbox="elevated"` for writable tasks
+  (hermetic mode had made it read-only). The human chose this option and granted Claude permission
+  to run `autolab run`. Lab validation then PASSED: pilot-004 positive control SUPPORTED.
+- D26 (2026-10-05, claude-code): GATE 0 PASSED in labs/robolab. G0-1 contracts (DLV-0001),
+  G0-2 telemetry (DLV-0002), G0-3 Safety Kernel v1 (DLV-0003), G0-4 cycle runner (DLV-0004); 186
+  tests on main; contracts and safety reviews by claude-code with independent checks (APR-0001,
+  APR-0002); audited that Environment.actuate only receives KernelResult.actuator_command. Known
+  limitation carried to G1-3: one-step workspace lookahead with a zero-force safe action.
+  Deviation from D21(4): pilot-004 and robolab G0-1 ran in parallel for ~15 min on 2026-10-05
+  (no shared state; both completed correctly). Back to one active run at a time.

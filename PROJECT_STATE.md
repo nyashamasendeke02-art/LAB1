@@ -129,7 +129,7 @@ Residual risks the fixes do NOT remove:
 - **Continue robolab G0-1 (PRJ-0002).** Verifier found and the engineer fixed 2 defects; 89 tests
   pass; contracts review APR-0001 approved by claude-code (delegated, note recorded). Claude
   Code's permission classifier blocked Claude from running the merge step. Run:
-  `.venv\Scriptsutolab.exe run labs/robolab PRJ-0002`
+  `.venv/Scripts/autolab.exe run labs/robolab PRJ-0002`
   or allow Claude to run `autolab.exe run` (Bash permission rule) so it can drive the lab.
 
 

@@ -70,3 +70,23 @@ def test_runner_contract_and_failures(tmp_path):
     (wd / "experiment.py").write_text("import sys; sys.exit(3)")
     crash = run_protocol(protocol(), wd, tmp_path / "runs4", seeds=[1])
     assert all(not t.ok for t in crash.trials)
+
+
+def test_paired_analysis_removes_shared_seed_variance():
+    # Large between-seed variance, small consistent per-seed effect of +0.6.
+    base = [0.0, 10.0, -10.0, 5.0, -5.0, 20.0]
+    c = trials("c", base)
+    t = trials("t", [b + 0.6 for b in base])
+    unpaired = evaluate_decision(RULE, c + t)
+    paired = evaluate_decision({**RULE, "pairing": "paired"}, c + t)
+    assert unpaired["outcome"] == "inconclusive"
+    assert paired["outcome"] == "supported" and paired["n_pairs"] == 6
+    assert abs(paired["effect"] - 0.6) < 1e-9
+
+
+def test_paired_analysis_only_uses_seeds_valid_in_both_arms():
+    c = trials("c", [0.0, 0.0, 0.0, 0.0])
+    t = trials("t", [1.0, 1.0, 1.0, 1.0])
+    t[0].error = "crashed"
+    out = evaluate_decision({**RULE, "pairing": "paired"}, c + t)
+    assert out["n_pairs"] == 3

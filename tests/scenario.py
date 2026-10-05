@@ -96,6 +96,8 @@ def protocol(kind="exploratory", protected=False, effect=1.0, seeds=(1, 2, 3, 4)
                           "direction": "greater", "min_effect": 0.5, "alpha": 0.05,
                           "n_boot": 500},
         "budget": {"timeout_s": 60},
+        "validity_checks": [{"id": "V1", "description": "baseline sane", "metric": "score",
+                             "condition": "base", "op": "<", "value": 10}],
     }
 
 
@@ -107,8 +109,7 @@ def design(**kw):
 
 
 def requirements(t):
-    return ok({"validity": [{"id": "V1", "description": "baseline sane", "metric": "score",
-                             "condition": "base", "op": "<", "value": 10}],
+    return ok({"validity_criteria": ["baseline score is in a sane range"],
                "engineering": ["entrypoint contract"]})
 
 

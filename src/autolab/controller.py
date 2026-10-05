@@ -23,9 +23,11 @@ import shlex
 import stat
 import subprocess
 import sys
+import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from . import __version__
 from .agents import Agent, make_backend
@@ -84,6 +86,7 @@ class StepResult:
     note: str = ""
     error: str | None = None
     blocked_on: str | None = None
+    elapsed_s: float | None = None
 
 
 def _tail(text: str, n: int = 4000) -> str:
@@ -195,6 +198,72 @@ class Controller:
                           author=by, reason=f"resumed by human: {note}")
         self.store.append_event(by, "research.resumed", pid, {"to": target, "note": note})
 
+    def halt(self, pid: str, note: str, by: str = "human") -> None:
+        """Human action: stop a running project (e.g. to amend its protocol)."""
+        if by != "human":
+            raise PermissionError("only the human researcher can halt a project")
+        state = R(self.project(pid).data["state"])
+        if state in TERMINAL:
+            raise ValueError(f"{pid} is {state.value}")
+        self._halt(pid, f"halted by human: {note}")
+
+    POST_FREEZE = {R.ENGINEERING, R.SCIENTIFIC_VALIDATION, R.RUN_EXPERIMENT, R.ANALYZE,
+                   R.CHALLENGE, R.EVALUATE, R.COMMUNICATE, R.NEXT_QUESTION}
+
+    def amend_protocol(self, pid: str, protocol: dict, reason: str, by: str = "human") -> Record:
+        """Recorded amendment of the current frozen protocol (human-only, while HALTED).
+
+        * the amendment is stored via Store.amend (justification + new freeze hash);
+        * if any run already used this protocol, a confirmatory protocol is
+          downgraded to exploratory -- post-data changes cannot stay confirmatory;
+        * the amended protocol is committed to the research repo;
+        * on resume the project re-enters ENGINEERING with a new task so the
+          implementation is re-verified against the amended protocol.
+        """
+        if by != "human":
+            raise PermissionError("only the human researcher can amend a frozen protocol")
+        if not reason or not reason.strip():
+            raise ValueError("an amendment needs a justification")
+        proj = self.project(pid)
+        if proj.data["state"] != R.HALTED.value:
+            raise ValueError(f"{pid} must be HALTED to amend its protocol (use halt)")
+        if R(proj.data["halted_from"]) not in self.POST_FREEZE:
+            raise ValueError("project is before protocol freeze; revise the design instead")
+        prot = self.store.get(proj.data["current"]["protocol"])
+        if not prot.frozen:
+            raise ValueError(f"{prot.id} is not frozen")
+        errs = validate_protocol(protocol)
+        if errs:
+            raise ValueError("invalid amended protocol: " + "; ".join(errs))
+        has_data = any(r.data["refs"]["protocol"] == prot.id for r in self.store.query("run"))
+        downgraded = bool(prot.data.get("downgraded_after_data"))
+        if has_data and protocol["kind"] == "confirmatory":
+            protocol = {**protocol, "kind": "exploratory"}
+            downgraded = True
+        rec = self.store.amend(prot.id, {"protocol": protocol,
+                                         "downgraded_after_data": downgraded},
+                               author=by, reason=reason)
+        rel = f"protocols/{prot.id}.json"
+        (self.repo.path / rel).write_text(json.dumps(protocol, indent=2, sort_keys=True) + "\n",
+                                          encoding="utf-8")
+        self.repo.commit_all(self.repo.path, f"Amend protocol {prot.id} (v{rec.version})",
+                             IDENTITIES[Role.CONTROLLER],
+                             {"Autolab-Protocol": f"{prot.id}@{rec.data['_freeze_hash'][:16]}",
+                              "Autolab-Amendment": reason[:200], "Autolab-Project": pid})
+        eng = self._new_eng_task(pid, prot.id, [
+            f"Protocol {prot.id} amended to v{rec.version} ({reason}). Update the "
+            f"implementation so it satisfies the amended protocol exactly."])
+        self.store.update(pid, {"halted_from": R.ENGINEERING.value,
+                                "current": {**proj.data["current"], "eng_task": eng.id},
+                                "design_iterations": proj.data["design_iterations"]},
+                          author=by, reason=f"protocol amended ({prot.id} v{rec.version}); "
+                                            f"resume re-enters ENGINEERING")
+        self.store.append_event(by, "protocol.amended", prot.id,
+                                {"version": rec.version, "reason": reason,
+                                 "downgraded_after_data": downgraded, "had_data": has_data})
+        self._export()
+        return rec
+
     def _feedback(self, pid: str, text: str) -> None:
         fb = list(self.project(pid).data.get("feedback", []))[-9:] + [text]
         self._set(pid, "feedback recorded", feedback=fb)
@@ -256,11 +325,16 @@ class Controller:
         self._export()
         return StepResult(pid, state.value, self.project(pid).data["state"], "", error=msg)
 
-    def run(self, pid: str, max_steps: int = 500) -> list[StepResult]:
+    def run(self, pid: str, max_steps: int = 500,
+            on_step: Callable[[StepResult], None] | None = None) -> list[StepResult]:
         out: list[StepResult] = []
         for _ in range(max_steps):
+            t0 = time.perf_counter()
             res = self.step(pid)
+            res.elapsed_s = round(time.perf_counter() - t0, 1)
             out.append(res)
+            if on_step:
+                on_step(res)
             if res.after in (R.COMPLETE.value, R.HALTED.value) or res.blocked_on:
                 break
         return out
@@ -427,7 +501,8 @@ class Controller:
         cur = self._cur(pid)
         payload, tid = self._call(pid, Role.SCIENTIST, "requirements", self._context(pid))
         rec = self.store.create("requirements", {
-            "validity": payload["validity"], "scientific": payload.get("scientific", []),
+            "validity_criteria": payload["validity_criteria"],
+            "success_criteria": payload.get("success_criteria", []),
             "engineering": payload["engineering"], "project": pid,
             "refs": {"hypothesis": cur["hypothesis"], "task": tid}},
             prefix="REQ", author="scientist", reason="requirements specified")
@@ -453,14 +528,6 @@ class Controller:
         payload, tid = self._call(pid, Role.SCIENTIST, "design", ctx)
         protocol = payload["protocol"]
         errs = validate_protocol(protocol)
-        req = self.store.get(cur["requirements"]).data
-        names = {c["name"] for c in protocol.get("conditions", [])}
-        metrics = {protocol["metrics"]["primary"], *protocol["metrics"].get("secondary", [])}
-        for r in req["validity"] + req.get("scientific", []):
-            if r["condition"] not in names:
-                errs.append(f"requirement {r['id']} references unknown condition {r['condition']}")
-            if r["metric"] not in metrics:
-                errs.append(f"requirement {r['id']} references undeclared metric {r['metric']}")
         if errs:
             self._failure(pid, "design_invalid", "; ".join(errs), {"task": tid})
             self._feedback(pid, "Protocol rejected by controller: " + "; ".join(errs))
@@ -622,7 +689,7 @@ class Controller:
         ctx = self._context(pid)
         req = ctx.pop("requirements", {})
         ctx["engineering_requirements"] = req.get("engineering", [])
-        ctx["validity_requirements"] = req.get("validity", [])
+        ctx["validity_criteria"] = req.get("validity_criteria", [])
         ctx["engineering_task"] = eng.id
         ctx["patch_attempt"] = eng.data["patch_attempts"]
         ctx["redesign_index"] = eng.data["redesigns"]
@@ -958,14 +1025,13 @@ class Controller:
             trials = self._trials(run)
             seed = int(hashlib.sha256(run.id.encode()).hexdigest()[:8], 16)
             summary = summarize(trials)
-            req = self.store.get(cur["requirements"]).data
             decision = evaluate_decision(p["decision_rule"], trials, seed)
             res = self.store.create("result", {
                 "label": Evidence.EXPERIMENTAL_RESULT.value, "summary": summary,
                 "decision": decision,
                 "contrasts": contrasts(p, trials, seed),
-                "validity": evaluate_requirements(req["validity"], summary),
-                "scientific": evaluate_requirements(req.get("scientific", []), summary),
+                "validity": evaluate_requirements(p.get("validity_checks", []), summary),
+                "scientific": evaluate_requirements(p.get("success_checks", []), summary),
                 "bootstrap_seed": seed, "analysis_version": __version__,
                 "outcome": decision["outcome"], "project": pid,
                 "refs": {"run": run.id, "protocol": prot.id, "hypothesis": cur["hypothesis"],

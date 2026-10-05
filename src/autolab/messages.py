@@ -94,12 +94,15 @@ PROTOCOL_SCHEMA = {
                 "min_effect": {"type": "number", "minimum": 0},
                 "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
                 "n_boot": {"type": "integer", "minimum": 100},
+                "pairing": {"enum": ["paired", "unpaired"]},
             },
         },
         "budget": {
             "type": "object",
             "properties": {"timeout_s": _num, "max_runs": {"type": "integer"}},
         },
+        "validity_checks": {"type": "array", "items": REQUIREMENT_SCHEMA},
+        "success_checks": {"type": "array", "items": REQUIREMENT_SCHEMA},
         "transfer_tests": _strs,
         "robustness_tests": _strs,
     },
@@ -133,9 +136,9 @@ STAGE_SCHEMAS: dict[str, dict] = {
         }},
     ),
     "requirements": _obj(
-        ["validity", "engineering"],
-        {"validity": {"type": "array", "items": REQUIREMENT_SCHEMA},
-         "scientific": {"type": "array", "items": REQUIREMENT_SCHEMA},
+        ["validity_criteria", "engineering"],
+        {"validity_criteria": {"type": "array", "minItems": 1, "items": _nstr},
+         "success_criteria": _strs,
          "engineering": _strs},
     ),
     "design": _obj(
@@ -279,6 +282,17 @@ def validate_protocol(protocol: dict) -> list[str]:
             errors.append(f"decision_rule.{key}={rule[key]!r} is not a condition")
     if rule["metric"] != protocol["metrics"]["primary"]:
         errors.append("decision_rule.metric must be the pre-specified primary metric")
+    metrics = {protocol["metrics"]["primary"], *protocol["metrics"].get("secondary", [])}
+    for key in ("validity_checks", "success_checks"):
+        for chk in protocol.get(key, []):
+            if chk["condition"] not in names:
+                errors.append(f"{key} {chk['id']}: condition {chk['condition']!r} is not one of "
+                              f"{sorted(names)}")
+            if chk["metric"] not in metrics:
+                errors.append(f"{key} {chk['id']}: metric {chk['metric']!r} is not a declared "
+                              f"metric {sorted(metrics)}")
+    if not protocol.get("validity_checks"):
+        errors.append("protocol needs >= 1 validity_check (instrument sanity check)")
     if len(set(protocol["seeds"])) != len(protocol["seeds"]):
         errors.append("seeds must be unique")
     if protocol["kind"] == "confirmatory" and len(protocol["seeds"]) < 3:

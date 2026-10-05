@@ -73,13 +73,9 @@ def hypothesis(t: TaskPacket) -> dict:
 
 def requirements(t: TaskPacket) -> dict:
     return ok({
-        "validity": [
-            {"id": "V1", "description": "Baseline GD converges within budget (instrument works)",
-             "metric": "iters_to_tol", "condition": "gd", "op": "<", "value": 5000},
-            {"id": "V2", "description": "Momentum run does not diverge (finite, non-increasing loss)",
-             "metric": "final_loss_ratio", "condition": "momentum", "op": "<=", "value": 1.0},
-        ],
-        "scientific": [],
+        "validity_criteria": ["Baseline gradient descent converges within the iteration budget",
+                              "No optimiser diverges (loss ratio stays <= 1)"],
+        "success_criteria": [],
         "engineering": ["Implement the entrypoint contract exactly",
                         "Deterministic given --seed", "Unit tests for the optimiser"]})
 
@@ -102,6 +98,12 @@ def _protocol(with_null: bool) -> dict:
         "decision_rule": {"metric": "iters_to_tol", "treatment": "momentum", "control": "gd",
                           "direction": "less", "min_effect": 100, "alpha": 0.05, "n_boot": 2000},
         "budget": {"timeout_s": 120},
+        "validity_checks": [
+            {"id": "V1", "description": "Baseline GD converges within budget (instrument works)",
+             "metric": "iters_to_tol", "condition": "gd", "op": "<", "value": 5000},
+            {"id": "V2", "description": "Momentum run does not diverge",
+             "metric": "final_loss_ratio", "condition": "momentum", "op": "<=", "value": 1.0},
+        ],
         "transfer_tests": [], "robustness_tests": [],
     }
 

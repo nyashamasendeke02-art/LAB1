@@ -9,6 +9,9 @@
     autolab approve LAB APR-0001 [--note]  human decision (gates)
     autolab reject LAB APR-0001 [--note]
     autolab resume LAB PRJ --note "..."    human: leave HALTED and retry
+    autolab halt LAB PRJ --note "..."      human: stop a project
+    autolab show LAB RECORD [--protocol]   print a record (or just its protocol JSON)
+    autolab amend LAB PRJ --file P.json --reason "..."   recorded protocol amendment
     autolab trace LAB RECORD               provenance lineage of any record
     autolab verify LAB                     check ledger hash chain + artifacts
     autolab export LAB [--json FILE]       regenerate project_state/*.md
@@ -20,6 +23,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime
 
 from .controller import Controller, Lab
 from .gates import Gates
@@ -36,14 +40,20 @@ def _project(lab: Lab, pid: str | None) -> str:
     return projects[-1].id
 
 
+def _print_step(s) -> None:
+    stamp = datetime.now().strftime("%H:%M:%S")
+    took = f"{s.elapsed_s:>6.1f}s" if s.elapsed_s is not None else "       "
+    line = f"{stamp} {took} {s.before:>22} -> {s.after:<22} {s.note}"
+    if s.error:
+        line += f"  ERROR: {s.error}"
+    if s.blocked_on:
+        line += f"  [blocked on {s.blocked_on}]"
+    print(line, flush=True)
+
+
 def _print_steps(steps) -> None:
     for s in steps:
-        line = f"{s.before:>22} -> {s.after:<22} {s.note}"
-        if s.error:
-            line += f"  ERROR: {s.error}"
-        if s.blocked_on:
-            line += f"  [blocked on {s.blocked_on}]"
-        print(line)
+        _print_step(s)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -69,6 +79,19 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("lab")
     p.add_argument("project")
     p.add_argument("--note", required=True)
+    p = sub.add_parser("halt")
+    p.add_argument("lab")
+    p.add_argument("project")
+    p.add_argument("--note", required=True)
+    p = sub.add_parser("show")
+    p.add_argument("lab")
+    p.add_argument("record")
+    p.add_argument("--protocol", action="store_true")
+    p = sub.add_parser("amend")
+    p.add_argument("lab")
+    p.add_argument("project")
+    p.add_argument("--file", required=True)
+    p.add_argument("--reason", required=True)
     p = sub.add_parser("trace")
     p.add_argument("lab")
     p.add_argument("record")
@@ -90,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
         ctl = Controller(lab, demo_agents())
         pid = ctl.new_project(DEMO_OBJECTIVE)
         print(f"[demo] scripted agents, no LLM calls. project {pid}")
-        _print_steps(ctl.run(pid))
+        ctl.run(pid, on_step=_print_step)
         print(f"\nreports: {lab.reports}\nstate:   {lab.exports}")
         return 0
 
@@ -101,7 +124,10 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd in ("run", "step"):
         ctl = Controller(lab)
         pid = _project(lab, a.project)
-        _print_steps(ctl.run(pid, a.max_steps) if a.cmd == "run" else [ctl.step(pid)])
+        if a.cmd == "run":
+            ctl.run(pid, a.max_steps, on_step=_print_step)
+        else:
+            _print_steps([ctl.step(pid)])
     elif a.cmd == "status":
         for proj in lab.store.query("project"):
             d = proj.data
@@ -121,6 +147,25 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "resume":
         Controller(lab, agents={}).resume(a.project, a.note)
         print(f"{a.project} resumed")
+    elif a.cmd == "halt":
+        Controller(lab, agents={}).halt(a.project, a.note)
+        print(f"{a.project} halted")
+    elif a.cmd == "show":
+        rec = lab.store.get(a.record)
+        if a.protocol:
+            print(json.dumps(rec.data["protocol"], indent=2, sort_keys=True))
+        else:
+            print(json.dumps({"id": rec.id, "version": rec.version, "kind": rec.kind,
+                              "author": rec.author, "reason": rec.reason,
+                              "data": rec.data}, indent=2, default=str))
+    elif a.cmd == "amend":
+        with open(a.file, encoding="utf-8") as fh:
+            new_protocol = json.load(fh)
+        rec = Controller(lab, agents={}).amend_protocol(a.project, new_protocol, a.reason)
+        kind = rec.data["protocol"]["kind"]
+        print(f"{rec.id} amended to v{rec.version} (kind={kind}, "
+              f"downgraded_after_data={rec.data['downgraded_after_data']}); "
+              f"`autolab resume` re-enters ENGINEERING")
     elif a.cmd == "trace":
         tree = trace(lab.store, a.record)
         print(json.dumps(tree, indent=2) if a.json else format_trace(tree))

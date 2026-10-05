@@ -103,3 +103,24 @@ def test_make_backend():
     assert isinstance(make_backend({"backend": "codex-cli"}), CodexCLIBackend)
     with pytest.raises(ValueError):
         make_backend({"backend": "gpt-telepathy"})
+
+
+def test_validity_checks_must_bind_to_protocol_conditions_and_metrics():
+    p = protocol()
+    p["validity_checks"][0]["condition"] = "each paired seed, easy vs random"  # prose (pilot-001)
+    p["validity_checks"].append({"id": "V2", "description": "d", "metric": "derived_diff",
+                                 "condition": "base", "op": ">", "value": 0})
+    errs = validate_protocol(p)
+    assert any("V1" in e and "condition" in e for e in errs)
+    assert any("V2" in e and "metric" in e for e in errs)
+    p = protocol()
+    p["validity_checks"] = []
+    assert any("validity_check" in e for e in validate_protocol(p))
+
+
+def test_requirements_stage_is_prose_only():
+    validate_completion("requirements", {"status": "complete", "summary": "", "payload": {
+        "validity_criteria": ["baseline learns"], "engineering": ["tests"]}})
+    with pytest.raises(ProtocolError):
+        validate_completion("requirements", {"status": "complete", "summary": "", "payload": {
+            "validity_criteria": [], "engineering": []}})

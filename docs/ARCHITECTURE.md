@@ -172,7 +172,11 @@ finding is treated as a fail.
 * **Protocol** = pre-registration: kind (exploratory | confirmatory),
   `protected`, entrypoint, conditions (baseline, intervention, ablation,
   null, transfer, robustness), seeds, primary/secondary metrics, decision
-  rule, and budget.
+  rule (optionally `pairing: paired` for seed-matched designs), budget, and
+  machine-checkable `validity_checks` / `success_checks` bound to the
+  protocol's own conditions and metrics. The REQUIREMENTS stage states
+  validity criteria in prose (conditions don't exist yet); DESIGN translates
+  them into checks, which are therefore frozen as part of the pre-registration.
 * Frozen before any implementation. Changes go only through `Store.amend`,
   which is recorded with a justification and a new freeze hash.
 * **Entrypoint contract:** `<entrypoint> --condition N --seed S --out DIR
@@ -186,7 +190,7 @@ finding is treated as a fail.
 * **Analysis** (controller, deterministic, seeded bootstrap): the
   pre-registered decision rule gives supported / partially_supported /
   unsupported / inconclusive. Secondary contrasts (ablations, null) are
-  reported but are not decisive. Validity requirements are evaluated
+  reported but are not decisive. Validity checks are evaluated
   mechanically. The scientist interprets (INFERENCE) but cannot change the
   outcome.
 

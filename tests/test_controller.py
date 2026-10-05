@@ -177,11 +177,11 @@ def test_critical_review_finding_blocks_merge_even_if_verdict_pass(tmp_path):
 
 def test_invalid_experiment_draws_no_conclusion(tmp_path):
     def impossible(t):
-        r = scenario.requirements(t)
-        r["payload"]["validity"][0]["value"] = -100  # base score < -100: never true
+        r = scenario.design()(t)
+        r["payload"]["protocol"]["validity_checks"][0]["value"] = -100  # never true
         return r
 
-    lab, ctl = make(tmp_path, sci__requirements=impossible)
+    lab, ctl = make(tmp_path, sci__design=impossible)
     pid = ctl.new_project("broken instrument")
     steps = ctl.run(pid)
     assert ("EVALUATE", "DESIGN") in states(steps)
@@ -254,3 +254,78 @@ def test_demo_scenario_end_to_end(tmp_path):
     assert lab.store.query("failure", category="review_failed")
     assert lab.store.query("conclusion")[0].data["outcome"] == "supported"
     assert "beta" in (lab.repo.path / "experiment.py").read_text()
+
+
+def test_run_reports_each_step_as_it_happens(tmp_path):
+    lab, ctl = make(tmp_path)
+    pid = ctl.new_project("streaming")
+    seen = []
+    steps = ctl.run(pid, max_steps=3, on_step=seen.append)
+    assert seen == steps and len(seen) == 3
+    assert all(s.elapsed_s is not None and s.elapsed_s >= 0 for s in seen)
+
+
+def _boom(t):
+    raise RuntimeError("stop here")
+
+
+def test_amendment_is_recorded_and_reverified(tmp_path):
+    lab, ctl = make(tmp_path, sci__scientific_validation=_boom)
+    pid = ctl.new_project("amend")
+    assert ctl.run(pid)[-1].after == "HALTED"
+    prot_id = lab.store.get(pid).data["current"]["protocol"]
+    old = lab.store.get(prot_id)
+    p = dict(old.data["protocol"], seeds=[1, 2, 3, 4, 5, 6])
+    with pytest.raises(PermissionError):
+        ctl.amend_protocol(pid, p, "more power", by="scientist")
+    with pytest.raises(ValueError):
+        ctl.amend_protocol(pid, p, "  ")
+    bad = dict(p, conditions=p["conditions"][:1])
+    with pytest.raises(ValueError):
+        ctl.amend_protocol(pid, bad, "drop baseline")
+    rec = ctl.amend_protocol(pid, p, "more power")
+    assert rec.frozen and rec.data["_freeze_hash"] != old.data["_freeze_hash"]
+    assert rec.data["_amendments"][-1]["reason"] == "more power"
+    assert rec.data["downgraded_after_data"] is False
+    committed = json.loads((lab.repo.path / "protocols" / f"{prot_id}.json").read_text())
+    assert committed["seeds"] == [1, 2, 3, 4, 5, 6]
+    ctl2 = Controller(lab, agents())
+    ctl2.resume(pid, "amended")
+    assert lab.store.get(pid).data["state"] == "ENGINEERING"
+    assert ctl2.run(pid)[-1].after == "COMPLETE"
+    run = lab.store.query("run")[-1]
+    assert run.data["protocol_version"] == rec.version and len(run.data["seeds"]) == 6
+    assert len(lab.store.query("eng_task")) == 2  # re-verified implementation
+
+
+def test_amendment_after_data_downgrades_confirmatory(tmp_path):
+    lab, ctl = make(tmp_path, sci__design=scenario.design(kind="confirmatory"),
+                    ver__challenge=_boom)
+    pid = ctl.new_project("post-data amend")
+    apr = ctl.run(pid)[-1].blocked_on
+    ctl.gates.decide(apr, True, by="human")
+    assert ctl.run(pid)[-1].after == "HALTED"
+    assert lab.store.query("run")  # data already collected
+    prot_id = lab.store.get(pid).data["current"]["protocol"]
+    p = dict(lab.store.get(prot_id).data["protocol"])
+    p["decision_rule"] = dict(p["decision_rule"], min_effect=0.1)
+    rec = ctl.amend_protocol(pid, p, "lower threshold after seeing data")
+    assert rec.data["protocol"]["kind"] == "exploratory"
+    assert rec.data["downgraded_after_data"] is True
+    ctl2 = Controller(lab, agents())
+    ctl2.resume(pid, "continue as exploratory")
+    assert ctl2.run(pid)[-1].after == "COMPLETE"
+    con = lab.store.query("conclusion")[-1]
+    assert con.data["experiment_kind"] == "exploratory"
+
+
+def test_human_halt_and_amend_requires_post_freeze(tmp_path):
+    lab, ctl = make(tmp_path)
+    pid = ctl.new_project("early")
+    ctl.step(pid)
+    with pytest.raises(PermissionError):
+        ctl.halt(pid, "x", by="engineer")
+    ctl.halt(pid, "pause")
+    assert lab.store.get(pid).data["state"] == "HALTED"
+    with pytest.raises(ValueError):
+        ctl.amend_protocol(pid, scenario.protocol(), "too early")

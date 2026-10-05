@@ -182,6 +182,28 @@ def bootstrap_mean_diff(t: list[float], c: list[float], n_boot: int, alpha: floa
     return diff, lo, hi
 
 
+def paired_values(trials: list[Trial], treatment: str, control: str,
+                  metric: str) -> list[tuple[int, float, float]]:
+    """(seed, treatment, control) for seeds where BOTH arms produced a valid value."""
+    def by_seed(cond):
+        return {t.seed: float(t.metrics[metric]) for t in trials
+                if t.ok and t.condition == cond and metric in t.metrics}
+    tv, cv = by_seed(treatment), by_seed(control)
+    return [(s, tv[s], cv[s]) for s in sorted(tv.keys() & cv.keys())]
+
+
+def bootstrap_paired_diff(diffs: list[float], n_boot: int, alpha: float,
+                          seed: int) -> tuple[float, float, float]:
+    """Percentile bootstrap CI of the mean of per-seed differences."""
+    rng = random.Random(seed)
+    mean = statistics.fmean(diffs)
+    boots = sorted(statistics.fmean([diffs[rng.randrange(len(diffs))] for _ in diffs])
+                   for _ in range(n_boot))
+    lo = boots[int(math.floor((alpha / 2) * (n_boot - 1)))]
+    hi = boots[int(math.ceil((1 - alpha / 2) * (n_boot - 1)))]
+    return mean, lo, hi
+
+
 def evaluate_decision(rule: dict, trials: list[Trial], seed: int = 0) -> dict:
     """Apply the pre-registered decision rule.
 
@@ -190,6 +212,10 @@ def evaluate_decision(rule: dict, trials: list[Trial], seed: int = 0) -> dict:
     * partially_supported: CI_low > 0 but effect < min_effect
     * unsupported:         CI_high < min_effect (a meaningful effect is excluded)
     * inconclusive:        otherwise, or < 2 valid trials in either arm
+
+    ``rule["pairing"] == "paired"`` bootstraps per-seed differences over seeds
+    valid in both arms (seed-matched designs); default "unpaired" resamples
+    each arm independently.
     """
     alpha = rule.get("alpha", 0.05)
     n_boot = rule.get("n_boot", 5000)
@@ -198,10 +224,20 @@ def evaluate_decision(rule: dict, trials: list[Trial], seed: int = 0) -> dict:
     base = {"metric": rule["metric"], "treatment": rule["treatment"],
             "control": rule["control"], "n_treatment": len(t), "n_control": len(c),
             "min_effect": rule["min_effect"], "alpha": alpha, "direction": rule["direction"]}
-    if len(t) < 2 or len(c) < 2:
-        return {**base, "outcome": Outcome.INCONCLUSIVE.value,
-                "reason": "fewer than 2 valid trials in an arm"}
-    diff, lo, hi = bootstrap_mean_diff(t, c, n_boot, alpha, seed)
+    pairing = rule.get("pairing", "unpaired")
+    base["pairing"] = pairing
+    if pairing == "paired":
+        pairs = paired_values(trials, rule["treatment"], rule["control"], rule["metric"])
+        base["n_pairs"] = len(pairs)
+        if len(pairs) < 2:
+            return {**base, "outcome": Outcome.INCONCLUSIVE.value,
+                    "reason": "fewer than 2 seeds valid in both arms"}
+        diff, lo, hi = bootstrap_paired_diff([a - b for _, a, b in pairs], n_boot, alpha, seed)
+    else:
+        if len(t) < 2 or len(c) < 2:
+            return {**base, "outcome": Outcome.INCONCLUSIVE.value,
+                    "reason": "fewer than 2 valid trials in an arm"}
+        diff, lo, hi = bootstrap_mean_diff(t, c, n_boot, alpha, seed)
     if rule["direction"] == "less":
         diff, lo, hi = -diff, -hi, -lo
     if lo > 0 and diff >= rule["min_effect"]:

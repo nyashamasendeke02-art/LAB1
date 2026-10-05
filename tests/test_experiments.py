@@ -90,3 +90,13 @@ def test_paired_analysis_only_uses_seeds_valid_in_both_arms():
     t[0].error = "crashed"
     out = evaluate_decision({**RULE, "pairing": "paired"}, c + t)
     assert out["n_pairs"] == 3
+
+
+def test_paired_difference_checks():
+    c = trials("c", [1.0, 2.0, 3.0])
+    t = trials("t", [0.5, 1.5, 2.5])
+    reqs = [{"id": "D", "description": "", "metric": "m", "condition": "t", "relative_to": "c",
+             "op": "<", "value": -0.4}]
+    out = evaluate_requirements(reqs, summarize(c + t), c + t)
+    assert out[0]["passed"] and abs(out[0]["observed"] + 0.5) < 1e-12 and out[0]["n_pairs"] == 3
+    assert not evaluate_requirements(reqs, summarize(c), c)[0]["passed"]  # no pairs

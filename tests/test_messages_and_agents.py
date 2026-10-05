@@ -142,3 +142,14 @@ def test_min_effect_must_be_positive_so_null_is_concludable():
     p = protocol()
     p["decision_rule"]["min_effect"] = 0
     assert any("min_effect must be > 0" in e for e in validate_protocol(p))
+
+
+def test_relative_to_must_name_a_condition():
+    p = protocol()
+    p["validity_checks"].append({"id": "R", "description": "d", "metric": "score",
+                                 "condition": "treat", "relative_to": "ghost", "op": ">",
+                                 "value": 0})
+    assert any("relative_to" in e for e in validate_protocol(p))
+    p["validity_checks"][-1]["relative_to"] = "base"
+    p["fixed_params"] = {"lr": 0.01}
+    assert validate_protocol(p) == []

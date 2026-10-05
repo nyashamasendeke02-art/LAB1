@@ -27,3 +27,7 @@
   prompts require a "baseline actually learns" validity check. (pilot-002 RUN-0001:
   min_effect=0 made a tight null CI permanently 'inconclusive'; all arms had weight
   error ~0.286, i.e. under-trained, which the 'finite/completed' checks did not catch.)
+- D13: Checks may use relative_to=<condition> (aggregate of per-seed differences); protocols
+  may carry fixed_params, and every reproduction-relevant parameter must be frozen there.
+  (pilot-002 review: the scientist could not express a paired-difference success check and
+  produced an impossible "mean MSE < -0.001"; operational details were left in prose.)

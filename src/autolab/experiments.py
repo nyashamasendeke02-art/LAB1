@@ -256,10 +256,28 @@ _OPS = {">": lambda a, b: a > b, ">=": lambda a, b: a >= b, "<": lambda a, b: a 
         "<=": lambda a, b: a <= b, "==": lambda a, b: a == b, "!=": lambda a, b: a != b}
 
 
-def evaluate_requirements(reqs: list[dict], summary: dict) -> list[dict]:
+_AGG = {"mean": statistics.fmean, "median": statistics.median, "min": min, "max": max}
+
+
+def evaluate_requirements(reqs: list[dict], summary: dict,
+                          trials: list[Trial] | None = None) -> list[dict]:
+    """Evaluate checks on per-condition aggregates, or -- with ``relative_to`` -- on the
+    aggregate of per-seed differences (condition - relative_to) over seeds valid in both."""
     results = []
     for r in reqs:
         agg = r.get("aggregate", "mean")
+        if r.get("relative_to"):
+            pairs = paired_values(trials or [], r["condition"], r["relative_to"], r["metric"])
+            label = f"{agg}(paired {r['condition']}-{r['relative_to']} {r['metric']})"
+            if not pairs:
+                results.append({"id": r["id"], "passed": False, "observed": None,
+                                "reason": f"no paired data for {label}"})
+                continue
+            observed = _AGG[agg]([a - b for _, a, b in pairs])
+            results.append({"id": r["id"], "passed": bool(_OPS[r["op"]](observed, r["value"])),
+                            "observed": observed, "n_pairs": len(pairs),
+                            "expected": f"{label} {r['op']} {r['value']}"})
+            continue
         stats = summary.get(r["condition"], {}).get(r["metric"])
         if stats is None:
             results.append({"id": r["id"], "passed": False, "observed": None,

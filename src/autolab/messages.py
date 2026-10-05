@@ -51,6 +51,7 @@ REQUIREMENT_SCHEMA = {
         "op": {"enum": [">", ">=", "<", "<=", "==", "!="]},
         "value": _num,
         "aggregate": {"enum": ["mean", "median", "min", "max"]},
+        "relative_to": _nstr,
     },
 }
 
@@ -101,6 +102,7 @@ PROTOCOL_SCHEMA = {
             "type": "object",
             "properties": {"timeout_s": _num, "max_runs": {"type": "integer"}},
         },
+        "fixed_params": {"type": "object"},
         "validity_checks": {"type": "array", "items": REQUIREMENT_SCHEMA},
         "success_checks": {"type": "array", "items": REQUIREMENT_SCHEMA},
         "transfer_tests": _strs,
@@ -292,6 +294,9 @@ def validate_protocol(protocol: dict) -> list[str]:
             if chk["condition"] not in names:
                 errors.append(f"{key} {chk['id']}: condition {chk['condition']!r} is not one of "
                               f"{sorted(names)}")
+            if chk.get("relative_to") and chk["relative_to"] not in names:
+                errors.append(f"{key} {chk['id']}: relative_to {chk['relative_to']!r} is not a "
+                              f"condition")
             if chk["metric"] not in metrics:
                 errors.append(f"{key} {chk['id']}: metric {chk['metric']!r} is not a declared "
                               f"metric {sorted(metrics)}")

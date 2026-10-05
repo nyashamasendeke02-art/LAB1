@@ -60,8 +60,9 @@ and `project_state/` (decisions, failures, open questions)._
        (PRJ-0001 HALTED: verifier sandbox bug, fixed 7ea88b2.) G0-2 telemetry DONE: PRJ-0003
        merged 3bf4a43 (DLV-0002; verifier caught a size-cap bypass, fixed). G0-3 Safety Kernel DONE:
        PRJ-0004 merged 4087f5b (DLV-0003; verifier caught e-stop reset + tamper defects;
-       APR-0002 safety review by claude-code with fault injection). G0-4 runner RUNNING as
-       PRJ-0005. Then G1-1, G1-2, then G1-3 (stopping-distance check, added from the
+       APR-0002 safety review by claude-code with fault injection). G0-4 runner DONE: PRJ-0005
+       merged af95831 (DLV-0004). **GATE 0 PASSED (D26)**: 186 tests on robolab main; every
+       actuation audited to pass the kernel. G1-1 Puck2D RUNNING as PRJ-0006. Then G1-2, then G1-3 (stopping-distance check, added from the
        safety review: v1 is one-step lookahead with a zero-force safe action) (docs/gates/GATE0_GATE1_TASKS.md), in order.
 
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,

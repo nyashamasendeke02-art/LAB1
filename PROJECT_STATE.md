@@ -48,9 +48,12 @@ and `project_state/` (decisions, failures, open questions)._
        L4 + L5 DONE (e0f95d4): non-inferiority rules, co-primary endpoints (intersection-union),
        p-values, Holm on secondary contrasts, power check that refuses underpowered confirmatory
        designs (paired pilot SD, 80% power). L10 deferred (D22).
-0b. [~] Lab validation run: labs/pilot-003, positive control (heavy-ball momentum vs GD,
-       expected 'supported'), exploratory. Started 00:12, interrupted at DESIGN 00:15 (the
-       machine went down; two test files were NUL-padded), RESUMED 2026-10-05 on e0f95d4.
+0b. [~] Lab validation (positive control: heavy-ball momentum vs GD, expected 'supported').
+       pilot-003 HALTED 2026-10-05 10:37: 4 designs rejected by scientific review. Causes
+       (lab gaps, fixed in 615d476): designer rewrote each protocol from scratch (it never saw
+       the rejected one), over-specified mechanisms, and the reviewer did not know the fixed
+       analysis method / run contract. pilot-003 is kept HALTED as a record (resume is a
+       human-only action). pilot-004 = same objective on 615d476, RUNNING since 2026-10-05.
 0c. [ ] Then: scripts/init_robolab.py -> labs/robolab; submit docs/gates/GATE0_GATE1_TASKS.md
        (G0-1..G0-4, G1-1, G1-2) through the engineering track.
 

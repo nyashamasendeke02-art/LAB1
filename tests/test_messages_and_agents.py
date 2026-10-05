@@ -124,3 +124,15 @@ def test_requirements_stage_is_prose_only():
     with pytest.raises(ProtocolError):
         validate_completion("requirements", {"status": "complete", "summary": "", "payload": {
             "validity_criteria": [], "engineering": []}})
+
+
+def test_claude_errors_reported_on_stdout_are_surfaced():
+    limit = json.dumps({"is_error": True, "result": "Usage limit reached", "subtype": "error"})
+    with pytest.raises(BackendError, match="Usage limit reached"):
+        ClaudeCLIBackend.parse_output(1, limit, "")
+    with pytest.raises(BackendError, match="Usage limit reached"):
+        ClaudeCLIBackend.parse_output(0, limit, "")  # exit 0 but is_error
+    with pytest.raises(BackendError, match="boom"):
+        ClaudeCLIBackend.parse_output(1, "not json", "boom")
+    ok = json.dumps({"is_error": False, "result": "{\"a\": 1}"})
+    assert ClaudeCLIBackend.parse_output(0, ok, "") == '{"a": 1}'

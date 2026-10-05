@@ -13,3 +13,8 @@
   as condition ids, and DESIGN could not change requirements, so the loop could not
   converge. The controller correctly rejected all three designs. Fixed by D8.
   Evidence retained in labs/pilot-001 (git-ignored local lab) and labs/pilot-001-run.log.
+- F5 (2026-10-04): LIVE PILOT pilot-002 HALTED in ENGINEERING after 3x
+  `claude exited 1:` with an empty message (Claude usage limit hit mid-run). Root cause
+  of the empty message: Claude Code reports errors as JSON on stdout; the backend read
+  only stderr. Fixed: ClaudeCLIBackend.parse_output surfaces stdout JSON errors (and
+  is_error with exit 0). Resumed via `autolab resume` with no lost work.

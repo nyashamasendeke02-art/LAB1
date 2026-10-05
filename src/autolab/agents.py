@@ -118,12 +118,27 @@ class ClaudeCLIBackend(AgentBackend):
 
     def invoke(self, task: TaskPacket, prompt: str) -> str:
         proc = _run(self.command(task), cwd=task.workdir, stdin=prompt, timeout=self.timeout)
-        if proc.returncode != 0:
-            raise BackendError(f"claude exited {proc.returncode}: {proc.stderr[-2000:]}")
+        return self.parse_output(proc.returncode, proc.stdout, proc.stderr)
+
+    @staticmethod
+    def parse_output(returncode: int, stdout: str, stderr: str) -> str:
+        """Claude Code reports errors (usage limits, API errors) as JSON on stdout."""
         try:
-            return json.loads(proc.stdout).get("result", "")
+            data = json.loads(stdout)
         except json.JSONDecodeError:
-            return proc.stdout
+            data = None
+        if isinstance(data, dict):
+            if returncode != 0 or data.get("is_error"):
+                detail = (data.get("result") or data.get("api_error_status")
+                          or data.get("subtype") or "")
+                raise BackendError(f"claude exited {returncode} (is_error="
+                                   f"{data.get('is_error')}): {str(detail)[:2000]} "
+                                   f"{stderr[-1000:]}".strip())
+            return data.get("result", "")
+        if returncode != 0:
+            raise BackendError(f"claude exited {returncode}: stderr={stderr[-1500:]!r} "
+                               f"stdout={stdout[-1500:]!r}")
+        return stdout
 
 
 class CodexCLIBackend(AgentBackend):
@@ -155,7 +170,8 @@ class CodexCLIBackend(AgentBackend):
             proc = _run(self.command(task, out_file), cwd=task.workdir or td,
                         stdin=prompt, timeout=self.timeout)
             if proc.returncode != 0:
-                raise BackendError(f"codex exited {proc.returncode}: {proc.stderr[-2000:]}")
+                raise BackendError(f"codex exited {proc.returncode}: stderr="
+                                   f"{proc.stderr[-1500:]!r} stdout={proc.stdout[-1500:]!r}")
             if os.path.exists(out_file):
                 return Path(out_file).read_text(encoding="utf-8")
             return proc.stdout

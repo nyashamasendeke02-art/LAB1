@@ -17,10 +17,10 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Reference documents
 
-- `AI_Robotics_Full_Documentation.pdf` (9 pages, untracked in git): AI Robotics Lab spec.
-  Modular robot brain (World Model, System 1/2, Awareness Harness, memory/skills, continual
-  learning, deterministic Safety Kernel), hypotheses H1-H5, experiments E1-E6, 13 Claude agent
-  roles. Read 2026-10-04; it is a candidate research program for this lab and is NOT adopted yet.
+- **`AI_Robotics_Full_Documentation.pdf` is the lab's FOUNDATION (D20, 2026-10-04):** the
+  research and engineering mandate. Digest, traceable IDs and reconciliation with CLAUDE.md:
+  `docs/MANDATE.md`. Direction: H1-H5, E1-E6, gates 0-8. Method: CLAUDE.md invariants;
+  every component is earned by an experiment against its ablation.
 
 ## High-level goals
 
@@ -28,8 +28,10 @@ and `project_state/` (decisions, failures, open questions)._
    engineering → experiment → evaluation → iteration → report → next question,
    with full provenance. **(built; validated offline only)**
 2. Prove it works with real agents on a small objective (live pilot).
-3. Use it for the Developmental Intelligence first milestone: a minimal predictive
-   agent baseline (HYP-001 / EXP-001), as a confirmatory pre-registered protocol.
+3. Carry out the mandate (docs/MANDATE.md), in order: Gate 0 contracts -> Gate 1 deterministic
+   simulation -> **E1: S1 baseline** (= CLAUDE.md first milestone, a minimal predictive agent
+   with a reproducible baseline) -> E4/E3 (World Model utility, H3 prediction error as a
+   reconsideration signal) -> E2/E3 (S2, Awareness) -> E5 -> E6.
 
 ## Todo
 
@@ -39,6 +41,7 @@ and `project_state/` (decisions, failures, open questions)._
 - [ ] Full suite run after D13 (68/68 passed up to D12; D13's targeted tests pass).
 
 ### Next (priority order)
+0. [ ] Human: choose the first experiment under the mandate (own proposal, or E1 baseline).
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
 2. [x] `autolab amend` CLI: recorded protocol amendments; amending after data

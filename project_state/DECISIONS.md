@@ -56,3 +56,9 @@
   the controller checks main HEAD/clean, ledger head + chain and lab.toml; a change HALTs the
   project (integrity_violation, never retried). Transient worktrees left by a crash are removed
   at the start of `run`.
+- D20 (2026-10-04, human): AI_Robotics_Full_Documentation.pdf is the foundation of this lab:
+  the research mandate and the engineering mandate. Digest and reconciliation with CLAUDE.md:
+  docs/MANDATE.md. The mandate sets the direction (H1-H5, E1-E6, gates 0-8, REQ-*, ADR-001..005);
+  CLAUDE.md sets the method. Every component is earned by an experiment against its ablation;
+  sequencing is Gate 0 (contracts) -> Gate 1 (simulation) -> E1 (S1 baseline), which is
+  CLAUDE.md's first milestone. The Safety Kernel is never a research variable.

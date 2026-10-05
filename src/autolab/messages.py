@@ -40,8 +40,11 @@ CLAIM_SCHEMA = {
     },
 }
 
+# Protocol objects are closed (additionalProperties: false): a misspelled or
+# misplaced key must be rejected, never silently dropped in favour of a default.
 REQUIREMENT_SCHEMA = {
     "type": "object",
+    "additionalProperties": False,
     "required": ["id", "description", "metric", "condition", "op", "value"],
     "properties": {
         "id": _nstr,
@@ -57,6 +60,7 @@ REQUIREMENT_SCHEMA = {
 
 PROTOCOL_SCHEMA = {
     "type": "object",
+    "additionalProperties": False,
     "required": ["title", "kind", "entrypoint", "conditions", "seeds", "metrics",
                  "decision_rule"],
     "properties": {
@@ -69,6 +73,7 @@ PROTOCOL_SCHEMA = {
             "minItems": 2,
             "items": {
                 "type": "object",
+                "additionalProperties": False,
                 "required": ["name", "role"],
                 "properties": {
                     "name": {"type": "string", "pattern": "^[A-Za-z0-9_\\-]+$"},
@@ -81,11 +86,13 @@ PROTOCOL_SCHEMA = {
         "seeds": {"type": "array", "minItems": 1, "items": {"type": "integer"}},
         "metrics": {
             "type": "object",
+            "additionalProperties": False,
             "required": ["primary"],
             "properties": {"primary": _nstr, "secondary": _strs},
         },
         "decision_rule": {
             "type": "object",
+            "additionalProperties": False,
             "required": ["metric", "treatment", "control", "direction", "min_effect"],
             "properties": {
                 "metric": _nstr,
@@ -94,12 +101,12 @@ PROTOCOL_SCHEMA = {
                 "direction": {"enum": ["greater", "less"]},
                 "min_effect": {"type": "number", "minimum": 0},
                 "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
-                "n_boot": {"type": "integer", "minimum": 100},
                 "pairing": {"enum": ["paired", "unpaired"]},
             },
         },
         "budget": {
             "type": "object",
+            "additionalProperties": False,
             "properties": {"timeout_s": _num, "max_runs": {"type": "integer"}},
         },
         "fixed_params": {"type": "object"},
@@ -302,10 +309,16 @@ def validate_protocol(protocol: dict) -> list[str]:
                               f"metric {sorted(metrics)}")
     if not protocol.get("validity_checks"):
         errors.append("protocol needs >= 1 validity_check (instrument sanity check)")
+    fixed = set(protocol.get("fixed_params", {}))
+    for c in protocol["conditions"]:
+        clash = sorted(fixed & set(c.get("params", {})))
+        if clash:
+            errors.append(f"condition {c['name']!r} overrides fixed_params {clash}; a parameter "
+                          f"is either fixed for all conditions or set per condition")
     if len(set(protocol["seeds"])) != len(protocol["seeds"]):
         errors.append("seeds must be unique")
-    if protocol["kind"] == "confirmatory" and len(protocol["seeds"]) < 3:
-        errors.append("confirmatory protocols need >= 3 seeds")
+    if len(protocol["seeds"]) < 3:
+        errors.append("protocols need >= 3 seeds (confidence intervals need replication)")
     return errors
 
 

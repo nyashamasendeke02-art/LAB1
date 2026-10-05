@@ -31,3 +31,28 @@
   may carry fixed_params, and every reproduction-relevant parameter must be frozen there.
   (pilot-002 review: the scientist could not express a paired-difference success check and
   produced an impossible "mean MSE < -0.001"; operational details were left in prose.)
+- D14 (code review 2026-10-04, R1/R7): every trial gets `--params` = protocol.fixed_params merged
+  with conditions[].params (overlapping keys are invalid). Protocol objects are closed schemas
+  (additionalProperties: false): unknown or misplaced keys are rejected, never defaulted.
+- D15 (R3, supersedes D10's bootstrap): decision CIs are Student t (paired) / Welch t (unpaired),
+  and every protocol needs >= 3 seeds. EXPERIMENTAL_RESULT (simulation in this session): percentile
+  bootstrap 95% CIs covered 0.76 / 0.86 / 0.88 / 0.91 at 3 / 5 / 10 / 20 seeds; t intervals are
+  within 0.93-0.97 at 3 and 5 seeds (regression test). The analysis version is now 0.2.0.
+- D16 (R2): verifier tests are also run hermetically by the controller (`python -P -E -B -m pytest
+  --noconftest`, controller ini, no PYTEST_ADDOPTS) and merge requires a JUnit report with >= 1 pass,
+  0 failures, 0 errors. The engineer's own pytest config can no longer hide them.
+- D17 (R4, R11): scientific validation runs in a read-only checkout of the merged commit and gets
+  the diff. Engineer and verifier (verify stage) are blinded: no hypothesis, question, background,
+  decision rule, success checks or earlier results, and a neutral objective. Blinding is partial:
+  condition names and the protocol title can still hint at the hypothesis.
+- D18 (R6): a redesign may not reuse seeds already used to test the same hypothesis, and every
+  conclusion records its look number; only a first look can be confirmatory. Later looks are
+  labelled "exploratory; look k, not corrected for multiple looks".
+- D19 (R5, R8, R9, R10, R12): agent CLIs run hermetically (claude: no setting sources, no MCP,
+  no skills, no auto-memory; codex: --ignore-user-config/--ignore-rules, plugins/apps/browser/
+  computer-use/memories disabled). Agent, test and trial subprocesses run in a kill-on-close job
+  (Windows) or a process group (POSIX). Rejected agent responses are stored. ENGINEERING stage
+  retries are counted per engineering sub-step and reset on progress. After every agent call
+  the controller checks main HEAD/clean, ledger head + chain and lab.toml; a change HALTs the
+  project (integrity_violation, never retried). Transient worktrees left by a crash are removed
+  at the start of `run`.

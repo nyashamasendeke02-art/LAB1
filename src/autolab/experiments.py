@@ -21,15 +21,14 @@ import json
 import math
 import os
 import platform
-import random
 import shlex
 import statistics
-import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .procs import run_tree
 from .taxonomy import Outcome
 
 
@@ -81,27 +80,28 @@ def _finite_number(v) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
 
 
+def trial_params(protocol: dict, condition: dict) -> dict:
+    """The frozen parameters a trial receives: protocol-wide fixed_params plus the
+    condition's own params (validate_protocol forbids overlapping keys)."""
+    return {**protocol.get("fixed_params", {}), **condition.get("params", {})}
+
+
 def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
-              seed: int, required_metrics: list[str], timeout_s: float) -> Trial:
+              seed: int, required_metrics: list[str], timeout_s: float,
+              params: dict | None = None) -> Trial:
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = build_command(entrypoint) + [
         "--condition", condition["name"], "--seed", str(seed),
-        "--out", str(out_dir), "--params", json.dumps(condition.get("params", {}),
-                                                     sort_keys=True),
+        "--out", str(out_dir),
+        "--params", json.dumps(condition.get("params", {}) if params is None else params,
+                               sort_keys=True),
     ]
     env = {**os.environ, "PYTHONHASHSEED": str(seed), "AUTOLAB_SEED": str(seed)}
     t0 = time.perf_counter()
     error = None
-    try:
-        proc = subprocess.run(cmd, cwd=str(workdir), capture_output=True, text=True,
-                              encoding="utf-8", errors="replace", timeout=timeout_s, env=env)
-        rc, stdout, stderr = proc.returncode, proc.stdout, proc.stderr
-    except subprocess.TimeoutExpired as exc:
-        rc, stdout, stderr = -1, exc.stdout or "", exc.stderr or ""
-        if isinstance(stdout, bytes):
-            stdout = stdout.decode(errors="replace")
-        if isinstance(stderr, bytes):
-            stderr = stderr.decode(errors="replace")
+    proc = run_tree(cmd, cwd=str(workdir), timeout=timeout_s, env=env)
+    rc, stdout, stderr = proc.returncode, proc.stdout, proc.stderr
+    if proc.timed_out:
         error = f"timeout after {timeout_s}s"
     dur = time.perf_counter() - t0
     (out_dir / "stdout.txt").write_text(stdout, encoding="utf-8")
@@ -139,7 +139,8 @@ def run_protocol(protocol: dict, workdir: Path, out_root: Path,
         for seed in seeds if seeds is not None else protocol["seeds"]:
             out.trials.append(run_trial(protocol["entrypoint"], workdir,
                                         out_root / cond["name"] / f"seed-{seed}",
-                                        cond, seed, required, timeout))
+                                        cond, seed, required, timeout,
+                                        params=trial_params(protocol, cond)))
     return out
 
 
@@ -167,19 +168,80 @@ def summarize(trials: list[Trial]) -> dict:
     return out
 
 
-def bootstrap_mean_diff(t: list[float], c: list[float], n_boot: int, alpha: float,
-                        seed: int) -> tuple[float, float, float]:
-    rng = random.Random(seed)
+# Confidence intervals use Student t (paired) / Welch t (unpaired). The percentile
+# bootstrap used before undercovers badly at lab-sized seed counts (simulated 95%
+# coverage: 0.76 at 3 seeds, 0.86 at 5, 0.91 at 20), inflating false "supported".
+def _betacf(a: float, b: float, x: float) -> float:
+    """Continued fraction for the regularized incomplete beta (Lentz's method)."""
+    tiny = 1e-300
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c, d = 1.0, 1.0 - qab * x / qap
+    d = 1.0 / (d if abs(d) > tiny else tiny)
+    h = d
+    for m in range(1, 300):
+        m2 = 2 * m
+        aa = m * (b - m) * x / ((qam + m2) * (a + m2))
+        d = 1.0 + aa * d
+        d = 1.0 / (d if abs(d) > tiny else tiny)
+        c = 1.0 + aa / c
+        c = c if abs(c) > tiny else tiny
+        h *= d * c
+        aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))
+        d = 1.0 + aa * d
+        d = 1.0 / (d if abs(d) > tiny else tiny)
+        c = 1.0 + aa / c
+        c = c if abs(c) > tiny else tiny
+        delta = d * c
+        h *= delta
+        if abs(delta - 1.0) < 1e-14:
+            break
+    return h
+
+
+def _betainc(a: float, b: float, x: float) -> float:
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    lbeta = math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b)
+    front = math.exp(lbeta + a * math.log(x) + b * math.log1p(-x))
+    if x < (a + 1.0) / (a + b + 2.0):
+        return front * _betacf(a, b, x) / a
+    return 1.0 - front * _betacf(b, a, 1.0 - x) / b
+
+
+def t_cdf(t: float, df: float) -> float:
+    tail = 0.5 * _betainc(df / 2.0, 0.5, df / (df + t * t))
+    return 1.0 - tail if t >= 0 else tail
+
+
+def t_quantile(p: float, df: float) -> float:
+    """Inverse Student t CDF by bisection (0 < p < 1)."""
+    if p == 0.5:
+        return 0.0
+    if p < 0.5:
+        return -t_quantile(1.0 - p, df)
+    lo, hi = 0.0, 1.0
+    while t_cdf(hi, df) < p:
+        hi *= 2.0
+    for _ in range(200):
+        mid = (lo + hi) / 2.0
+        if t_cdf(mid, df) < p:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
+
+
+def welch_ci(t: list[float], c: list[float], alpha: float) -> tuple[float, float, float, float]:
+    """(difference of means, CI low, CI high, Welch df)."""
     diff = statistics.fmean(t) - statistics.fmean(c)
-    boots = []
-    for _ in range(n_boot):
-        bt = [t[rng.randrange(len(t))] for _ in t]
-        bc = [c[rng.randrange(len(c))] for _ in c]
-        boots.append(statistics.fmean(bt) - statistics.fmean(bc))
-    boots.sort()
-    lo = boots[int(math.floor((alpha / 2) * (n_boot - 1)))]
-    hi = boots[int(math.ceil((1 - alpha / 2) * (n_boot - 1)))]
-    return diff, lo, hi
+    vt, vc = statistics.variance(t) / len(t), statistics.variance(c) / len(c)
+    se = math.sqrt(vt + vc)
+    den = (vt * vt / (len(t) - 1) if vt else 0.0) + (vc * vc / (len(c) - 1) if vc else 0.0)
+    df = (vt + vc) ** 2 / den if den else float(len(t) + len(c) - 2)
+    half = t_quantile(1 - alpha / 2, df) * se
+    return diff, diff - half, diff + half, df
 
 
 def paired_values(trials: list[Trial], treatment: str, control: str,
@@ -192,19 +254,15 @@ def paired_values(trials: list[Trial], treatment: str, control: str,
     return [(s, tv[s], cv[s]) for s in sorted(tv.keys() & cv.keys())]
 
 
-def bootstrap_paired_diff(diffs: list[float], n_boot: int, alpha: float,
-                          seed: int) -> tuple[float, float, float]:
-    """Percentile bootstrap CI of the mean of per-seed differences."""
-    rng = random.Random(seed)
+def paired_t_ci(diffs: list[float], alpha: float) -> tuple[float, float, float, float]:
+    """(mean per-seed difference, CI low, CI high, df) with a Student t interval."""
     mean = statistics.fmean(diffs)
-    boots = sorted(statistics.fmean([diffs[rng.randrange(len(diffs))] for _ in diffs])
-                   for _ in range(n_boot))
-    lo = boots[int(math.floor((alpha / 2) * (n_boot - 1)))]
-    hi = boots[int(math.ceil((1 - alpha / 2) * (n_boot - 1)))]
-    return mean, lo, hi
+    df = len(diffs) - 1
+    half = t_quantile(1 - alpha / 2, df) * statistics.stdev(diffs) / math.sqrt(len(diffs))
+    return mean, mean - half, mean + half, float(df)
 
 
-def evaluate_decision(rule: dict, trials: list[Trial], seed: int = 0) -> dict:
+def evaluate_decision(rule: dict, trials: list[Trial]) -> dict:
     """Apply the pre-registered decision rule.
 
     effect is oriented so that positive == the hypothesised direction.
@@ -213,12 +271,11 @@ def evaluate_decision(rule: dict, trials: list[Trial], seed: int = 0) -> dict:
     * unsupported:         CI_high < min_effect (a meaningful effect is excluded)
     * inconclusive:        otherwise, or < 2 valid trials in either arm
 
-    ``rule["pairing"] == "paired"`` bootstraps per-seed differences over seeds
-    valid in both arms (seed-matched designs); default "unpaired" resamples
-    each arm independently.
+    The CI is a (1 - alpha) Student t interval: ``rule["pairing"] == "paired"``
+    uses per-seed differences over seeds valid in both arms (seed-matched
+    designs); default "unpaired" uses Welch's interval. Fully deterministic.
     """
     alpha = rule.get("alpha", 0.05)
-    n_boot = rule.get("n_boot", 5000)
     t = values(trials, rule["treatment"], rule["metric"])
     c = values(trials, rule["control"], rule["metric"])
     base = {"metric": rule["metric"], "treatment": rule["treatment"],
@@ -232,12 +289,15 @@ def evaluate_decision(rule: dict, trials: list[Trial], seed: int = 0) -> dict:
         if len(pairs) < 2:
             return {**base, "outcome": Outcome.INCONCLUSIVE.value,
                     "reason": "fewer than 2 seeds valid in both arms"}
-        diff, lo, hi = bootstrap_paired_diff([a - b for _, a, b in pairs], n_boot, alpha, seed)
+        diff, lo, hi, df = paired_t_ci([a - b for _, a, b in pairs], alpha)
+        base["ci_method"] = "student_t_paired"
     else:
         if len(t) < 2 or len(c) < 2:
             return {**base, "outcome": Outcome.INCONCLUSIVE.value,
                     "reason": "fewer than 2 valid trials in an arm"}
-        diff, lo, hi = bootstrap_mean_diff(t, c, n_boot, alpha, seed)
+        diff, lo, hi, df = welch_ci(t, c, alpha)
+        base["ci_method"] = "welch_t"
+    base["df"] = df
     if rule["direction"] == "less":
         diff, lo, hi = -diff, -hi, -lo
     if lo > 0 and diff >= rule["min_effect"]:
@@ -290,7 +350,7 @@ def evaluate_requirements(reqs: list[dict], summary: dict,
     return results
 
 
-def contrasts(protocol: dict, trials: list[Trial], seed: int = 0) -> list[dict]:
+def contrasts(protocol: dict, trials: list[Trial]) -> list[dict]:
     """Secondary (non-decisive) comparisons of every non-control condition vs control."""
     rule = protocol["decision_rule"]
     out = []
@@ -298,7 +358,7 @@ def contrasts(protocol: dict, trials: list[Trial], seed: int = 0) -> list[dict]:
         if cond["name"] == rule["control"] or cond["name"] == rule["treatment"]:
             continue
         r = {**rule, "treatment": cond["name"]}
-        res = evaluate_decision(r, trials, seed)
+        res = evaluate_decision(r, trials)
         res["role"] = cond["role"]
         res["decisive"] = False
         out.append(res)

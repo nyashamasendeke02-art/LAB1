@@ -367,3 +367,171 @@ def test_merge_requires_independent_verification_tests(tmp_path):
     ctl2 = Controller(lab, agents())
     ctl2.resume(pid, "verifier fixed")
     assert ctl2.run(pid)[-1].after == "COMPLETE"
+
+
+# ------------------------------------------------- code review 2026-10-04 regressions
+def _until(ctl, pid, cond, max_steps=200):
+    for _ in range(max_steps):
+        if cond():
+            return
+        res = ctl.step(pid)
+        if res.after in ("COMPLETE", "HALTED"):
+            break
+    assert cond()
+
+
+def test_engineer_config_cannot_hide_failing_verification_tests(tmp_path):
+    """R2: a conftest.py that deselects tests/verification must not let a failing
+    independent test through (pytest alone would report success)."""
+    def hide(t):
+        scenario.write_impl(t)
+        (Path(t.workdir) / "conftest.py").write_text(
+            'collect_ignore_glob = ["tests/verification/*"]\n', encoding="utf-8")
+        return ok({"summary": "implemented"})
+
+    def finds_bug(t):
+        vdir = Path(t.workdir) / "tests" / "verification"
+        vdir.mkdir(parents=True, exist_ok=True)
+        (vdir / "test_v.py").write_text("def test_bug():\n    assert False, 'real defect'\n",
+                                        encoding="utf-8")
+        return ok({"verdict": "pass", "findings": [], "reproducibility_ok": True,
+                   "protocol_compliance_ok": True})
+
+    lab, ctl = make(tmp_path, eng__implement=hide, ver__verify=finds_bug)
+    pid = ctl.new_project("hidden tests")
+    _until(ctl, pid, lambda: lab.store.query("review", review_type="code_review"))
+    rev = lab.store.query("review", review_type="code_review")[0]
+    assert rev.data["tests_passed"] is True  # the project's own pytest config hid the test
+    assert rev.data["verification_tests_passed"] is False
+    assert rev.data["verification_test_counts"]["failures"] == 1
+    assert rev.data["passed"] is False
+    assert not lab.store.query("run")
+
+
+def test_hermetic_verification_run_counts_passing_tests(tmp_path):
+    lab, ctl = make(tmp_path)
+    wd = tmp_path / "wd"
+    (wd / "tests" / "verification").mkdir(parents=True)
+    (wd / "experiment.py").write_text(scenario.EXPERIMENT, encoding="utf-8")
+    (wd / "tests" / "verification" / "test_v.py").write_text(scenario.VERIFY_TEST,
+                                                             encoding="utf-8")
+    (wd / "pytest.ini").write_text("[pytest]\naddopts = -k nothing_matches\n", encoding="utf-8")
+    ok_, out, _, counts = ctl._run_verification_tests(wd)
+    assert ok_, out
+    assert counts["passed"] == 1 and counts["failures"] == 0
+
+
+def test_scientific_validation_reads_the_merged_code(tmp_path):
+    """R4: the scientist validating the implementation gets the code, not just a verdict."""
+    seen = []
+
+    def validation(t):
+        wd = Path(t.workdir)
+        seen.append(((wd / "experiment.py").exists(),
+                     "experiment.py" in t.context["implementation_diff"], wd))
+        return ok({"verdict": "approve", "issues": []})
+
+    lab, ctl = make(tmp_path, sci__scientific_validation=validation)
+    pid = ctl.new_project("validate")
+    assert ctl.run(pid)[-1].after == "COMPLETE"
+    assert seen and seen[0][:2] == (True, True)
+    assert not seen[0][2].exists()  # read-only checkout removed afterwards
+
+
+def test_engineer_and_verifier_are_blinded(tmp_path):
+    """R11: implementers do not see the hypothesis, decision rule or earlier results."""
+    packets = []
+
+    def implement(t):
+        packets.append(t)
+        return scenario.implement(t)
+
+    def verify(t):
+        packets.append(t)
+        return scenario.verify_pass(t)
+
+    lab, ctl = make(tmp_path, eng__implement=implement, ver__verify=verify)
+    pid = ctl.new_project("Investigate whether treat can produce higher score")
+    assert ctl.run(pid)[-1].after == "COMPLETE"
+    assert len(packets) == 2
+    for t in packets:
+        assert "treat can produce higher score" not in t.objective
+        assert "hypothesis" not in t.context and "question" not in t.context
+        assert "decision_rule" not in t.context["protocol"]
+        assert "success_checks" not in t.context["protocol"]
+        assert t.context["protocol"]["conditions"]  # the spec itself is intact
+
+
+def test_redesign_must_collect_fresh_data_and_later_looks_are_exploratory(tmp_path):
+    """R6: no re-testing a hypothesis on the same seeds; a second look is not
+    confirmatory and is labelled with its look number."""
+    lab, ctl = make(tmp_path, sci__design=scenario.design(effect=0.6, noise=3.0,
+                                                          seeds=(1, 2, 3, 4)))
+    pid = ctl.new_project("same seeds")
+    ctl.run(pid)
+    fails = lab.store.query("failure", category="design_invalid")
+    assert fails and "already used" in fails[0].data["summary"]
+    assert len(lab.store.query("run")) == 1
+
+    lab2, ctl2 = make(tmp_path / "b", sci__design=scenario.design(effect=0.6, noise=3.0))
+    pid2 = ctl2.new_project("fresh seeds")
+    ctl2.run(pid2)
+    cons = sorted(lab2.store.query("conclusion"), key=lambda c: c.id)
+    assert [c.data["look"] for c in cons][:2] == [1, 2]
+    assert "look 2" in cons[1].data["confidence"]
+    seeds = [set(r.data["seeds"]) for r in lab2.store.query("run")]
+    assert not seeds[0] & seeds[1]
+
+
+def test_agent_tampering_with_controller_state_halts(tmp_path):
+    """R12: the engineer is not OS-sandboxed; touching the main checkout is detected."""
+    def tamper(t):
+        scenario.write_impl(t)
+        main = Path(t.workdir).parents[2] / "repo"
+        (main / "protocols" / "note.txt").write_text("edited outside my worktree")
+        return ok({"summary": "implemented"})
+
+    lab, ctl = make(tmp_path, eng__implement=tamper)
+    pid = ctl.new_project("tamper")
+    steps = ctl.run(pid)
+    assert steps[-1].after == "HALTED"
+    assert "integrity violation" in lab.store.get(pid).data["halt_reason"]
+    assert lab.store.query("failure", category="integrity_violation")
+    assert not lab.store.query("run")
+
+
+def test_stale_transient_worktrees_are_cleaned(tmp_path):
+    lab, ctl = make(tmp_path)
+    stale = lab.repo.add_detached_worktree(lab.worktrees / "readonly" / "design-TASK-9",
+                                           lab.repo.rev("main"))
+    assert stale.exists()
+    assert ctl.cleanup_stale_worktrees() == [str(Path("worktrees/readonly/design-TASK-9"))]
+    assert not stale.exists()
+
+
+def test_rejected_agent_responses_are_kept(tmp_path):
+    """R8: when an agent never produces a valid answer, what it said is still stored."""
+    lab, ctl = make(tmp_path, sci__define_problem=lambda t: "I refuse to answer in JSON")
+    pid = ctl.new_project("junk")
+    ctl.step(pid)
+    task = [t for t in lab.store.query("task") if t.data["status"] == "error"][0]
+    assert len(task.data["rejections"]) == 3
+    raw = lab.artifacts.get_text(task.data["refs"]["responses"][7:])
+    assert "I refuse to answer in JSON" in raw
+    assert (lab.handoffs / task.id / "rejected_responses.md").exists()
+
+
+def test_engineering_retries_are_counted_per_substep(tmp_path):
+    """R10: one transient error while implementing and another while verifying must not
+    add up to a HALT (max_stage_retries = 1 in FAST_CONFIG)."""
+    def flaky(t):
+        raise RuntimeError("transient backend error")
+
+    lab, ctl = make(tmp_path, eng__implement=[flaky, scenario.implement],
+                    ver__verify=[flaky, scenario.verify_pass])
+    pid = ctl.new_project("flaky")
+    assert ctl.run(pid)[-1].after == "COMPLETE"
+    keys = [f.data["summary"].split(":")[0:3] for f in
+            lab.store.query("failure", category="stage_error")]
+    assert ["ENGINEERING", "ENG-0001", "IMPLEMENTING"] in keys
+    assert ["ENGINEERING", "ENG-0001", "ADVERSARIAL_REVIEW"] in keys

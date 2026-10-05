@@ -18,3 +18,9 @@
   of the empty message: Claude Code reports errors as JSON on stdout; the backend read
   only stderr. Fixed: ClaudeCLIBackend.parse_output surfaces stdout JSON errors (and
   is_error with exit 0). Resumed via `autolab resume` with no lost work.
+- F6 (2026-10-04): CODE REVIEW (no experiment run) found 12 defects R1-R12 (see PROJECT_STATE.md
+  and D14-D19). Most serious: frozen fixed_params never reached the experiment (R1); engineer
+  pytest config could hide failing verifier tests (R2, reproduced); percentile bootstrap CIs
+  undercovered (R3, simulated); the engineer agent loaded the user's Claude memory index ("user
+  granted 100% autonomy"), skills and MCP servers (R5, observed with a probe prompt). pilot-001/002
+  results were produced before these fixes; RUN-0001 used the bootstrap CI.

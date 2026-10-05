@@ -21,13 +21,14 @@ import json
 import os
 import shlex
 import stat
-import subprocess
 import sys
+import tempfile
 import time
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
+from xml.etree import ElementTree
 
 from . import __version__
 from .agents import Agent, make_backend
@@ -38,6 +39,7 @@ from .gates import (COMPUTE_BUDGET, CONFIRMATORY_FREEZE, MERGE_TO_MAIN,
                     PROTECTED_EXPERIMENT, Gates)
 from .memory import export_markdown
 from .messages import TaskPacket, validate_protocol
+from .procs import run_tree
 from .report import build_report
 from .state_machines import (EngineeringState as E, ResearchState as R,
                              check_engineering, check_research)
@@ -76,6 +78,10 @@ TERMINAL = {R.COMPLETE, R.HALTED}
 
 class StageError(Exception):
     """A recoverable failure inside a stage handler."""
+
+
+class IntegrityError(Exception):
+    """An agent changed controller-owned state. Never retried: the project HALTs."""
 
 
 @dataclass
@@ -320,6 +326,12 @@ class Controller:
         handler = getattr(self, f"_h_{state.value.lower()}")
         try:
             note = handler(pid) or ""
+        except IntegrityError as exc:  # tampering is not a transient failure
+            self._failure(pid, "integrity_violation", str(exc)[:500],
+                          details={"traceback": traceback.format_exc()[-6000:]})
+            self._halt(pid, f"integrity violation: {exc}"[:500])
+            self._export()
+            return StepResult(pid, state.value, R.HALTED.value, "", error=str(exc))
         except Exception as exc:  # recorded, retried, then HALT
             return self._stage_failed(pid, state, exc)
         after = self.project(pid)
@@ -330,20 +342,26 @@ class Controller:
     def _stage_failed(self, pid: str, state: R, exc: Exception) -> StepResult:
         proj = self.project(pid)
         retries = dict(proj.data.get("retries", {}))
-        retries[state.value] = retries.get(state.value, 0) + 1
+        key = state.value
+        if state == R.ENGINEERING and "eng_task" in proj.data.get("current", {}):
+            # Count per engineering sub-step; reset on every engineering transition,
+            # so unrelated transient errors across a long ENGINEERING phase don't add up.
+            eng = self.store.get(proj.data["current"]["eng_task"])
+            key = f"ENGINEERING:{eng.id}:{eng.data['state']}"
+        retries[key] = retries.get(key, 0) + 1
         msg = f"{type(exc).__name__}: {exc}"
-        self._failure(pid, "stage_error", f"{state.value}: {msg}"[:500],
+        self._failure(pid, "stage_error", f"{key}: {msg}"[:500],
                       details={"traceback": traceback.format_exc()[-6000:]})
-        self._set(pid, f"stage error in {state.value} (attempt {retries[state.value]})",
-                  retries=retries)
-        if retries[state.value] > self.limits["max_stage_retries"]:
-            self._halt(pid, f"{state.value} failed {retries[state.value]} times; last: {msg}"[:500])
+        self._set(pid, f"stage error in {key} (attempt {retries[key]})", retries=retries)
+        if retries[key] > self.limits["max_stage_retries"]:
+            self._halt(pid, f"{key} failed {retries[key]} times; last: {msg}"[:500])
         self._export()
         return StepResult(pid, state.value, self.project(pid).data["state"], "", error=msg)
 
     def run(self, pid: str, max_steps: int = 500,
             on_step: Callable[[StepResult], None] | None = None) -> list[StepResult]:
         out: list[StepResult] = []
+        self.cleanup_stale_worktrees()
         for _ in range(max_steps):
             t0 = time.perf_counter()
             res = self.step(pid)
@@ -373,8 +391,9 @@ class Controller:
               workdir: Path | None = None, writable: bool = False) -> tuple[dict, str]:
         proj = self.project(pid)
         task_id = self.store.next_id("TASK")
+        blind = role == Role.ENGINEER or (role == Role.VERIFIER and stage == "verify")
         packet = TaskPacket(task_id=task_id, role=role, stage=stage,
-                            objective=proj.data["objective"],
+                            objective=self.BLINDED_OBJECTIVE if blind else proj.data["objective"],
                             context={"project": pid, "cycle": proj.data["cycle"], **context},
                             constraints=self._constraints(role),
                             workdir=str(workdir) if workdir else None, writable=writable)
@@ -386,15 +405,27 @@ class Controller:
         self.store.append_event("controller", "task.dispatched", task_id,
                                 {"role": role.value, "stage": stage, "project": pid,
                                  **agent.backend.describe()})
+        before = self._integrity_snapshot()
         try:
             result = agent.run(packet)
         except Exception as exc:
+            self._check_integrity(before, f"{role.value}/{stage} ({task_id})")
+            refs, extra = {}, {}
+            raws = getattr(exc, "raw_responses", None)
+            if raws:  # protocol violations: keep what the agent actually said
+                (hdir / "rejected_responses.md").write_text(
+                    "\n\n-----\n\n".join(raws), encoding="utf-8")
+                refs = {"prompt": "sha256:" + self.lab.artifacts.put_text(exc.prompt),
+                        "responses": "sha256:" + self.lab.artifacts.put_text(
+                            "\n\n-----\n\n".join(raws))}
+                extra = {"rejections": exc.rejections}
             self.store.create("task", {
                 "project": pid, "role": role.value, "stage": stage, "status": "error",
-                "error": f"{type(exc).__name__}: {exc}"[:2000],
-                "backend": agent.backend.describe(), "refs": {}},
+                "error": f"{type(exc).__name__}: {exc}"[:2000], **extra,
+                "backend": agent.backend.describe(), "refs": refs},
                 record_id=task_id, author=role.value, reason=f"{stage} errored")
             raise
+        self._check_integrity(before, f"{role.value}/{stage} ({task_id})")
         comp = result.completion
         (hdir / "completion.json").write_text(json.dumps(comp, indent=2), encoding="utf-8")
         (hdir / "prompt.md").write_text(result.prompt, encoding="utf-8")
@@ -410,6 +441,7 @@ class Controller:
         self.store.create("task", {
             "project": pid, "role": role.value, "stage": stage, "status": comp["status"],
             "summary": comp.get("summary", ""), "attempts": result.attempts,
+            "rejections": result.rejections,
             "backend": agent.backend.describe(), "claims": ok_claims,
             "rejected_claims": rejected, "risks": comp.get("risks", []), "refs": refs,
         }, record_id=task_id, author=role.value, reason=f"{stage} completed")
@@ -442,6 +474,64 @@ class Controller:
         if fb:
             ctx["feedback_from_previous_iterations"] = fb[-6:]
         return ctx
+
+    # Context the engineer and verifier do not get (blinding): which outcome is
+    # hypothesised, how it will be decided, and earlier results.
+    BLINDED_KEYS = ("question", "hypothesis", "background", "feedback_from_previous_iterations",
+                    "previous_failures")
+    BLINDED_OBJECTIVE = ("Implement and verify the frozen experiment protocol in the task context "
+                         "exactly as specified. The research hypothesis and decision rule are "
+                         "withheld on purpose (blinding).")
+
+    @classmethod
+    def _blinded(cls, ctx: dict) -> dict:
+        out = {k: v for k, v in ctx.items() if k not in cls.BLINDED_KEYS}
+        for key in ("protocol", "proposed_protocol"):
+            if key in out:
+                out[key] = {k: v for k, v in out[key].items()
+                            if k not in ("decision_rule", "success_checks")}
+        out["blinding"] = ("hypothesis, decision rule, success criteria and earlier results "
+                           "are withheld; implement the conditions as specified")
+        return out
+
+    def _seeds_used_for(self, pid: str, hypothesis: str) -> set[int]:
+        """Seeds of every analysed run that tested ``hypothesis`` (fresh data rule)."""
+        seeds: set[int] = set()
+        for res in self.store.query("result", project=pid):
+            if res.data["refs"].get("hypothesis") == hypothesis:
+                seeds.update(self.store.get(res.data["refs"]["run"]).data["seeds"])
+        return seeds
+
+    def _integrity_snapshot(self) -> dict:
+        return {"main_head": self.repo.rev("main"), "main_clean": self.repo.is_clean(),
+                "ledger_head": self.store.head(),
+                "lab_toml": hashlib.sha256(self.lab.config_path.read_bytes()).hexdigest()}
+
+    def _check_integrity(self, before: dict, who: str) -> None:
+        """Agents are not OS-sandboxed against everything (the engineer runs Python):
+        after every agent call, verify it left controller-owned state untouched."""
+        after = self._integrity_snapshot()
+        problems = [f"{k}: {before[k]!r} -> {after[k]!r}" for k in before if before[k] != after[k]]
+        try:
+            self.store.verify_chain()
+        except Exception as exc:  # ChainError
+            problems.append(f"ledger verification failed: {exc}")
+        if problems:
+            raise IntegrityError(f"{who} changed controller-owned state: " + "; ".join(problems))
+
+    def cleanup_stale_worktrees(self) -> list[str]:
+        """Remove transient checkouts a crashed controller left behind. Engineer
+        worktrees persist across steps and are kept; branches are never deleted."""
+        removed = []
+        for sub in ("readonly", "verifier"):
+            d = self.lab.worktrees / sub
+            if d.exists():
+                for p in sorted(d.iterdir()):
+                    self.repo.remove_worktree(p)
+                    removed.append(str(p.relative_to(self.lab.root)))
+        if removed:
+            self.store.append_event("controller", "worktrees.cleaned", "LAB", {"removed": removed})
+        return removed
 
     def _scratch_checkout(self, name: str, commit: str) -> Path:
         path = self.lab.worktrees / "readonly" / name
@@ -544,6 +634,11 @@ class Controller:
         payload, tid = self._call(pid, Role.SCIENTIST, "design", ctx)
         protocol = payload["protocol"]
         errs = validate_protocol(protocol)
+        used = self._seeds_used_for(pid, cur["hypothesis"])
+        reused = sorted(used & set(protocol["seeds"]))
+        if reused:
+            errs.append(f"seeds {reused} were already used to test this hypothesis; a new "
+                        f"design must collect fresh data (use seeds outside {sorted(used)})")
         if errs:
             self._failure(pid, "design_invalid", "; ".join(errs), {"task": tid})
             self._feedback(pid, "Protocol rejected by controller: " + "; ".join(errs))
@@ -552,8 +647,8 @@ class Controller:
         wt = self._scratch_checkout(f"design-{tid}", self.repo.rev("main"))
         try:
             sd, tid2 = self._call(pid, Role.ENGINEER, "solution_design",
-                                  {**ctx, "proposed_protocol": protocol,
-                                   "chosen_option": payload["chosen"]}, workdir=wt)
+                                  self._blinded({**ctx, "proposed_protocol": protocol}),
+                                  workdir=wt)
         finally:
             self.repo.remove_worktree(wt)
         if not sd["feasible"]:
@@ -671,6 +766,10 @@ class Controller:
                           reason=f"{cur.value} -> {target.value}: {reason[:200]}")
         self.store.append_event("controller", "engineering.transition", eng.id,
                                 {"from": cur.value, "to": target.value, "reason": reason[:300]})
+        pid = eng.data["project"]
+        if self.project(pid).data.get("retries"):
+            self._set(pid, f"{eng.id} progressed to {target.value}: stage retries reset",
+                      retries={})
 
     def _eng_fail(self, pid: str, eng: Record, feedback: str, category: str) -> str:
         self._failure(pid, category, feedback[:500], {"eng_task": eng.id},
@@ -703,7 +802,7 @@ class Controller:
         return branch
 
     def _eng_context(self, pid: str, eng: Record) -> dict:
-        ctx = self._context(pid)
+        ctx = self._blinded(self._context(pid))
         req = ctx.pop("requirements", {})
         ctx["engineering_requirements"] = req.get("engineering", [])
         ctx["validity_criteria"] = req.get("validity_criteria", [])
@@ -765,18 +864,55 @@ class Controller:
         cmd = shlex.split(self.cfg["engineering"]["test_command"])
         if cmd and cmd[0] in ("python", "python3", "py"):
             cmd[0] = sys.executable
-        try:
-            proc = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True,
-                                  encoding="utf-8", errors="replace",
-                                  timeout=self.limits["test_timeout_s"],
-                                  env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
-            out, rc = proc.stdout + proc.stderr, proc.returncode
-        except subprocess.TimeoutExpired:
-            out, rc = "test command timed out", -1
+        proc = run_tree(cmd, cwd=str(cwd), timeout=self.limits["test_timeout_s"],
+                        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+        out, rc = proc.stdout + proc.stderr, proc.returncode
+        if proc.timed_out:
+            out += "\n[controller] test command timed out"
         if rc == 5 and "pytest" in " ".join(cmd):
             out += "\n[controller] no tests were collected; tests are required."
         art = self.lab.artifacts.put_text(f"$ {' '.join(cmd)}\n(exit {rc})\n{out}")
         return rc == 0, out, art
+
+    def _run_verification_tests(self, cwd: Path) -> tuple[bool, str, str, dict]:
+        """Run tests/verification hermetically and prove they ran.
+
+        The engineer controls conftest.py, pytest.ini and pyproject.toml, any of which
+        can deselect or skip the verifier's tests while pytest still exits 0. So the
+        controller runs them with ``python -P -E -B`` (cwd not on sys.path at startup, so
+        a repo-level ``pytest.py`` cannot shadow pytest; no PYTHON* env), ``--noconftest``, its own ini file (``-c``) and no PYTEST_ADDOPTS,
+        then requires from the JUnit report: >= 1 test passed, 0 failures, 0 errors.
+        """
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("PYTEST_ADDOPTS", "PYTEST_PLUGINS")}
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        with tempfile.TemporaryDirectory() as td:
+            ini, xml = Path(td) / "pytest.ini", Path(td) / "junit.xml"
+            # quoted: pytest shlex-splits path lists, and lab paths may contain spaces
+            ini.write_text(f'[pytest]\npythonpath = "{Path(cwd).resolve().as_posix()}"\n',
+                           encoding="utf-8")
+            cmd = [sys.executable, "-P", "-E", "-B", "-m", "pytest", "-q", "-c", str(ini),
+                   "--rootdir", str(cwd), "--noconftest", "-p", "no:cacheprovider",
+                   f"--junitxml={xml}", "tests/verification"]
+            proc = run_tree(cmd, cwd=str(cwd), timeout=self.limits["test_timeout_s"], env=env)
+            counts = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+            try:
+                root = ElementTree.parse(xml).getroot()
+                for suite in root.iter("testsuite"):
+                    for k in counts:
+                        counts[k] += int(suite.get(k, 0))
+            except (OSError, ElementTree.ParseError):
+                pass
+        counts["passed"] = counts["tests"] - counts["failures"] - counts["errors"] - counts["skipped"]
+        out = proc.stdout + proc.stderr
+        ok = (proc.returncode == 0 and not proc.timed_out and counts["passed"] >= 1
+              and counts["failures"] == 0 and counts["errors"] == 0)
+        if not ok:
+            out += (f"\n[controller] hermetic verification run: {counts}; required >= 1 passed, "
+                    f"0 failures, 0 errors (exit {proc.returncode}"
+                    f"{', timed out' if proc.timed_out else ''})")
+        art = self.lab.artifacts.put_text(f"$ {' '.join(cmd)}\n(exit {proc.returncode})\n{out}")
+        return ok, out, art, counts
 
     def _eng_testing(self, pid: str, eng: Record) -> str:
         wt = Path(eng.data["worktree"])
@@ -829,6 +965,8 @@ class Controller:
             head_v = self.repo.rev("HEAD", cwd=vwt)
             has_vtests = any((vwt / "tests" / "verification").glob("test_*.py"))
             ok, out, art = self._run_tests(vwt)
+            if has_vtests:
+                vok, vout, vart, vcounts = self._run_verification_tests(vwt)
         finally:
             self.repo.remove_worktree(vwt)
         if not has_vtests:
@@ -840,15 +978,17 @@ class Controller:
             raise StageError(f"verifier added no independent tests in round {rnd}; "
                              f"independent tests are required before merge")
         blocking = [f for f in findings if f["severity"] in ("critical", "major")]
-        passed = (payload["verdict"] == "pass" and ok and not blocking
+        passed = (payload["verdict"] == "pass" and ok and vok and not blocking
                   and payload["reproducibility_ok"] and payload["protocol_compliance_ok"])
         rev = self.store.create("review", {
             "review_type": "code_review", "round": rnd, "verdict": payload["verdict"],
-            "findings": findings, "tests_passed": ok, "passed": passed,
+            "findings": findings, "tests_passed": ok, "verification_tests_passed": vok,
+            "verification_test_counts": vcounts, "passed": passed,
             "reproducibility_ok": payload["reproducibility_ok"],
             "protocol_compliance_ok": payload["protocol_compliance_ok"],
             "branch": vbranch, "commit": head_v, "project": pid,
-            "refs": {"eng_task": eng.id, "task": tid, "tests": "sha256:" + art}},
+            "refs": {"eng_task": eng.id, "task": tid, "tests": "sha256:" + art,
+                     "verification_tests": "sha256:" + vart}},
             prefix="REV", author="verifier", reason=f"adversarial review round {rnd}")
         eng = self.store.update(eng.id, {"review_round": rnd, "last_verify_head": head_v,
                                          "last_verify_branch": vbranch, "last_review": rev.id},
@@ -859,6 +999,9 @@ class Controller:
         lines = [f"[{f['severity']}] {f['description']} ({f.get('location', '')})" for f in findings]
         if not ok:
             lines.append("Tests (incl. independent verification tests) failed:\n" + _tail(out, 3000))
+        if not vok:
+            lines.append("Independent verification tests, run hermetically (no conftest.py, "
+                         "no project pytest config), did not pass:\n" + _tail(vout, 3000))
         if not payload["protocol_compliance_ok"]:
             lines.append("Verifier: implementation does not comply with the frozen protocol.")
         if not payload["reproducibility_ok"]:
@@ -926,12 +1069,20 @@ class Controller:
         ctx = self._context(pid)
         ctx["merged_commit"] = commit
         ctx["changed_files"] = self.repo.changed_files(eng.data["base"], commit)
+        ctx["implementation_diff"] = _tail(self.repo.diff(eng.data["base"], commit), 20000)
+        ctx["code"] = ("Your working directory is a read-only checkout of the merged commit: "
+                       "read the code itself, do not rely on the verifier's report alone.")
         ctx["verifier_review"] = {k: v for k, v in
                                   self.store.get(eng.data["last_review"]).data.items()
                                   if k != "refs"}
         ctx["smoke_test"] = {"note": "seed outside the protocol seeds; not data", "seed": smoke_seed,
                              "trials": smoke}
-        payload, tid = self._call(pid, Role.SCIENTIST, "scientific_validation", ctx)
+        wt = self._scratch_checkout(f"validate-{eng.id}", commit)
+        try:
+            payload, tid = self._call(pid, Role.SCIENTIST, "scientific_validation", ctx,
+                                      workdir=wt)
+        finally:
+            self.repo.remove_worktree(wt)
         approved = payload["verdict"] == "approve" and not any(
             i["severity"] == "critical" for i in payload["issues"])
         rev = self.store.create("review", {
@@ -1050,16 +1201,15 @@ class Controller:
             res = self.store.get(existing)  # idempotent on retry
         else:
             trials = self._trials(run)
-            seed = int(hashlib.sha256(run.id.encode()).hexdigest()[:8], 16)
             summary = summarize(trials)
-            decision = evaluate_decision(p["decision_rule"], trials, seed)
+            decision = evaluate_decision(p["decision_rule"], trials)
             res = self.store.create("result", {
                 "label": Evidence.EXPERIMENTAL_RESULT.value, "summary": summary,
                 "decision": decision,
-                "contrasts": contrasts(p, trials, seed),
+                "contrasts": contrasts(p, trials),
                 "validity": evaluate_requirements(p.get("validity_checks", []), summary, trials),
                 "scientific": evaluate_requirements(p.get("success_checks", []), summary, trials),
-                "bootstrap_seed": seed, "analysis_version": __version__,
+                "analysis_version": __version__,
                 "outcome": decision["outcome"], "project": pid,
                 "refs": {"run": run.id, "protocol": prot.id, "hypothesis": cur["hypothesis"],
                          "requirements": cur["requirements"]}},
@@ -1124,13 +1274,24 @@ class Controller:
             self._design_iteration(pid, "invalid experiment")
             self._transition(pid, R.DESIGN, "requirements not met: experiment invalid")
             return "invalid"
+        # Multiplicity: every analysed run of this hypothesis is a "look". Redesigning
+        # after an inconclusive look and testing again is optional stopping, so only a
+        # first look can count as confirmatory; later looks are exploratory evidence.
+        looks = sum(1 for r in self.store.query("result", project=pid)
+                    if r.data["refs"].get("hypothesis") == hyp.id)
+        evidence_kind = kind if looks <= 1 else "exploratory"
         contested = chl.data["verdict"] == "challenged"
         confidence = ("contested" if contested else
-                      "preliminary (exploratory)" if kind == "exploratory" else "confirmatory")
+                      "confirmatory" if evidence_kind == "confirmatory" else
+                      "preliminary (exploratory)" if looks <= 1 else
+                      f"preliminary (exploratory; look {looks} at this hypothesis, "
+                      f"not corrected for multiple looks)")
+        kind = evidence_kind
         interp = self.store.get(cur["interpretation"]).data
         con = self.store.create("conclusion", {
             "hypothesis": hyp.id, "statement": hyp.data["statement"], "outcome": outcome,
             "label": Evidence.EXPERIMENTAL_RESULT.value, "experiment_kind": kind,
+            "protocol_kind": prot.data["protocol"]["kind"], "look": looks,
             "confidence": confidence, "decision": res.data["decision"],
             "scientific_criteria": res.data["scientific"],
             "caveats": [i["description"] for i in chl.data["issues"]] + interp.get("limitations", []),

@@ -39,6 +39,11 @@ in `src/autolab/`.
 | Verifier (Codex) | `codex-cli` `--sandbox workspace-write` | `worktrees/verifier/<ENG>-r<n>` | `tests/verification/*` only |
 
 Agents never touch the database, never run git and never decide transitions.
+Agent CLIs run hermetically (no user settings, CLAUDE.md, plugins, skills, MCP servers or
+memories): the task packet is their only context. The engineer and the verifier (verify
+stage) are blinded to the hypothesis, decision rule and earlier results. After every agent
+call the controller checks that controller-owned state (main checkout, ledger, lab.toml)
+is unchanged, and HALTs on any change (the engineer runs Python outside an OS sandbox).
 
 ## 2. Agent architecture
 
@@ -93,6 +98,9 @@ not an engineering failure. Hypothesis records keep the label HYPOTHESIS: a
 test outcome never upgrades them to ESTABLISHED. Exploratory conclusions are
 marked `preliminary (exploratory)`; a non-critical "challenged" verdict marks
 them `contested`.
+Every analysed run of a hypothesis is a *look*: a redesign must use seeds not yet
+used for that hypothesis, and only a first look can be confirmatory (later looks
+are labelled exploratory with their look number; no multiplicity correction).
 
 ## 4. Engineering state machine
 
@@ -107,7 +115,8 @@ redesigns ≥ max_redesigns → ESCALATED → research DESIGN ("approach inadequ
 ```
 
 This implements "do not patch indefinitely": the patch → redesign → rethink-the-
-solution escalation is mechanical. Merge requires *controller-run* tests passing
+solution escalation is mechanical. Merge requires *controller-run* tests passing, the
+verifier's tests passing in a hermetic run (no conftest, controller ini, JUnit-checked),
 **and** a verifier pass with no critical/major findings, reproducibility and
 protocol compliance confirmed. A "pass" verdict accompanied by a critical
 finding is treated as a fail.
@@ -183,14 +192,15 @@ finding is treated as a fail.
   after data collection is downgraded to exploratory, and resuming re-enters
   ENGINEERING so the implementation is re-verified.
 * **Entrypoint contract:** `<entrypoint> --condition N --seed S --out DIR
-  --params JSON` writes `DIR/metrics.json`. The interpreter is pinned to the
+  --params JSON` writes `DIR/metrics.json`; `--params` is `fixed_params` merged with the
+  condition's `params`. The interpreter is pinned to the
   recorded `sys.executable`; `PYTHONHASHSEED` is set to the seed.
 * **Smoke test:** a seed outside the protocol seeds, so confirmatory data is
   never peeked at, and it is not counted as data.
 * **Run:** every condition × seed. Raw stdout/stderr/metrics are hashed and
   made read-only. The manifest links protocol version + freeze hash, commit,
   environment snapshot (Python, platform, installed packages), and command.
-* **Analysis** (controller, deterministic, seeded bootstrap): the
+* **Analysis** (controller, deterministic; Student t / Welch t CIs, >= 3 seeds): the
   pre-registered decision rule gives supported / partially_supported /
   unsupported / inconclusive. Secondary contrasts (ablations, null) are
   reported but are not decisive. Validity checks are evaluated

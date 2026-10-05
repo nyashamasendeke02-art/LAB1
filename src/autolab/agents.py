@@ -15,7 +15,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
 import tempfile
 import urllib.request
 from abc import ABC, abstractmethod
@@ -24,6 +23,7 @@ from pathlib import Path
 from typing import Callable
 
 from .messages import ProtocolError, TaskPacket, extract_json, validate_completion
+from .procs import ProcResult, run_tree
 from .prompts import build_prompt
 from .taxonomy import Role
 
@@ -79,19 +79,29 @@ class ScriptedBackend(AgentBackend):
 
 
 # --------------------------------------------------------------- subprocess
-def _run(cmd: list[str], *, cwd: str | None, stdin: str, timeout: float) -> subprocess.CompletedProcess:
+def _run(cmd: list[str], *, cwd: str | None, stdin: str, timeout: float,
+         env: dict | None = None) -> ProcResult:
+    """Run an agent CLI; on timeout its whole process tree is killed (no orphans)."""
     exe = shutil.which(cmd[0])
     if exe is None:
         raise BackendError(f"{cmd[0]!r} not found on PATH")
-    try:
-        return subprocess.run([exe, *cmd[1:]], cwd=cwd, input=stdin, capture_output=True,
-                              text=True, encoding="utf-8", errors="replace", timeout=timeout)
-    except subprocess.TimeoutExpired:
-        raise BackendError(f"{cmd[0]} timed out after {timeout}s") from None
+    proc = run_tree([exe, *cmd[1:]], cwd=cwd, input=stdin, timeout=timeout, env=env)
+    if proc.timed_out:
+        raise BackendError(f"{cmd[0]} timed out after {timeout}s (process tree killed)")
+    return proc
 
 
 class ClaudeCLIBackend(AgentBackend):
-    """Claude Code in headless mode (``claude -p``), run inside the worktree."""
+    """Claude Code in headless mode (``claude -p``), run inside the worktree.
+
+    Hermetic: no user/project/local settings (so no plugins, hooks or CLAUDE.md
+    from parent directories), no MCP servers, no skills and no auto-memory. The
+    task packet is the agent's only context.
+    """
+
+    HERMETIC = ["--setting-sources", "", "--strict-mcp-config", "--disable-slash-commands",
+                "--settings", '{"autoMemoryEnabled": false}']
+    HERMETIC_ENV = {"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"}
 
     name = "claude-cli"
 
@@ -105,7 +115,7 @@ class ClaudeCLIBackend(AgentBackend):
         ]
 
     def command(self, task: TaskPacket) -> list[str]:
-        cmd = ["claude", "-p", "--output-format", "json"]
+        cmd = ["claude", "-p", "--output-format", "json", *self.HERMETIC]
         if task.writable:
             cmd += ["--permission-mode", "acceptEdits",
                     "--allowedTools", ",".join(self.allowed_tools)]
@@ -117,7 +127,8 @@ class ClaudeCLIBackend(AgentBackend):
         return cmd
 
     def invoke(self, task: TaskPacket, prompt: str) -> str:
-        proc = _run(self.command(task), cwd=task.workdir, stdin=prompt, timeout=self.timeout)
+        proc = _run(self.command(task), cwd=task.workdir, stdin=prompt, timeout=self.timeout,
+                    env={**os.environ, **self.HERMETIC_ENV})
         return self.parse_output(proc.returncode, proc.stdout, proc.stderr)
 
     @staticmethod
@@ -147,6 +158,13 @@ class CodexCLIBackend(AgentBackend):
 
     name = "codex-cli"
 
+    # Hermetic: ignore ~/.codex/config.toml and exec-policy rules; no plugins, apps,
+    # browser/computer use or memories. The task packet is the only context.
+    HERMETIC = ["--ignore-user-config", "--ignore-rules",
+                *[a for f in ("plugins", "apps", "browser_use", "browser_use_external",
+                              "in_app_browser", "computer_use", "memories")
+                  for a in ("--disable", f)]]
+
     def __init__(self, model: str | None = None, timeout: float = 1800,
                  sandbox_when_writable: str = "workspace-write"):
         self.model = model
@@ -156,7 +174,7 @@ class CodexCLIBackend(AgentBackend):
     def command(self, task: TaskPacket, out_file: str) -> list[str]:
         sandbox = self.sandbox_when_writable if task.writable else "read-only"
         cmd = ["codex", "exec", "--sandbox", sandbox, "--skip-git-repo-check",
-               "--ephemeral", "--color", "never", "-o", out_file]
+               "--ephemeral", "--color", "never", *self.HERMETIC, "-o", out_file]
         if task.workdir:
             cmd += ["-C", task.workdir]
         if self.model:
@@ -227,6 +245,7 @@ class AgentResult:
     prompt: str
     raw_responses: list[str]
     attempts: int
+    rejections: list[str]
 
 
 class Agent:
@@ -241,15 +260,18 @@ class Agent:
         base_prompt = build_prompt(self.role, task.stage, task.to_dict())
         prompt = base_prompt
         raws: list[str] = []
-        last_err = None
+        rejections: list[str] = []
         for attempt in range(1, self.max_protocol_retries + 2):
             raw = self.backend.invoke(task, prompt)
             raws.append(raw)
             try:
                 completion = validate_completion(task.stage, extract_json(raw))
-                return AgentResult(completion, base_prompt, raws, attempt)
+                return AgentResult(completion, base_prompt, raws, attempt, rejections)
             except ProtocolError as exc:
-                last_err = exc
+                rejections.append(str(exc))
                 prompt = (base_prompt + "\n\nYOUR PREVIOUS ANSWER WAS REJECTED BY THE "
                           f"CONTROLLER: {exc}\nReturn a corrected JSON object only.")
-        raise ProtocolError(f"{self.role.value}/{task.stage}: {last_err}")
+        err = ProtocolError(f"{self.role.value}/{task.stage}: {rejections[-1]}")
+        # Keep the evidence: the controller stores rejected responses as artifacts.
+        err.prompt, err.raw_responses, err.rejections = base_prompt, raws, rejections
+        raise err

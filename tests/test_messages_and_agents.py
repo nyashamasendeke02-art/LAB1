@@ -39,6 +39,28 @@ def test_protocol_semantic_checks():
     p["decision_rule"]["metric"] = "other"
     assert any("primary metric" in e for e in validate_protocol(p))
     assert any(">= 3 seeds" in e for e in validate_protocol(protocol("confirmatory", seeds=(1, 2))))
+    assert any(">= 3 seeds" in e for e in validate_protocol(protocol(seeds=(1, 2))))
+
+
+def test_protocol_rejects_unknown_or_misplaced_keys():
+    """R7 regression: a misplaced key must not be silently dropped in favour of a default."""
+    p = protocol()
+    p["pairing"] = "paired"  # belongs inside decision_rule
+    assert any("pairing" in e for e in validate_protocol(p))
+    p = protocol()
+    p["decision_rule"]["alhpa"] = 0.01
+    assert validate_protocol(p)
+    p = protocol()
+    p["conditions"][0]["param"] = {"effect": 1}
+    assert validate_protocol(p)
+
+
+def test_condition_params_may_not_override_fixed_params():
+    p = protocol()
+    p["fixed_params"] = {"noise": 0.1, "lr": 0.5}
+    assert any("overrides fixed_params ['noise']" in e for e in validate_protocol(p))
+    p["fixed_params"] = {"lr": 0.5}
+    assert validate_protocol(p) == []
 
 
 def test_claim_taxonomy_enforcement():
@@ -65,8 +87,10 @@ def test_agent_retries_on_protocol_violation():
 def test_agent_gives_up_after_retries():
     agent = Agent(Role.SCIENTIST, ScriptedBackend({"research_question": lambda t: "junk"}),
                   max_protocol_retries=1)
-    with pytest.raises(ProtocolError):
+    with pytest.raises(ProtocolError) as exc:
         agent.run(TaskPacket("TASK-1", Role.SCIENTIST, "research_question", "obj"))
+    # R8: the rejected responses travel with the error so the controller can store them
+    assert exc.value.raw_responses == ["junk", "junk"] and len(exc.value.rejections) == 2
 
 
 def test_agent_rejects_wrong_role():
@@ -90,6 +114,23 @@ def test_cli_backend_commands_are_sandboxed():
     assert "Bash(git:*)" in cmd[cmd.index("--disallowedTools") + 1]
     ro_cmd = claude.command(TaskPacket("T", Role.ENGINEER, "solution_design", "o"))
     assert "Edit" not in ro_cmd[ro_cmd.index("--allowedTools") + 1]
+
+
+def test_cli_backends_are_hermetic():
+    """R5 regression: agents must not inherit the user's CLAUDE.md, memory, plugins,
+    skills, MCP servers or codex config; the task packet is their only context."""
+    for writable in (False, True):
+        cmd = ClaudeCLIBackend().command(TaskPacket("T", Role.ENGINEER, "implement", "o",
+                                                    writable=writable))
+        assert cmd[cmd.index("--setting-sources") + 1] == ""
+        assert "--strict-mcp-config" in cmd and "--mcp-config" not in cmd
+        assert "--disable-slash-commands" in cmd
+        assert json.loads(cmd[cmd.index("--settings") + 1]) == {"autoMemoryEnabled": False}
+    assert ClaudeCLIBackend.HERMETIC_ENV == {"CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"}
+    cmd = CodexCLIBackend().command(TaskPacket("T", Role.SCIENTIST, "design", "o"), "out.txt")
+    assert "--ignore-user-config" in cmd and "--ignore-rules" in cmd
+    disabled = {cmd[i + 1] for i, a in enumerate(cmd) if a == "--disable"}
+    assert {"plugins", "apps", "memories", "browser_use", "computer_use"} <= disabled
 
 
 def test_openai_backend_requires_key(monkeypatch):

@@ -96,7 +96,7 @@ def _protocol(with_null: bool) -> dict:
         "conditions": conds, "seeds": [0, 1, 2, 3, 4, 5],
         "metrics": {"primary": "iters_to_tol", "secondary": ["final_loss_ratio"]},
         "decision_rule": {"metric": "iters_to_tol", "treatment": "momentum", "control": "gd",
-                          "direction": "less", "min_effect": 100, "alpha": 0.05, "n_boot": 2000},
+                          "direction": "less", "min_effect": 100, "alpha": 0.05},
         "budget": {"timeout_s": 120},
         "validity_checks": [
             {"id": "V1", "description": "Baseline GD converges within budget (instrument works)",

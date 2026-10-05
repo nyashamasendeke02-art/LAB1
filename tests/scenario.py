@@ -93,8 +93,7 @@ def protocol(kind="exploratory", protected=False, effect=1.0, seeds=(1, 2, 3, 4)
         "seeds": list(seeds),
         "metrics": {"primary": "score", "secondary": []},
         "decision_rule": {"metric": "score", "treatment": "treat", "control": "base",
-                          "direction": "greater", "min_effect": 0.5, "alpha": 0.05,
-                          "n_boot": 500},
+                          "direction": "greater", "min_effect": 0.5, "alpha": 0.05},
         "budget": {"timeout_s": 60},
         "validity_checks": [{"id": "V1", "description": "baseline sane", "metric": "score",
                              "condition": "base", "op": "<", "value": 10}],
@@ -102,9 +101,15 @@ def protocol(kind="exploratory", protected=False, effect=1.0, seeds=(1, 2, 3, 4)
 
 
 def design(**kw):
+    calls = {"n": 0}
+
     def h(t):
+        args = dict(kw)
+        if "seeds" not in args:  # fresh data per design (the controller rejects reused seeds)
+            args["seeds"] = tuple(range(4 * calls["n"] + 1, 4 * calls["n"] + 5))
+        calls["n"] += 1
         return ok({"options": [{"name": "A", "description": "two-arm"}], "chosen": "A",
-                   "rationale": "minimal", "protocol": protocol(**kw)})
+                   "rationale": "minimal", "protocol": protocol(**args)})
     return h
 
 

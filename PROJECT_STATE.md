@@ -5,12 +5,13 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** 0.1.0 (commit `e4a1398`), 56/56 tests passing.
+- **Version:** 0.2.0 (code-review fixes R1-R12), 86/86 tests passing (~10.5 min on Windows).
 - **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). pilot-002 ran the first
   full live pass (RUN-0001: INCONCLUSIVE, paired effect -0.00008 MSE, CI [-0.00075, 0.00059]),
   then redesigned twice; the review exposed lab gaps that are now fixed (D11-D13).
   **pilot-002 STOPPED 2026-10-04 at the human's request** (still DESIGN, cycle 1, no data).
-  **No experiments until the code review's blocking findings (R1-R5 below) are fixed.**
+  The code review's 12 findings (R1-R12) are FIXED (D14-D19). No experiment has been run since;
+  the next run needs the human's go-ahead.
 - **Agents:** ChatGPT scientist via `codex exec --sandbox read-only`; Claude engineer
   via `claude -p`; Codex verifier via `codex exec --sandbox workspace-write`.
 
@@ -26,7 +27,6 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress
-- [ ] Code review 2026-10-04 (no experiments meanwhile). Fix order: R1, R2, R3, R4, R5, then R6-R12.
 - [ ] pilot-002: check the outcome (`autolab status labs/pilot-002`, the log, the report);
       fix and record anything it exposes.
 - [ ] Full suite run after D13 (68/68 passed up to D12; D13's targeted tests pass).
@@ -47,6 +47,9 @@ and `project_state/` (decisions, failures, open questions)._
 7. [ ] Start the Developmental Intelligence EXP-001 project in a dedicated lab.
 
 ### Done
+- [x] Code review 2026-10-04: R1-R12 fixed with regression tests (D14-D19, F6); hermetic agent
+      CLIs verified live (no CLAUDE.md, memory, skills or MCP for claude; no user config,
+      memories or AGENTS.md for codex).
 - [x] Store: versioned append-only records, hash-chained ledger, artifacts.
 - [x] Research and engineering state machines.
 - [x] Agent protocol: schemas, claim taxonomy, retry-on-violation.
@@ -60,30 +63,18 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Known bugs / technical debt
 
-### Code review 2026-10-04 (blocking = must fix before any run)
-- R1 BLOCKING: `protocol.fixed_params` is never passed to the entrypoint (run_trial sends only
-  conditions[].params), so "frozen" parameters are whatever the engineer hard-coded.
-- R2 BLOCKING: engineer-controlled conftest.py / pytest.ini / pyproject can silently skip
-  tests/verification (demonstrated: `collect_ignore_glob` -> exit 0, verifier test never ran).
-  The merge gate checks only that test files exist and the exit code is 0.
-- R3 BLOCKING: percentile bootstrap undercovers at small seed counts (simulated 95% CI coverage:
-  3 seeds 0.76, 5 seeds 0.86, 10 seeds 0.88, 20 seeds 0.91) -> false "supported" rate well above alpha.
-- R4 BLOCKING: SCIENTIFIC_VALIDATION scientist gets no code or diff (no workdir), only the
-  verifier's verdict and smoke metrics; it cannot check protocol fidelity.
-- R5 BLOCKING: agents inherit uncontrolled context: `claude -p` loads Desktop/CLAUDE.md, user
-  plugins/skills/MCP servers (also a likely memory-pressure source, INFERENCE); codex loads
-  ~/.codex config/plugins/memories. Tasks must be hermetic.
-- R6: inconclusive -> redesign of the same hypothesis with knowledge of the effect (optional
-  stopping); no multiplicity accounting across design iterations.
-- R7: schemas allow unknown keys; a misplaced key (e.g. `pairing` at top level) is silently
-  dropped and defaults apply.
-- R8: on ProtocolError the raw agent responses are discarded (only stored on success).
-- R9: Windows timeouts kill codex.CMD's cmd.exe but not its node child (orphans).
-- R10: stage-retry counter for ENGINEERING spans all sub-steps; unrelated transient errors add up.
-- R11: engineer/verifier see the hypothesis and expected direction (no blinding).
-- R12: engineer `Bash(python:*)` is unsandboxed (can write lab.db, main checkout, other
-  worktrees); isolation is advisory except for codex sandboxes. Crashed runs leave stale
-  worktrees under worktrees/readonly.
+### Code review 2026-10-04: R1-R12 fixed (details in DECISIONS D14-D19, FAILURES F6)
+Residual risks the fixes do NOT remove:
+- Engineer-written code still runs unsandboxed (tests, trials). Tampering with the main checkout,
+  ledger or lab.toml is detected after each agent call and HALTs; other writes (e.g. other
+  worktrees, artifact files) are not detected. The ledger stays tamper-evident, not tamper-proof.
+- Blinding is partial: condition names and the protocol title can hint at the hypothesis.
+- Looks are counted and labelled, but there is no alpha correction across looks.
+- t intervals assume roughly normal per-seed metrics; heavy-tailed metrics need more seeds.
+- Codex still sees its built-in system skills (imagegen, openai-docs, skill-creator,
+  skill-installer); no user content.
+- pilot-001/002 results predate these fixes (RUN-0001 used the old bootstrap CI).
+- The full test suite now takes ~10.5 min.
 
 ### Older items
 
@@ -101,4 +92,5 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Human tasks (only what Claude cannot do)
 
-- Decide: approve fixing R1-R5 (then R6-R12) before any further experiment.
+- Decide when to resume experiments. pilot-002 was designed under the old rules; recommended:
+  start a fresh lab (pilot-003) with the same objective rather than resuming pilot-002.

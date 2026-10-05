@@ -93,13 +93,24 @@ PROTOCOL_SCHEMA = {
         "decision_rule": {
             "type": "object",
             "additionalProperties": False,
-            "required": ["metric", "treatment", "control", "direction", "min_effect"],
+            "required": ["metric", "treatment", "control", "direction"],
             "properties": {
                 "metric": _nstr,
                 "treatment": _nstr,
                 "control": _nstr,
                 "direction": {"enum": ["greater", "less"]},
+                "type": {"enum": ["superiority", "non_inferiority"]},
                 "min_effect": {"type": "number", "minimum": 0},
+                "margin": {"type": "number", "exclusiveMinimum": 0},
+                "co_primary": {"type": "array", "items": {
+                    "type": "object", "additionalProperties": False,
+                    "required": ["metric", "direction"],
+                    "properties": {
+                        "metric": _nstr, "treatment": _nstr, "control": _nstr,
+                        "direction": {"enum": ["greater", "less"]},
+                        "type": {"enum": ["superiority", "non_inferiority"]},
+                        "min_effect": {"type": "number", "minimum": 0},
+                        "margin": {"type": "number", "exclusiveMinimum": 0}}}},
                 "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
                 "pairing": {"enum": ["paired", "unpaired"]},
             },
@@ -300,13 +311,23 @@ def validate_protocol(protocol: dict) -> list[str]:
     for key in ("treatment", "control"):
         if rule[key] not in names:
             errors.append(f"decision_rule.{key}={rule[key]!r} is not a condition")
-    if rule["min_effect"] <= 0:
-        errors.append("decision_rule.min_effect must be > 0 (smallest effect size of interest);"
-                      " with 0 an 'unsupported' outcome is unreachable and null results can"
-                      " only ever be 'inconclusive'")
+    metrics = {protocol["metrics"]["primary"], *protocol["metrics"].get("secondary", [])}
+    for label, r in [("decision_rule", rule)] + [
+            (f"decision_rule.co_primary[{i}]", r) for i, r in enumerate(rule.get("co_primary", []))]:
+        if r.get("type", "superiority") == "non_inferiority":
+            if not r.get("margin"):
+                errors.append(f"{label}: a non_inferiority rule needs margin > 0")
+        elif not r.get("min_effect") or r["min_effect"] <= 0:
+            errors.append(f"{label}: min_effect must be > 0 (smallest effect size of interest);"
+                          " with 0 an 'unsupported' outcome is unreachable and null results can"
+                          " only ever be 'inconclusive'")
+        for key in ("treatment", "control"):
+            if key in r and r[key] not in names:
+                errors.append(f"{label}.{key}={r[key]!r} is not a condition")
+        if label != "decision_rule" and r["metric"] not in metrics:
+            errors.append(f"{label}: metric {r['metric']!r} is not a declared metric")
     if rule["metric"] != protocol["metrics"]["primary"]:
         errors.append("decision_rule.metric must be the pre-specified primary metric")
-    metrics = {protocol["metrics"]["primary"], *protocol["metrics"].get("secondary", [])}
     for key in ("validity_checks", "success_checks"):
         for chk in protocol.get(key, []):
             if chk["condition"] not in names:

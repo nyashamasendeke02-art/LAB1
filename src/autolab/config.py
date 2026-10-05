@@ -39,6 +39,7 @@ max_cycles = 3               # research cycles (question -> report) per project
 max_trials_without_approval = 200
 test_timeout_s = 900
 max_trial_output_mb = 25     # raw output cap per trial (telemetry policy)
+require_pilot_for_confirmatory = false   # true: confirmatory only after an exploratory pilot
 
 [gates]
 # Human approval is ALWAYS required for protocols marked protected = true.

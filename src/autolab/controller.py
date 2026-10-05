@@ -19,6 +19,7 @@ from __future__ import annotations
 import fnmatch
 import hashlib
 import json
+import math
 import os
 import shlex
 import stat
@@ -34,7 +35,8 @@ from xml.etree import ElementTree
 from . import __version__
 from .agents import Agent, make_backend
 from .config import DEFAULT_TOML, load_config
-from .experiments import (Trial, check_lock, contrasts, environment_snapshot, evaluate_decision,
+from .experiments import (Trial, check_lock, contrasts, environment_snapshot, evaluate_rule,
+                          required_seeds,
                           evaluate_requirements, run_protocol, summarize)
 from .gates import (COMPUTE_BUDGET, CONFIRMATORY_FREEZE, MERGE_TO_MAIN,
                     PROTECTED_EXPERIMENT, REVIEW_PREFIX, Gates)
@@ -537,6 +539,24 @@ class Controller:
                            "are withheld; implement the conditions as specified")
         return out
 
+    def _power_analysis(self, pid: str, hypothesis: str, protocol: dict) -> dict:
+        """L5: per-seed SD from earlier (pilot) looks at this hypothesis -> seeds needed for
+        80% power at the protocol's smallest effect (or non-inferiority margin)."""
+        rule = protocol["decision_rule"]
+        effect = rule.get("margin") if rule.get("type") == "non_inferiority" else rule.get("min_effect")
+        pilots = [r for r in self.store.query("result", project=pid)
+                  if r.data["refs"].get("hypothesis") == hypothesis]
+        info: dict = {"pilots": [r.id for r in pilots], "effect": effect}
+        sds = [r.data["decision"]["se"] * math.sqrt(r.data["decision"]["n_pairs"])
+               for r in pilots if r.data["decision"].get("pairing") == "paired"
+               and r.data["decision"].get("se") is not None
+               and r.data["decision"].get("metric") == rule["metric"]]
+        if sds and effect:
+            info["pilot_sd"] = max(sds)  # conservative: the noisiest pilot
+            info["required_seeds"] = required_seeds(info["pilot_sd"], effect,
+                                                    rule.get("alpha", 0.05), 0.8)
+        return info
+
     def _seeds_used_for(self, pid: str, hypothesis: str) -> set[int]:
         """Seeds of every analysed run that tested ``hypothesis`` (fresh data rule)."""
         seeds: set[int] = set()
@@ -683,6 +703,15 @@ class Controller:
                 if r.data["refs"].get("hypothesis") == cur["hypothesis"]):
             errs.append("this hypothesis already had its one confirmatory study; further "
                         "studies of it must be exploratory")
+        power = self._power_analysis(pid, cur["hypothesis"], protocol)
+        if protocol.get("kind") == "confirmatory":
+            if self.limits.get("require_pilot_for_confirmatory") and not power["pilots"]:
+                errs.append("a confirmatory study needs an exploratory pilot of this hypothesis "
+                            "first (pilot -> power analysis -> confirmatory)")
+            if power.get("required_seeds") and len(protocol["seeds"]) < power["required_seeds"]:
+                errs.append(f"underpowered: pilot per-seed SD {power['pilot_sd']:.4g} needs >= "
+                            f"{power['required_seeds']} seeds for 80% power at the "
+                            f"pre-registered effect; protocol has {len(protocol['seeds'])}")
         used = self._seeds_used_for(pid, cur["hypothesis"])
         reused = sorted(used & set(protocol["seeds"]))
         if reused:
@@ -725,6 +754,8 @@ class Controller:
         ctx = self._context(pid)
         ctx["design"] = {k: v for k, v in self.store.get(cur["design"]).data.items()
                          if k != "refs"}
+        ctx["power_analysis"] = self._power_analysis(
+            pid, cur["hypothesis"], self.store.get(cur["protocol"]).data["protocol"])
         payload, tid = self._call(pid, Role.SCIENTIST, "scientific_review", ctx)
         critical = [i for i in payload["issues"] if i["severity"] == "critical"]
         approved = payload["verdict"] == "approve" and not critical
@@ -1322,7 +1353,7 @@ class Controller:
         else:
             trials = self._trials(run)
             summary = summarize(trials)
-            decision = evaluate_decision(p["decision_rule"], trials)
+            decision = evaluate_rule(p["decision_rule"], trials)
             res = self.store.create("result", {
                 "label": Evidence.EXPERIMENTAL_RESULT.value, "summary": summary,
                 "decision": decision,

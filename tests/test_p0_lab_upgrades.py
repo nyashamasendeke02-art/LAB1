@@ -233,3 +233,52 @@ def test_hermetic_verification_supports_src_layout(tmp_path):
     ok_, out, _, counts = ctl._run_verification_tests(wd)
     assert ok_, out
     assert counts["passed"] == 1
+
+
+def paired_design(**kw):
+    inner = scenario.design(**kw)
+
+    def h(t):
+        res = inner(t)
+        prot = res["payload"]["protocol"]
+        prot["decision_rule"]["pairing"] = "paired"
+        prot["conditions"][0]["params"]["noise"] = 0.0  # else the arms share noise: SD 0
+        return res
+    return h
+
+
+def run_until_design_fails(lab, ctl, pid, text):
+    for _ in range(4):
+        steps = ctl.run(pid)
+        if any(text in f.data["summary"] for f in lab.store.query("failure",
+                                                                   category="design_invalid")):
+            return True
+        if not steps[-1].blocked_on:
+            return False
+        ctl.gates.decide(steps[-1].blocked_on, True, by="human", note="ok")
+    return False
+
+
+def test_underpowered_confirmatory_study_is_refused(tmp_path):
+    """L5: a noisy paired pilot sets the per-seed SD; a 5-seed confirmatory design is then
+    refused as underpowered, and the scientific review sees the power analysis."""
+    seen = []
+
+    def review(t):
+        seen.append(t.context.get("power_analysis"))
+        return scenario.demo.review_approve(t)
+
+    lab, ctl = make(tmp_path, sci__scientific_review=review, sci__design=[
+        paired_design(effect=0.6, noise=3.0, seeds=(1, 2, 3, 4)),
+        paired_design(kind="confirmatory", effect=2.0, seeds=(11, 12, 13, 14, 15))])
+    pid = ctl.new_project("pilot then underpowered confirm")
+    assert run_until_design_fails(lab, ctl, pid, "underpowered")
+    assert seen[0]["pilots"] == [] and "required_seeds" not in seen[0]
+
+
+def test_confirmatory_can_require_a_pilot(tmp_path):
+    cfg = FAST_CONFIG.replace("test_timeout_s = 300",
+                              "test_timeout_s = 300\nrequire_pilot_for_confirmatory = true")
+    lab, ctl = make(tmp_path, config=cfg, sci__design=scenario.design(kind="confirmatory"))
+    pid = ctl.new_project("confirm without pilot")
+    assert run_until_design_fails(lab, ctl, pid, "exploratory pilot")

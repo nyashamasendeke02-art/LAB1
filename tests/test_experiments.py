@@ -1,7 +1,8 @@
 import random
 from pathlib import Path
 
-from autolab.experiments import (RESOURCE_METRICS, Trial, evaluate_decision,
+from autolab.experiments import (RESOURCE_METRICS, Trial, contrasts, evaluate_decision, evaluate_rule,
+                                 holm, required_seeds,
                                  evaluate_requirements, paired_t_ci, run_protocol, summarize, t_quantile, welch_ci)
 
 from scenario import EXPERIMENT, protocol
@@ -150,3 +151,68 @@ def test_paired_difference_checks():
     out = evaluate_requirements(reqs, summarize(c + t), c + t)
     assert out[0]["passed"] and abs(out[0]["observed"] + 0.5) < 1e-12 and out[0]["n_pairs"] == 3
     assert not evaluate_requirements(reqs, summarize(c), c)[0]["passed"]  # no pairs
+
+
+def mtrials(cond, rows):
+    return [Trial(cond, "x", i, 0, 0.0, dict(r), "") for i, r in enumerate(rows)]
+
+
+def test_non_inferiority():
+    ni = {**RULE, "type": "non_inferiority", "margin": 0.5}
+    c = trials("c", [1.0, 1.1, 0.9, 1.05, 0.95])
+    same = trials("t", [1.0, 1.1, 0.9, 1.05, 0.95])
+    assert evaluate_decision(ni, c + same)["outcome"] == "supported"
+    worse = trials("t", [-1.0, -0.9, -1.1, -0.95, -1.05])
+    assert evaluate_decision(ni, c + worse)["outcome"] == "unsupported"
+    noisy = trials("t", [3.0, -3.0, 2.0, -2.0, 1.0])
+    assert evaluate_decision(ni, c + noisy)["outcome"] == "inconclusive"
+    out = evaluate_decision(ni, c + same)
+    assert out["type"] == "non_inferiority" and out["margin"] == 0.5
+
+
+def test_p_value_and_se_are_reported():
+    c = trials("c", [0.0, 0.1, -0.1, 0.05, -0.05])
+    out = evaluate_decision(RULE, c + trials("t", [2.0, 2.1, 1.9, 2.05, 1.95]))
+    assert out["se"] > 0 and out["p_value"] < 0.001
+    out = evaluate_decision(RULE, c + trials("t", [3.0, -3.0, 2.0, -2.0, 1.0]))
+    assert out["p_value"] > 0.05
+
+
+def test_co_primary_intersection_union():
+    rule = {**RULE, "co_primary": [{"metric": "n", "direction": "less",
+                                    "type": "non_inferiority", "margin": 1.0}]}
+    c = mtrials("c", [{"m": v, "n": 5.0 + v} for v in [0.0, 0.1, -0.1, 0.05, -0.05]])
+    good = mtrials("t", [{"m": 2.0 + v, "n": 5.0 + v} for v in [0.0, 0.1, -0.1, 0.05, -0.05]])
+    out = evaluate_rule(rule, c + good)
+    assert out["outcome"] == "supported" and len(out["endpoints"]) == 2
+    bad = mtrials("t", [{"m": 2.0 + v, "n": 9.0 + v} for v in [0.0, 0.1, -0.1, 0.05, -0.05]])
+    assert evaluate_rule(rule, c + bad)["outcome"] == "unsupported"
+    assert evaluate_rule(RULE, trials("c", [0, 1, 2]) + trials("t", [0, 1, 2])) ==         evaluate_decision(RULE, trials("c", [0, 1, 2]) + trials("t", [0, 1, 2]))
+
+
+def test_holm():
+    out = holm([0.01, 0.04, 0.03], 0.05)
+    assert [round(a, 6) for a, _ in out] == [0.03, 0.06, 0.06]
+    assert [r for _, r in out] == [True, False, False]
+    assert holm([], 0.05) == []
+
+
+def test_secondary_contrasts_are_holm_corrected():
+    p = {"conditions": [{"name": "c", "role": "baseline"}, {"name": "t", "role": "intervention"},
+                        {"name": "a", "role": "ablation"}, {"name": "b", "role": "ablation"}],
+         "decision_rule": {**RULE, "co_primary": [{"metric": "m", "direction": "greater",
+                                                   "min_effect": 0.1}]}}
+    base = [0.0, 0.1, -0.1, 0.05, -0.05]
+    ts = (trials("c", base) + trials("t", base) + trials("a", [v + 2 for v in base])
+          + trials("b", [v + 0.01 for v in base]))
+    out = contrasts(p, ts)
+    assert len(out) == 2 and all("p_holm" in c and c["p_holm"] >= c["p_value"] for c in out)
+    assert [c["holm_significant"] for c in out] == [True, False]
+
+
+def test_required_seeds():
+    assert required_seeds(1.0, 1.0) == 10   # (t.975 + t.8) * sd / sqrt(n) <= effect
+    assert required_seeds(1.0, 0.5) > required_seeds(1.0, 1.0)
+    assert required_seeds(0.0, 1.0) == 3
+    assert required_seeds(1.0, 0.0) is None
+    assert required_seeds(100.0, 0.01, max_n=50) is None

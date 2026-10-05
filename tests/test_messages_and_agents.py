@@ -194,3 +194,19 @@ def test_relative_to_must_name_a_condition():
     p["validity_checks"][-1]["relative_to"] = "base"
     p["fixed_params"] = {"lr": 0.01}
     assert validate_protocol(p) == []
+
+
+def test_non_inferiority_and_co_primary_rules_validate():
+    p = protocol()
+    p["metrics"]["secondary"] = ["calls"]
+    p["decision_rule"] = {"metric": "score", "treatment": "treat", "control": "base",
+                          "direction": "greater", "type": "non_inferiority", "margin": 0.2,
+                          "co_primary": [{"metric": "calls", "direction": "less",
+                                          "min_effect": 1}]}
+    assert validate_protocol(p) == []
+    p["decision_rule"].pop("margin")
+    p["decision_rule"]["co_primary"].append({"metric": "ghost", "direction": "less",
+                                             "min_effect": 1, "control": "nobody"})
+    errs = validate_protocol(p)
+    assert any("margin" in e for e in errs)
+    assert any("ghost" in e for e in errs) and any("nobody" in e for e in errs)

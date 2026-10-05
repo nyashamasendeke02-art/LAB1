@@ -307,6 +307,8 @@ def evaluate_decision(rule: dict, trials: list[Trial]) -> dict:
     * partially_supported: CI_low > 0 but effect < min_effect
     * unsupported:         CI_high < min_effect (a meaningful effect is excluded)
     * inconclusive:        otherwise, or < 2 valid trials in either arm
+    With ``rule["type"] == "non_inferiority"`` the outcome instead compares the CI
+    with ``-margin``: supported if CI_low > -margin, unsupported if CI_high < -margin.
 
     The CI is a (1 - alpha) Student t interval: ``rule["pairing"] == "paired"``
     uses per-seed differences over seeds valid in both arms (seed-matched
@@ -317,7 +319,7 @@ def evaluate_decision(rule: dict, trials: list[Trial]) -> dict:
     c = values(trials, rule["control"], rule["metric"])
     base = {"metric": rule["metric"], "treatment": rule["treatment"],
             "control": rule["control"], "n_treatment": len(t), "n_control": len(c),
-            "min_effect": rule["min_effect"], "alpha": alpha, "direction": rule["direction"]}
+            "min_effect": rule.get("min_effect"), "alpha": alpha, "direction": rule["direction"]}
     pairing = rule.get("pairing", "unpaired")
     base["pairing"] = pairing
     if pairing == "paired":
@@ -337,7 +339,24 @@ def evaluate_decision(rule: dict, trials: list[Trial]) -> dict:
     base["df"] = df
     if rule["direction"] == "less":
         diff, lo, hi = -diff, -hi, -lo
-    if lo > 0 and diff >= rule["min_effect"]:
+    tq = t_quantile(1 - alpha / 2, df)
+    se = (hi - lo) / (2 * tq)
+    base["se"] = se
+    base["p_value"] = (1.0 if diff == 0 else 0.0) if se == 0 else 2 * (1 - t_cdf(abs(diff) / se, df))
+    kind = rule.get("type", "superiority")
+    base["type"] = kind
+    if kind == "non_inferiority":
+        # Oriented effect: positive = better. Non-inferior if the CI excludes a loss
+        # larger than the margin; inferior if the CI lies entirely below -margin.
+        margin = rule["margin"]
+        base["margin"] = margin
+        if lo > -margin:
+            outcome = Outcome.SUPPORTED
+        elif hi < -margin:
+            outcome = Outcome.UNSUPPORTED
+        else:
+            outcome = Outcome.INCONCLUSIVE
+    elif lo > 0 and diff >= rule["min_effect"]:
         outcome = Outcome.SUPPORTED
     elif lo > 0:
         outcome = Outcome.PARTIALLY_SUPPORTED
@@ -347,6 +366,61 @@ def evaluate_decision(rule: dict, trials: list[Trial]) -> dict:
         outcome = Outcome.INCONCLUSIVE
     return {**base, "effect": diff, "ci_low": lo, "ci_high": hi,
             "outcome": outcome.value}
+
+
+def evaluate_rule(rule: dict, trials: list[Trial]) -> dict:
+    """The pre-registered decision with optional co-primary endpoints.
+
+    ``rule["co_primary"]`` is a list of further rules (metric, direction, type,
+    min_effect | margin; treatment/control/alpha/pairing default to the main rule's).
+    Intersection-union logic, so no alpha correction is needed: supported only if
+    every endpoint is supported; unsupported if any endpoint is unsupported;
+    otherwise inconclusive (or partially_supported if all are at least partial).
+    """
+    main = evaluate_decision(rule, trials)
+    subs = rule.get("co_primary") or []
+    if not subs:
+        return main
+    inherit = {k: rule[k] for k in ("treatment", "control", "alpha", "pairing") if k in rule}
+    parts = [main] + [evaluate_decision({**inherit, **s}, trials) for s in subs]
+    outs = [p["outcome"] for p in parts]
+    if all(o == Outcome.SUPPORTED.value for o in outs):
+        outcome = Outcome.SUPPORTED
+    elif any(o == Outcome.UNSUPPORTED.value for o in outs):
+        outcome = Outcome.UNSUPPORTED
+    elif all(o in (Outcome.SUPPORTED.value, Outcome.PARTIALLY_SUPPORTED.value) for o in outs):
+        outcome = Outcome.PARTIALLY_SUPPORTED
+    else:
+        outcome = Outcome.INCONCLUSIVE
+    return {**main, "outcome": outcome.value, "endpoints": parts,
+            "combination": "intersection-union (all co-primary endpoints must hold)"}
+
+
+def holm(p_values: list[float], alpha: float) -> list[tuple[float, bool]]:
+    """Holm-Bonferroni: (adjusted p, rejected at alpha) for each p, in input order."""
+    m = len(p_values)
+    order = sorted(range(m), key=lambda i: p_values[i])
+    adjusted = [0.0] * m
+    running = 0.0
+    for rank, i in enumerate(order):
+        running = max(running, min(1.0, (m - rank) * p_values[i]))
+        adjusted[i] = running
+    return [(adjusted[i], adjusted[i] <= alpha) for i in range(m)]
+
+
+def required_seeds(sd: float, effect: float, alpha: float = 0.05, power: float = 0.8,
+                   max_n: int = 1000) -> int | None:
+    """Smallest number of paired seeds for a two-sided t test at ``alpha`` to detect a
+    true mean difference ``effect`` with probability ``power`` given per-seed SD ``sd``
+    (approximation: t_{1-a/2,n-1} + t_{power,n-1} <= effect*sqrt(n)/sd)."""
+    if effect <= 0 or sd < 0:
+        return None
+    if sd == 0:
+        return 3
+    for n in range(3, max_n + 1):
+        if (t_quantile(1 - alpha / 2, n - 1) + t_quantile(power, n - 1)) * sd / math.sqrt(n) <= effect:
+            return n
+    return None
 
 
 _OPS = {">": lambda a, b: a > b, ">=": lambda a, b: a >= b, "<": lambda a, b: a < b,
@@ -389,7 +463,7 @@ def evaluate_requirements(reqs: list[dict], summary: dict,
 
 def contrasts(protocol: dict, trials: list[Trial]) -> list[dict]:
     """Secondary (non-decisive) comparisons of every non-control condition vs control."""
-    rule = protocol["decision_rule"]
+    rule = {k: v for k, v in protocol["decision_rule"].items() if k != "co_primary"}
     out = []
     for cond in protocol["conditions"]:
         if cond["name"] == rule["control"] or cond["name"] == rule["treatment"]:
@@ -399,4 +473,9 @@ def contrasts(protocol: dict, trials: list[Trial]) -> list[dict]:
         res["role"] = cond["role"]
         res["decisive"] = False
         out.append(res)
+    # Multiplicity: Holm across the secondary contrasts that produced a p-value.
+    tested = [c for c in out if "p_value" in c]
+    for c, (adj, rej) in zip(tested, holm([c["p_value"] for c in tested],
+                                          rule.get("alpha", 0.05))):
+        c["p_holm"], c["holm_significant"] = adj, rej
     return out

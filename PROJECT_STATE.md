@@ -15,6 +15,13 @@ and `project_state/` (decisions, failures, open questions)._
 - **Agents:** ChatGPT scientist via `codex exec --sandbox read-only`; Claude engineer
   via `claude -p`; Codex verifier via `codex exec --sandbox workspace-write`.
 
+## Reference documents
+
+- `AI_Robotics_Full_Documentation.pdf` (9 pages, untracked in git): AI Robotics Lab spec.
+  Modular robot brain (World Model, System 1/2, Awareness Harness, memory/skills, continual
+  learning, deterministic Safety Kernel), hypotheses H1-H5, experiments E1-E6, 13 Claude agent
+  roles. Read 2026-10-04; it is a candidate research program for this lab and is NOT adopted yet.
+
 ## High-level goals
 
 1. A lab that takes "Investigate whether X can produce Y" through research →

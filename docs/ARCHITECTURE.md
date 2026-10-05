@@ -177,8 +177,11 @@ finding is treated as a fail.
   protocol's own conditions and metrics. The REQUIREMENTS stage states
   validity criteria in prose (conditions don't exist yet); DESIGN translates
   them into checks, which are therefore frozen as part of the pre-registration.
-* Frozen before any implementation. Changes go only through `Store.amend`,
-  which is recorded with a justification and a new freeze hash.
+* Frozen before any implementation. Changes go only through
+  `autolab halt` + `autolab amend` (human-only): recorded with a justification
+  and a new freeze hash, committed to the repo. A confirmatory protocol amended
+  after data collection is downgraded to exploratory, and resuming re-enters
+  ENGINEERING so the implementation is re-verified.
 * **Entrypoint contract:** `<entrypoint> --condition N --seed S --out DIR
   --params JSON` writes `DIR/metrics.json`. The interpreter is pinned to the
   recorded `sys.executable`; `PYTHONHASHSEED` is set to the seed.

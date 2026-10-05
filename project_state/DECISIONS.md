@@ -12,5 +12,11 @@
 - D6: An engineer "no changes" response is allowed but always re-verified by
   controller tests and an independent review (added after tests exposed false
   failures in legitimate cases).
+- D8: Structured validity/success checks live in the protocol (written at DESIGN,
+  frozen with the pre-registration); the REQUIREMENTS stage is prose. (The live
+  pilot showed requirements cannot reference conditions that do not exist yet.)
+- D9: Amendments are human-only, require HALTED, downgrade confirmatory→exploratory
+  after data, and force re-verification via a new engineering task.
+- D10: Paired bootstrap is an opt-in `pairing` field of the frozen decision rule.
 - D7: The default ChatGPT scientist backend is the Codex CLI in read-only mode,
   because no OPENAI_API_KEY is configured; the openai-api backend is available.

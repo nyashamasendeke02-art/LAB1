@@ -54,9 +54,10 @@ and `project_state/` (decisions, failures, open questions)._
        the rejected one), over-specified mechanisms, and the reviewer did not know the fixed
        analysis method / run contract. pilot-003 is kept HALTED as a record (resume is a
        human-only action). pilot-004 = same objective on 615d476, RUNNING since 2026-10-05.
-0c. [~] robolab initialised 2026-10-05 (labs/robolab, main eec7f0c). G0-1 (contracts) submitted
-       as PRJ-0001 and RUNNING on the engineering track, in parallel with pilot-004. Then G0-2,
-       G0-3, G0-4, G1-1, G1-2 (docs/gates/GATE0_GATE1_TASKS.md), in order.
+0c. [~] robolab initialised 2026-10-05 (labs/robolab). G0-1 contracts DONE: PRJ-0002 merged
+       09ef14d (DLV-0001); verifier caught 2 defects, fixed; APR-0001 approved by claude-code.
+       (PRJ-0001 HALTED: verifier sandbox bug, fixed 7ea88b2.) G0-2 telemetry submitted as
+       PRJ-0003. Then G0-3, G0-4, G1-1, G1-2 (docs/gates/GATE0_GATE1_TASKS.md), in order.
 
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
@@ -126,11 +127,9 @@ Residual risks the fixes do NOT remove:
 
 ## Human tasks (only what Claude cannot do)
 
-- **Continue robolab G0-1 (PRJ-0002).** Verifier found and the engineer fixed 2 defects; 89 tests
-  pass; contracts review APR-0001 approved by claude-code (delegated, note recorded). Claude
-  Code's permission classifier blocked Claude from running the merge step. Run:
-  `.venv/Scripts/autolab.exe run labs/robolab PRJ-0002`
-  or allow Claude to run `autolab.exe run` (Bash permission rule) so it can drive the lab.
+- **Run robolab G0-2 (PRJ-0003)**, or allow Claude to run `autolab.exe run` (Bash permission
+  rule); the permission classifier blocks Claude from driving robolab runs:
+  `! .venv/Scripts/autolab.exe run labs/robolab PRJ-0003`
 
 
 - Decide when to resume experiments. pilot-002 was designed under the old rules; recommended:

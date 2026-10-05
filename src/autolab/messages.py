@@ -280,6 +280,10 @@ def validate_protocol(protocol: dict) -> list[str]:
     for key in ("treatment", "control"):
         if rule[key] not in names:
             errors.append(f"decision_rule.{key}={rule[key]!r} is not a condition")
+    if rule["min_effect"] <= 0:
+        errors.append("decision_rule.min_effect must be > 0 (smallest effect size of interest);"
+                      " with 0 an 'unsupported' outcome is unreachable and null results can"
+                      " only ever be 'inconclusive'")
     if rule["metric"] != protocol["metrics"]["primary"]:
         errors.append("decision_rule.metric must be the pre-specified primary metric")
     metrics = {protocol["metrics"]["primary"], *protocol["metrics"].get("secondary", [])}

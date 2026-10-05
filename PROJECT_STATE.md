@@ -6,9 +6,12 @@ and `project_state/` (decisions, failures, open questions)._
 ## Status
 
 - **Version:** 0.1.0 (commit `e4a1398`), 56/56 tests passing.
-- **Phase:** live pilots. pilot-001 HALTED (architectural flaw F4, fixed by D8).
-  **pilot-002 running in the background**: it passed DESIGN on the first try and is
-  now in SCIENTIFIC_REVIEW. Log: `labs/pilot-002-run.log`.
+- **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). **pilot-002 completed its
+  first full live pass through every stage**: ChatGPT design → review → freeze → Claude
+  implementation → controller tests → Codex review → merge → validation → RUN-0001
+  (80 trials) → analysis → challenge. The result was INCONCLUSIVE (paired effect -0.00008 MSE,
+  95% CI [-0.00075, 0.00059], 20 seeds), so it looped to DESIGN as specified. It was restarted
+  with the D11/D12 rules and is redesigning. Log: `labs/pilot-002-run.log`.
 - **Agents:** ChatGPT scientist via `codex exec --sandbox read-only`; Claude engineer
   via `claude -p`; Codex verifier via `codex exec --sandbox workspace-write`.
 
@@ -26,8 +29,7 @@ and `project_state/` (decisions, failures, open questions)._
 ### In Progress
 - [ ] pilot-002: check the outcome (`autolab status labs/pilot-002`, the log, the report);
       fix and record anything it exposes.
-- [ ] Full suite run after the ledger-anchoring change (anchor + store tests pass;
-      the full run was in progress when the session ended).
+- [ ] Full suite run after the D11/D12 changes.
 
 ### Next (priority order)
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
@@ -58,10 +60,13 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Known bugs / technical debt
 
-- No full live run has completed yet; real-agent schema compliance is unproven.
+- No live cycle has reached COMMUNICATE yet; every real-agent stage has worked at least once.
+- Killing the controller orphans agent subprocesses (codex/claude are not killed with it).
+- The scientific review missed min_effect=0 and an under-trained baseline. These are now
+  mechanical or prompt rules, but reviewer depth remains an open question.
 - The verifier sandbox (codex workspace-write) can read outside its worktree.
 - The ledger is anchored in git commit trailers; rewriting both the DB and git is still possible.
-- Statistics are an unpaired bootstrap of means only.
+- No power analysis or multiple-comparison correction yet.
 - Background-research citations are unverified (`sources_verified: false`).
 - The full test suite takes ~5 min on Windows (subprocess/git heavy); there is no fast subset marker.
 - The `project_state/*.md` written by hand in LAB1 and the generated per-lab

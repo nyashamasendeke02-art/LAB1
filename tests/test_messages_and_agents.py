@@ -136,3 +136,9 @@ def test_claude_errors_reported_on_stdout_are_surfaced():
         ClaudeCLIBackend.parse_output(1, "not json", "boom")
     ok = json.dumps({"is_error": False, "result": "{\"a\": 1}"})
     assert ClaudeCLIBackend.parse_output(0, ok, "") == '{"a": 1}'
+
+
+def test_min_effect_must_be_positive_so_null_is_concludable():
+    p = protocol()
+    p["decision_rule"]["min_effect"] = 0
+    assert any("min_effect must be > 0" in e for e in validate_protocol(p))

@@ -9,9 +9,8 @@ and `project_state/` (decisions, failures, open questions)._
 - **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). pilot-002 ran the first
   full live pass (RUN-0001: INCONCLUSIVE, paired effect -0.00008 MSE, CI [-0.00075, 0.00059]),
   then redesigned twice; the review exposed lab gaps that are now fixed (D11-D13).
-  **pilot-002 is resumed in DESIGN but NOT running**: Claude Code stopped its background
-  run because the system was critically low on memory. No work was lost and no processes
-  were orphaned.
+  **pilot-002 RESTARTED 2026-10-04** (4.5 GB RAM free) from DESIGN, cycle 1; running in
+  the background, log: `labs/pilot-002/run-2026-10-04b.log`.
 - **Agents:** ChatGPT scientist via `codex exec --sandbox read-only`; Claude engineer
   via `claude -p`; Codex verifier via `codex exec --sandbox workspace-write`.
 
@@ -74,6 +73,6 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Human tasks (only what Claude cannot do)
 
-- When the machine has free memory, restart pilot-002 (or ask Claude to), from `LAB1`:
-  `PYTHONPATH=src python -m autolab.cli run labs/pilot-002 PRJ-0001`
-  Closing other heavy apps first helps: each live step runs a codex/claude CLI process.
+- Keep this Claude Code session and the PC open while pilot-002 runs, and avoid heavy apps
+  (the previous run was killed under memory pressure).
+- Progress check: `PYTHONPATH=src python -m autolab.cli status labs/pilot-002`

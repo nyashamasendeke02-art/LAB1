@@ -6,8 +6,9 @@ and `project_state/` (decisions, failures, open questions)._
 ## Status
 
 - **Version:** 0.1.0 (commit `e4a1398`), 56/56 tests passing.
-- **Phase:** first **live pilot** running (`labs/pilot-001`, PRJ-0001: curriculum vs
-  random ordering for an online linear predictor; exploratory, unprotected, 1 cycle).
+- **Phase:** live pilots. pilot-001 HALTED (architectural flaw F4, fixed by D8).
+  **pilot-002 running in the background**: it passed DESIGN on the first try and is
+  now in SCIENTIFIC_REVIEW. Log: `labs/pilot-002-run.log`.
 - **Agents:** ChatGPT scientist via `codex exec --sandbox read-only`; Claude engineer
   via `claude -p`; Codex verifier via `codex exec --sandbox workspace-write`.
 
@@ -23,18 +24,21 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress
-- [ ] Live pilot PRJ-0001: observe, diagnose failures, fix, and record results.
+- [ ] pilot-002: check the outcome (`autolab status labs/pilot-002`, the log, the report);
+      fix and record anything it exposes.
+- [ ] Full suite run after the ledger-anchoring change (anchor + store tests pass;
+      the full run was in progress when the session ended).
 
 ### Next (priority order)
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
-2. [ ] `autolab amend` CLI: recorded protocol amendments; amending after data
+2. [x] `autolab amend` CLI: recorded protocol amendments; amending after data
        collection auto-downgrades confirmatory to exploratory.
-3. [ ] Progress visibility: `autolab watch` / per-step log lines with the agent
+3. [x] Progress visibility: `autolab watch` / per-step log lines with the agent
        and elapsed time.
-4. [ ] Statistics: paired bootstrap (shared seeds), power/sample-size check at
+4. [~] Statistics: paired bootstrap DONE; still to do: (shared seeds), power/sample-size check at
        scientific review, Holm correction for multiple contrasts.
-5. [ ] Ledger anchoring: commit the ledger head hash into the research repo
+5. [x] Ledger anchoring: commit the ledger head hash into the research repo
        at each merge/run.
 6. [ ] Citation verification step for background research (mark as verified
        or unverified with the method used).
@@ -56,7 +60,7 @@ and `project_state/` (decisions, failures, open questions)._
 
 - No full live run has completed yet; real-agent schema compliance is unproven.
 - The verifier sandbox (codex workspace-write) can read outside its worktree.
-- The ledger is tamper-evident only; there is no external anchor.
+- The ledger is anchored in git commit trailers; rewriting both the DB and git is still possible.
 - Statistics are an unpaired bootstrap of means only.
 - Background-research citations are unverified (`sources_verified: false`).
 - The full test suite takes ~5 min on Windows (subprocess/git heavy); there is no fast subset marker.

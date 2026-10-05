@@ -188,7 +188,14 @@ def main(argv: list[str] | None = None) -> int:
         if bad:
             print("ARTIFACT PROBLEMS:\n" + "\n".join(bad))
             return 1
-        print(f"ledger OK ({n} events); referenced artifacts intact")
+        anchored, missing = lab.verify_anchors()
+        if missing:
+            print("LEDGER/GIT ANCHOR MISMATCH:")
+            for m in missing:
+                print("  " + m)
+            return 1
+        print(f"ledger OK ({n} events); referenced artifacts intact; "
+              f"{anchored} git anchors match")
     elif a.cmd == "export":
         for p in export_markdown(lab.store, lab.exports):
             print(p)

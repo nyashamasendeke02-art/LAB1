@@ -329,3 +329,22 @@ def test_human_halt_and_amend_requires_post_freeze(tmp_path):
     assert lab.store.get(pid).data["state"] == "HALTED"
     with pytest.raises(ValueError):
         ctl.amend_protocol(pid, scenario.protocol(), "too early")
+
+
+def test_ledger_head_anchored_in_git_and_verified(tmp_path):
+    lab, ctl = make(tmp_path)
+    pid = ctl.new_project("anchor")
+    assert ctl.run(pid)[-1].after == "COMPLETE"
+    checked, missing = lab.verify_anchors()
+    assert checked >= 2 and missing == []  # protocol freeze + merge
+    # Rebuild the DB from scratch (a forged history): git anchors no longer match.
+    lab.close()
+    (lab.state_dir / "lab.db").unlink()
+    for suffix in ("-wal", "-shm"):
+        p = lab.state_dir / f"lab.db{suffix}"
+        if p.exists():
+            p.unlink()
+    forged = Lab(lab.root)
+    forged.store.append_event("controller", "forged", "X", {})
+    checked, missing = forged.verify_anchors()
+    assert checked >= 2 and len(missing) == checked

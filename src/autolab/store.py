@@ -325,6 +325,14 @@ class Store:
             for r in self._conn.execute(sql, args).fetchall()
         ]
 
+    def head(self) -> str:
+        """Hash of the latest ledger event (GENESIS if empty)."""
+        row = self._conn.execute("SELECT hash FROM events ORDER BY seq DESC LIMIT 1").fetchone()
+        return row["hash"] if row else GENESIS
+
+    def has_event_hash(self, h: str) -> bool:
+        return self._conn.execute("SELECT 1 FROM events WHERE hash=?", (h,)).fetchone() is not None
+
     def verify_chain(self) -> int:
         """Recompute the event hash chain. Returns event count or raises ChainError."""
         prev = GENESIS

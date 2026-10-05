@@ -135,6 +135,21 @@ class Lab:
     def close(self) -> None:
         self.store.close()
 
+    def verify_anchors(self) -> tuple[int, list[str]]:
+        """Check every ledger head anchored in main's commit trailers exists in the DB chain."""
+        log = self.repo.git("log", "main",
+                            "--format=@@COMMIT %H%n%(trailers:key=Autolab-Ledger-Head,valueonly)")
+        checked, missing, sha = 0, [], ""
+        for line in log.splitlines():
+            line = line.strip()
+            if line.startswith("@@COMMIT "):
+                sha = line.split()[1]
+            elif line:
+                checked += 1
+                if not self.store.has_event_hash(line):
+                    missing.append(f"commit {sha[:10]} anchors unknown ledger head {line[:16]}")
+        return checked, missing
+
 
 # =============================================================== Controller
 class Controller:
@@ -249,7 +264,8 @@ class Controller:
         self.repo.commit_all(self.repo.path, f"Amend protocol {prot.id} (v{rec.version})",
                              IDENTITIES[Role.CONTROLLER],
                              {"Autolab-Protocol": f"{prot.id}@{rec.data['_freeze_hash'][:16]}",
-                              "Autolab-Amendment": reason[:200], "Autolab-Project": pid})
+                              "Autolab-Amendment": reason[:200], "Autolab-Project": pid,
+                              "Autolab-Ledger-Head": self.store.head()})
         eng = self._new_eng_task(pid, prot.id, [
             f"Protocol {prot.id} amended to v{rec.version} ({reason}). Update the "
             f"implementation so it satisfies the amended protocol exactly."])
@@ -607,7 +623,8 @@ class Controller:
         path.write_text(json.dumps(p, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         sha = self.repo.commit_all(self.repo.path, f"Freeze protocol {prot.id}",
                                    IDENTITIES[Role.CONTROLLER],
-                                   {"Autolab-Protocol": prot.id, "Autolab-Project": pid})
+                                   {"Autolab-Protocol": prot.id, "Autolab-Project": pid,
+                                    "Autolab-Ledger-Head": self.store.head()})
         self.store.update(prot.id, {"status": "frozen", "repo_file": rel,
                                     "repo_commit": sha or self.repo.rev("main")},
                           reason="protocol committed to research repo")
@@ -865,6 +882,7 @@ class Controller:
                 eng.data["merge_candidate"],
                 f"Merge {eng.data['merge_candidate']} ({eng.id})",
                 {"Autolab-Eng": eng.id, "Autolab-Review": eng.data["last_review"],
+                 "Autolab-Ledger-Head": self.store.head(),
                  "Autolab-Protocol": f"{prot.id}@{prot.data.get('_freeze_hash', '')[:16]}"})
         except GitError as exc:
             return self._eng_fail(pid, eng, f"merge failed: {exc}", "merge_conflict")

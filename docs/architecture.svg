@@ -1,0 +1,263 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1262" viewBox="0 0 1800 1262">
+<defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker><marker id="a0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="context-stroke"/></marker></defs>
+<rect x="0" y="0" width="1800" height="1262" rx="0" fill="#ffffff" stroke="#ffffff" stroke-width="0"/>
+<text x="40" y="44" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" font-weight="800" text-anchor="start" fill="#1f2937">Autonomous Research Lab (autolab v0.2.0): architecture</text>
+<text x="40" y="72" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" text-anchor="start" fill="#5b6472">The controller owns all state · agents propose · the controller records, verifies and transitions · the human approves and has final authority</text>
+<rect x="40" y="100" width="1320" height="62" rx="12" fill="#fff4e0" stroke="#d98a00" stroke-width="2"/>
+<text x="60" y="127" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" text-anchor="start" fill="#1f2937">HUMAN RESEARCHER: final authority</text>
+<text x="60" y="149" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#5b6472">submits the objective · approves or rejects gates · halt / amend frozen protocol / resume · accepts major conclusions</text>
+<line x1="700" y1="162" x2="700" y2="198" stroke="#d98a00" stroke-width="1.6" marker-end="url(#a1)" marker-start="url(#a0)"/>
+<text x="712" y="186" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" text-anchor="start" fill="#d98a00">autolab CLI</text>
+<rect x="1420" y="100" width="340" height="62" rx="12" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.5"/>
+<text x="1436" y="124" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="start" fill="#1f2937">Lab instance  labs/&lt;name&gt;/</text>
+<text x="1436" y="145" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">lab.toml · .autolab/lab.db · repo/ · worktrees/</text>
+<text x="1436" y="158" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">runs/ · reports/ · project_state/</text>
+<rect x="40" y="200" width="1320" height="820" rx="12" fill="#eef4ff" stroke="#3565c9" stroke-width="2.5"/>
+<text x="60" y="234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" font-weight="800" text-anchor="start" fill="#3565c9">CONTROLLER  (controller.py)</text>
+<text x="60" y="256" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#5b6472">one state-machine action per step() · records everything, then at most one transition · any process can resume a project from the DB after a crash</text>
+<text x="60" y="292" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="start" fill="#3565c9">RESEARCH STATE MACHINE  (state_machines.py · whitelisted transitions)</text>
+<rect x="65.0" y="316.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="131" y="337.39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">DEFINE</text>
+<text x="131" y="350.89" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">PROBLEM</text>
+<rect x="225.0" y="316.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="291" y="337.39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">BACKGROUND</text>
+<text x="291" y="350.89" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">RESEARCH</text>
+<rect x="385.0" y="316.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="451" y="337.39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">RESEARCH</text>
+<text x="451" y="350.89" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">QUESTION</text>
+<rect x="545.0" y="316.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="611" y="344.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">HYPOTHESIS</text>
+<rect x="705.0" y="316.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="771" y="344.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">REQUIREMENTS</text>
+<rect x="865.0" y="316.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="931" y="344.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">DESIGN</text>
+<rect x="1025.0" y="316.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="1091" y="337.39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">SCIENTIFIC</text>
+<text x="1091" y="350.89" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">REVIEW</text>
+<rect x="1185.0" y="316.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="1251" y="337.39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">PROTOCOL</text>
+<text x="1251" y="350.89" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">FREEZE</text>
+<circle cx="1313.0" cy="318.0" r="10" fill="#e0a100" stroke="#fff" stroke-width="2"/>
+<text x="1313.0" y="322.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="middle" fill="#fff">G</text>
+<line x1="199.0" y1="340" x2="223.0" y2="340" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="359.0" y1="340" x2="383.0" y2="340" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="519.0" y1="340" x2="543.0" y2="340" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="679.0" y1="340" x2="703.0" y2="340" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="839.0" y1="340" x2="863.0" y2="340" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="999.0" y1="340" x2="1023.0" y2="340" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)" marker-start="url(#a0)"/>
+<line x1="1159.0" y1="340" x2="1183.0" y2="340" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<text x="1011.0" y="305" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" text-anchor="middle" fill="#5b6472">approve / revise</text>
+<rect x="1185.0" y="436.0" width="132" height="48" rx="10" fill="#fff7ef" stroke="#3565c9" stroke-width="1.8"/>
+<text x="1251" y="464.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">ENGINEERING</text>
+<rect x="1025.0" y="436.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="1091" y="457.39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">SCIENTIFIC</text>
+<text x="1091" y="470.89" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">VALIDATION</text>
+<rect x="865.0" y="436.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="931" y="457.39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">RUN</text>
+<text x="931" y="470.89" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">EXPERIMENT</text>
+<circle cx="993.0" cy="438.0" r="10" fill="#e0a100" stroke="#fff" stroke-width="2"/>
+<text x="993.0" y="442.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="middle" fill="#fff">G</text>
+<rect x="705.0" y="436.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="771" y="464.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">ANALYZE</text>
+<rect x="545.0" y="436.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="611" y="464.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">CHALLENGE</text>
+<rect x="385.0" y="436.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="451" y="464.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">EVALUATE</text>
+<rect x="225.0" y="436.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="291" y="464.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">COMMUNICATE</text>
+<rect x="65.0" y="436.0" width="132" height="48" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.8"/>
+<text x="131" y="457.39" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">NEXT</text>
+<text x="131" y="470.89" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">QUESTION</text>
+<line x1="1183.0" y1="460" x2="1159.0" y2="460" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="1023.0" y1="460" x2="999.0" y2="460" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="863.0" y1="460" x2="839.0" y2="460" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="703.0" y1="460" x2="679.0" y2="460" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="543.0" y1="460" x2="519.0" y2="460" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="383.0" y1="460" x2="359.0" y2="460" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="223.0" y1="460" x2="199.0" y2="460" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<text x="371.0" y="500" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" text-anchor="middle" fill="#5b6472">valid</text>
+<line x1="1251" y1="366.0" x2="1251" y2="434.0" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<text x="1259" y="404" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" text-anchor="start" fill="#5b6472">frozen</text>
+<line x1="471" y1="434.0" x2="905" y2="366.0" stroke="#8a5a00" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+<rect x="579.74" y="390.5" width="222.52" height="17.5" rx="4" fill="#eef4ff"/>
+<text x="691.0" y="402" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" text-anchor="middle" fill="#8a5a00">invalid / inconclusive → redesign</text>
+<line x1="1211" y1="434.0" x2="957" y2="366.0" stroke="#8a5a00" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+<rect x="1047.02" y="390.5" width="67.96000000000001" height="17.5" rx="4" fill="#eef4ff"/>
+<text x="1081.0" y="402" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" text-anchor="middle" fill="#8a5a00">escalated</text>
+<line x1="151" y1="434.0" x2="431" y2="366.0" stroke="#3565c9" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+<rect x="253.8" y="390.5" width="74.4" height="17.5" rx="4" fill="#eef4ff"/>
+<text x="291.0" y="402" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" text-anchor="middle" fill="#3565c9">next cycle</text>
+<rect x="65.0" y="530.0" width="132" height="36" rx="10" fill="#e8f6ee" stroke="#2e8f57" stroke-width="1.8"/>
+<text x="131" y="552.14" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1f2937">COMPLETE</text>
+<line x1="131" y1="486.0" x2="131" y2="528" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<rect x="222" y="528" width="420" height="42" rx="10" fill="#fdecec" stroke="#c43c3c" stroke-width="1.6"/>
+<text x="236" y="545" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="start" fill="#c43c3c">HALTED ← any non-terminal state</text>
+<text x="236" y="562" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" fill="#5b6472">retries / budgets exhausted, integrity violation; exit only by human resume</text>
+<rect x="660" y="528" width="610" height="42" rx="10" fill="#fffaf0" stroke="#e0a100" stroke-width="1.6"/>
+<circle cx="678" cy="549" r="10" fill="#e0a100" stroke="#fff" stroke-width="2"/>
+<text x="678" y="553.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="middle" fill="#fff">G</text>
+<text x="696" y="545" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="start" fill="#1f2937">Human approval gates (agents can never approve):</text>
+<text x="696" y="562" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" text-anchor="start" fill="#5b6472">confirmatory pre-registration · protected experiment · compute budget · merge (optional)</text>
+<rect x="700" y="600" width="640" height="192" rx="10" fill="#fff7ef" stroke="#cf6a32" stroke-width="1.6"/>
+<line x1="1290" y1="486.0" x2="1290" y2="598" stroke="#cf6a32" stroke-width="1.6" stroke-dasharray="2 4" marker-end="url(#a1)"/>
+<text x="1297" y="590" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" text-anchor="start" fill="#cf6a32">delegates</text>
+<text x="716" y="622" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="start" fill="#cf6a32">ENGINEERING STATE MACHINE  (one per ENG task)</text>
+<rect x="712.0" y="640.0" width="92" height="40" rx="10" fill="#ffffff" stroke="#cf6a32" stroke-width="1.8"/>
+<text x="758" y="663.78" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">SPEC</text>
+<rect x="818.0" y="640.0" width="92" height="40" rx="10" fill="#ffffff" stroke="#cf6a32" stroke-width="1.8"/>
+<text x="864" y="663.78" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">IMPLEMENTING</text>
+<rect x="924.0" y="640.0" width="92" height="40" rx="10" fill="#ffffff" stroke="#cf6a32" stroke-width="1.8"/>
+<text x="970" y="663.78" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">TESTING</text>
+<rect x="1030.0" y="640.0" width="92" height="40" rx="10" fill="#ffffff" stroke="#cf6a32" stroke-width="1.8"/>
+<text x="1076" y="657.53" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">ADVERSARIAL</text>
+<text x="1076" y="670.03" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">REVIEW</text>
+<rect x="1136.0" y="640.0" width="92" height="40" rx="10" fill="#ffffff" stroke="#cf6a32" stroke-width="1.8"/>
+<text x="1182" y="663.78" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">MERGE</text>
+<circle cx="1224.0" cy="642.0" r="10" fill="#e0a100" stroke="#fff" stroke-width="2"/>
+<text x="1224.0" y="646.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="middle" fill="#fff">G</text>
+<rect x="1242.0" y="640.0" width="92" height="40" rx="10" fill="#ffffff" stroke="#cf6a32" stroke-width="1.8"/>
+<text x="1288" y="663.78" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">MERGED</text>
+<line x1="805" y1="660" x2="817" y2="660" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="911" y1="660" x2="923" y2="660" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="1017" y1="660" x2="1029" y2="660" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="1123" y1="660" x2="1135" y2="660" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<line x1="1229" y1="660" x2="1241" y2="660" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)"/>
+<path d="M 1076 681 C 1076 712, 864 712, 864 682" fill="none" stroke="#8a5a00" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+<text x="970" y="724" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="600" text-anchor="middle" fill="#8a5a00">tests or review fail → patch</text>
+<text x="716" y="752" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#1f2937">≥ 3 failed patches → REDESIGN: fresh branch from main + full failure history</text>
+<text x="716" y="772" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#1f2937">≥ 2 redesigns → ESCALATED → research DESIGN (approach inadequate)</text>
+<rect x="60" y="600" width="620" height="400" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.4"/>
+<text x="76" y="624" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="start" fill="#3565c9">CONTROLLER MECHANISMS</text>
+<text x="76" y="650" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1f2937"><tspan font-weight="700">Agent dispatch: </tspan>builds the TaskPacket, extracts the JSON answer, validates it</text>
+<text x="76" y="668" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">against the stage schema; up to 2 protocol retries; rejected answers are stored.</text>
+<text x="76" y="695" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1f2937"><tspan font-weight="700">Integrity check: </tspan>after every agent call, main HEAD and clean tree, ledger chain and</text>
+<text x="76" y="713" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">lab.toml must be unchanged, otherwise HALT (never retried).</text>
+<text x="76" y="740" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1f2937"><tspan font-weight="700">Commits, path policy, merge: </tspan>the controller commits for agents; edits to protected</text>
+<text x="76" y="758" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">paths are reverted. Merge needs controller tests, the verifier&#x27;s tests passing in a</text>
+<text x="76" y="776" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">hermetic run, and a verifier pass with no critical/major finding.</text>
+<text x="76" y="803" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1f2937"><tspan font-weight="700">Experiment engine: </tspan>detached checkout of the merged commit; smoke test on a non-</text>
+<text x="76" y="821" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">protocol seed; then every condition × seed with --params = fixed_params + condition</text>
+<text x="76" y="839" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">params; raw data hashed and made read-only.</text>
+<text x="76" y="866" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1f2937"><tspan font-weight="700">Analysis: </tspan>the pre-registered decision rule with Student / Welch t intervals and</text>
+<text x="76" y="884" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">validity checks gives the outcome before any agent interprets it; looks per</text>
+<text x="76" y="902" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">hypothesis are counted.</text>
+<text x="76" y="929" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" fill="#1f2937"><tspan font-weight="700">Processes: </tspan>agents, tests and trials run in kill-on-close job objects, so no orphaned</text>
+<text x="76" y="947" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">processes.</text>
+<rect x="700" y="806" width="640" height="194" rx="10" fill="#ffffff" stroke="#3565c9" stroke-width="1.4"/>
+<text x="716" y="828" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="start" fill="#3565c9">AGENT COMMUNICATION PROTOCOL  (messages.py · prompts.py)</text>
+<rect x="714" y="840" width="294" height="112" rx="8" fill="#f7f9ff" stroke="#9fb3e0" stroke-width="1.2"/>
+<text x="726" y="858" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="800" text-anchor="start" fill="#1f2937">TaskPacket  (controller → agent)</text>
+<text x="726" y="876" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">task_id · role · stage</text>
+<text x="726" y="891" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">objective (neutral if blinded)</text>
+<text x="726" y="906" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">context: explicit; no conversation memory</text>
+<text x="726" y="921" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">constraints · acceptance_criteria</text>
+<text x="726" y="936" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">workdir · writable · output_schema</text>
+<line x1="1010" y1="896" x2="1032" y2="896" stroke="#1f2937" stroke-width="1.6" marker-end="url(#a1)" marker-start="url(#a0)"/>
+<rect x="1034" y="840" width="294" height="112" rx="8" fill="#f7f9ff" stroke="#9fb3e0" stroke-width="1.2"/>
+<text x="1046" y="858" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="800" text-anchor="start" fill="#1f2937">Completion  (agent → controller)</text>
+<text x="1046" y="876" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">status: complete | blocked | needs_review | failed</text>
+<text x="1046" y="891" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">summary · risks[]</text>
+<text x="1046" y="906" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">payload: validated against STAGE_SCHEMAS</text>
+<text x="1046" y="921" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">research_claims[]: each labelled</text>
+<text x="1046" y="936" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">invalid → rejected, retried, stored</text>
+<text x="716" y="972" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">Evidence labels: ESTABLISHED · SOURCE_CLAIM · HYPOTHESIS · ENGINEERING_DECISION · EXPERIMENTAL_RESULT</text>
+<text x="716" y="987" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">(must cite a run the controller recorded) · INFERENCE · OPEN_QUESTION</text>
+<rect x="1420" y="200" width="340" height="212" rx="12" fill="#e8f6ee" stroke="#2e8f57" stroke-width="2"/>
+<text x="1436" y="226" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" text-anchor="start" fill="#2e8f57">SCIENTIST</text>
+<text x="1744" y="226" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="end" fill="#2e8f57">ChatGPT</text>
+<text x="1436" y="246" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">codex exec --sandbox read-only</text>
+<text x="1436" y="268" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">Writes: </tspan>nothing</text>
+<text x="1436" y="289" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">Stages: </tspan>define problem · background research ·</text>
+<text x="1436" y="306" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">research question · hypothesis · requirements</text>
+<text x="1436" y="323" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">· design (options + protocol) · scientific</text>
+<text x="1436" y="340" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">review · scientific validation (reads the</text>
+<text x="1436" y="357" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">merged code) · interpret · communicate · next</text>
+<text x="1436" y="374" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">question</text>
+<line x1="1362" y1="306.0" x2="1418" y2="306.0" stroke="#2e8f57" stroke-width="1.6" marker-end="url(#a1)" marker-start="url(#a0)"/>
+<text x="1390" y="299.0" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#2e8f57">JSON</text>
+<rect x="1420" y="430" width="340" height="205" rx="12" fill="#fdeee5" stroke="#cf6a32" stroke-width="2"/>
+<text x="1436" y="456" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" text-anchor="start" fill="#cf6a32">ENGINEER</text>
+<text x="1744" y="456" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="end" fill="#cf6a32">Claude</text>
+<text x="1436" y="476" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">claude -p · acceptEdits · no git</text>
+<text x="1436" y="498" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">Worktree: </tspan>eng/&lt;ENG&gt;-d&lt;n&gt;, branched from main</text>
+<text x="1436" y="519" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">May write: </tspan>anything except protocols/ and</text>
+<text x="1436" y="536" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">tests/verification/</text>
+<text x="1436" y="557" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">Stages: </tspan>solution design (read-only) ·</text>
+<text x="1436" y="574" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">implement · redesign</text>
+<text x="1436" y="595" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">Blinded: </tspan>no hypothesis, decision rule or</text>
+<text x="1436" y="612" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">earlier results</text>
+<line x1="1362" y1="532.5" x2="1418" y2="532.5" stroke="#cf6a32" stroke-width="1.6" marker-end="url(#a1)" marker-start="url(#a0)"/>
+<text x="1390" y="525.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#cf6a32">JSON</text>
+<rect x="1420" y="653" width="340" height="215" rx="12" fill="#efeaff" stroke="#6a4fd0" stroke-width="2"/>
+<text x="1436" y="679" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" text-anchor="start" fill="#6a4fd0">VERIFIER</text>
+<text x="1744" y="679" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="700" text-anchor="end" fill="#6a4fd0">Codex</text>
+<text x="1436" y="699" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#1f2937">codex exec --sandbox workspace-write</text>
+<text x="1436" y="721" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">Worktree: </tspan>verify/&lt;ENG&gt;-r&lt;n&gt;, from the</text>
+<text x="1436" y="738" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">engineer&#x27;s head</text>
+<text x="1436" y="759" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">May write: </tspan>tests/verification/* only</text>
+<text x="1436" y="780" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">verify: </tspan>adversarial code review + at least 1</text>
+<text x="1436" y="797" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">independent pytest (blinded)</text>
+<text x="1436" y="818" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="#1f2937"><tspan font-weight="700">challenge: </tspan>read-only attack on results and raw</text>
+<text x="1436" y="835" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">data</text>
+<line x1="1362" y1="760.5" x2="1418" y2="760.5" stroke="#6a4fd0" stroke-width="1.6" marker-end="url(#a1)" marker-start="url(#a0)"/>
+<text x="1390" y="753.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#6a4fd0">JSON</text>
+<rect x="1420" y="886" width="340" height="134" rx="10" fill="#fafafa" stroke="#9aa1ad" stroke-width="1.4" stroke-dasharray="5 4"/>
+<text x="1436" y="908" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="start" fill="#1f2937">All agent CLIs are hermetic</text>
+<text x="1436" y="928" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">claude: no settings, MCP, skills, auto-memory</text>
+<text x="1436" y="943" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">codex: --ignore-user-config, --ignore-rules;</text>
+<text x="1436" y="958" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">  plugins, apps, memories disabled</text>
+<text x="1436" y="973" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">the task packet is the only context</text>
+<text x="1436" y="988" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">agents never touch the DB, never run git,</text>
+<text x="1436" y="1003" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">  never decide transitions</text>
+<line x1="700" y1="1022" x2="700" y2="1058" stroke="#6b7280" stroke-width="1.6" marker-end="url(#a1)" marker-start="url(#a0)"/>
+<text x="712" y="1046" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="600" text-anchor="start" fill="#6b7280">records · ledger events · commits · artifacts</text>
+<line x1="1590" y1="1022" x2="1590" y2="1058" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="2 4" marker-end="url(#a1)"/>
+<text x="1600" y="1046" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="600" text-anchor="start" fill="#6b7280">files in own worktree only</text>
+<rect x="40" y="1060" width="415" height="138" rx="12" fill="#f3f4f6" stroke="#6b7280" stroke-width="2"/>
+<text x="56" y="1086" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" text-anchor="start" fill="#1f2937">STORE</text>
+<text x="56" y="1105" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">store.py · SQLite .autolab/lab.db</text>
+<text x="56" y="1128" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">Versioned, immutable records (SQL triggers block UPDATE and</text>
+<text x="56" y="1145" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">DELETE) · sha256 hash-chained event ledger · frozen</text>
+<text x="56" y="1162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">protocols; amendments carry a justification and a new freeze</text>
+<text x="56" y="1179" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">hash</text>
+<rect x="475" y="1060" width="415" height="138" rx="12" fill="#f3f4f6" stroke="#6b7280" stroke-width="2"/>
+<text x="491" y="1086" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" text-anchor="start" fill="#1f2937">ARTIFACTS</text>
+<text x="491" y="1105" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">content-addressed (sha256)</text>
+<text x="491" y="1128" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">Read-only files: prompts, raw agent responses (including</text>
+<text x="491" y="1145" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">rejected ones), completions, test logs, raw trial data, run</text>
+<text x="491" y="1162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">manifests, reports</text>
+<rect x="910" y="1060" width="415" height="138" rx="12" fill="#f3f4f6" stroke="#6b7280" stroke-width="2"/>
+<text x="926" y="1086" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" text-anchor="start" fill="#1f2937">MEMORY &amp; REPORTS</text>
+<text x="926" y="1105" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">memory.py · report.py</text>
+<text x="926" y="1128" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">project_state/*.md regenerated every step · lineage trace:</text>
+<text x="926" y="1145" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">conclusion → result → run → commit → frozen protocol →</text>
+<text x="926" y="1162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">design → hypothesis → agent tasks · reports/</text>
+<rect x="1345" y="1060" width="415" height="138" rx="12" fill="#f3f4f6" stroke="#6b7280" stroke-width="2"/>
+<text x="1361" y="1086" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="800" text-anchor="start" fill="#1f2937">GIT</text>
+<text x="1361" y="1105" font-family="Consolas, Menlo, monospace" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472">worktrees.py · repo/</text>
+<text x="1361" y="1128" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">main changes only through controller --no-ff merges with</text>
+<text x="1361" y="1145" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">provenance trailers · one worktree and branch per agent</text>
+<text x="1361" y="1162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">task; branches never deleted · ledger head anchored in</text>
+<text x="1361" y="1179" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">commits</text>
+<text x="40" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="800" text-anchor="start" fill="#1f2937">Legend</text>
+<rect x="110" y="1221" width="22" height="16" rx="4" fill="#fff4e0" stroke="#d98a00" stroke-width="1.5"/>
+<text x="140" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">Human</text>
+<rect x="201.0" y="1221" width="22" height="16" rx="4" fill="#eef4ff" stroke="#3565c9" stroke-width="1.5"/>
+<text x="231.0" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">Controller</text>
+<rect x="325.0" y="1221" width="22" height="16" rx="4" fill="#e8f6ee" stroke="#2e8f57" stroke-width="1.5"/>
+<text x="355.0" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">Scientist (ChatGPT)</text>
+<rect x="508.4" y="1221" width="22" height="16" rx="4" fill="#fdeee5" stroke="#cf6a32" stroke-width="1.5"/>
+<text x="538.4" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">Engineer (Claude)</text>
+<rect x="678.5999999999999" y="1221" width="22" height="16" rx="4" fill="#efeaff" stroke="#6a4fd0" stroke-width="1.5"/>
+<text x="708.5999999999999" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">Verifier (Codex)</text>
+<rect x="842.1999999999999" y="1221" width="22" height="16" rx="4" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.5"/>
+<text x="872.1999999999999" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">Storage</text>
+<circle cx="954.3999999999999" cy="1230" r="10" fill="#e0a100" stroke="#fff" stroke-width="2"/>
+<text x="954.3999999999999" y="1234.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="800" text-anchor="middle" fill="#fff">G</text>
+<text x="970.3999999999999" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">human approval gate</text>
+<line x1="1121.3999999999999" y1="1230" x2="1161.3999999999999" y2="1230" stroke="#8a5a00" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#a1)"/>
+<text x="1169.3999999999999" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">loop back / redesign</text>
+<line x1="1321.3999999999999" y1="1230" x2="1361.3999999999999" y2="1230" stroke="#6b7280" stroke-width="1.6" stroke-dasharray="2 4" marker-end="url(#a1)"/>
+<text x="1369.3999999999999" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#1f2937">delegation / file access</text>
+<text x="1760" y="1234" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" font-weight="400" text-anchor="end" fill="#5b6472">source: docs/architecture_diagram.py</text>
+</svg>

@@ -16,6 +16,10 @@ import os
 import signal
 import subprocess
 import sys
+import time
+
+if sys.platform != "win32":
+    import resource
 from dataclasses import dataclass
 
 
@@ -25,6 +29,10 @@ class ProcResult:
     stdout: str
     stderr: str
     timed_out: bool = False
+    # Controller-measured resources of the whole process tree (None if unavailable).
+    wall_s: float | None = None
+    cpu_s: float | None = None
+    peak_mb: float | None = None
 
 
 class _Job:
@@ -41,6 +49,8 @@ class _Job:
                                                 wintypes.LPVOID, wintypes.DWORD]
         k32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
         k32.TerminateJobObject.argtypes = [wintypes.HANDLE, wintypes.UINT]
+        k32.QueryInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID,
+                                                  wintypes.DWORD, wintypes.LPVOID]
         k32.CloseHandle.argtypes = [wintypes.HANDLE]
 
         class BASIC(ctypes.Structure):
@@ -66,6 +76,15 @@ class _Job:
                         ("PeakProcessMemoryUsed", ctypes.c_size_t),
                         ("PeakJobMemoryUsed", ctypes.c_size_t)]
 
+        class ACCOUNTING(ctypes.Structure):
+            _fields_ = [("TotalUserTime", ctypes.c_int64), ("TotalKernelTime", ctypes.c_int64),
+                        ("ThisPeriodTotalUserTime", ctypes.c_int64),
+                        ("ThisPeriodTotalKernelTime", ctypes.c_int64),
+                        ("TotalPageFaultCount", wintypes.DWORD),
+                        ("TotalProcesses", wintypes.DWORD), ("ActiveProcesses", wintypes.DWORD),
+                        ("TotalTerminatedProcesses", wintypes.DWORD)]
+
+        self._ctypes, self._EXTENDED, self._ACCOUNTING = ctypes, EXTENDED, ACCOUNTING
         self.handle = k32.CreateJobObjectW(None, None)
         if not self.handle:
             raise OSError(ctypes.get_last_error(), "CreateJobObjectW failed")
@@ -81,6 +100,17 @@ class _Job:
 
     def kill(self) -> None:
         self._k32.TerminateJobObject(self.handle, 1)
+
+    def usage(self) -> tuple[float | None, float | None]:
+        """(CPU seconds, peak job memory in MB) for every process that ran in the job."""
+        ct = self._ctypes
+        acc, ext = self._ACCOUNTING(), self._EXTENDED()
+        cpu = peak = None
+        if self._k32.QueryInformationJobObject(self.handle, 1, ct.byref(acc), ct.sizeof(acc), None):
+            cpu = (acc.TotalUserTime + acc.TotalKernelTime) / 1e7  # 100 ns units
+        if self._k32.QueryInformationJobObject(self.handle, 9, ct.byref(ext), ct.sizeof(ext), None):
+            peak = ext.PeakJobMemoryUsed / 2**20
+        return cpu, peak
 
     def close(self) -> None:
         if self.handle:
@@ -103,6 +133,8 @@ def run_tree(cmd: list[str], *, cwd: str | None = None, input: str | None = None
              timeout: float | None = None, env: dict | None = None) -> ProcResult:
     """Run ``cmd`` to completion; kill its whole process tree on timeout or interrupt."""
     win = sys.platform == "win32"
+    t0 = time.perf_counter()
+    ru0 = None if win else resource.getrusage(resource.RUSAGE_CHILDREN)
     proc = subprocess.Popen(
         cmd, cwd=cwd, env=env, text=True, encoding="utf-8", errors="replace",
         stdin=subprocess.PIPE if input is not None else subprocess.DEVNULL,
@@ -116,14 +148,29 @@ def run_tree(cmd: list[str], *, cwd: str | None = None, input: str | None = None
         except OSError:
             job.close()
             job = None
+    def finish(rc: int, out: str, err: str, timed_out: bool = False) -> ProcResult:
+        res = ProcResult(rc, out or "", err or "", timed_out,
+                         wall_s=round(time.perf_counter() - t0, 4))
+        if job is not None:
+            res.cpu_s, res.peak_mb = job.usage()
+        elif ru0 is not None:
+            ru1 = resource.getrusage(resource.RUSAGE_CHILDREN)
+            res.cpu_s = (ru1.ru_utime - ru0.ru_utime) + (ru1.ru_stime - ru0.ru_stime)
+            res.peak_mb = ru1.ru_maxrss / (2**20 if sys.platform == "darwin" else 2**10)
+        if res.cpu_s is not None:
+            res.cpu_s = round(res.cpu_s, 4)
+        if res.peak_mb is not None:
+            res.peak_mb = round(res.peak_mb, 2)
+        return res
+
     try:
         try:
             out, err = proc.communicate(input=input, timeout=timeout)
-            return ProcResult(proc.returncode, out or "", err or "")
+            return finish(proc.returncode, out, err)
         except subprocess.TimeoutExpired:
             _kill_tree(proc, job)
             out, err = proc.communicate()
-            return ProcResult(-1, out or "", err or "", timed_out=True)
+            return finish(-1, out, err, timed_out=True)
         except BaseException:  # KeyboardInterrupt etc.: never leave the tree behind
             _kill_tree(proc, job)
             proc.wait()

@@ -1,13 +1,17 @@
 """Command-line interface.
 
     autolab init LAB                       create a lab (config, research repo, DB)
-    autolab new LAB "Investigate whether X can produce Y"
+    autolab new LAB "Investigate whether X can produce Y" [--refs "H3,E4"]
+    autolab task LAB "engineering spec" --accept "criterion" [--accept ...] [--refs "REQ-SAFE,Gate 0"]
+                                           engineering track (no hypothesis)
+    autolab mandate LAB                    mandate traceability: refs -> deliveries / conclusions
     autolab run LAB [PRJ] [--max-steps N]  advance autonomously until done/blocked/halted
     autolab step LAB [PRJ]                 advance one state-machine action
     autolab status LAB                     projects, states, pending approvals
     autolab approvals LAB                  list pending approval gates
-    autolab approve LAB APR-0001 [--note]  human decision (gates)
-    autolab reject LAB APR-0001 [--note]
+    autolab approve LAB APR-0001 [--note] [--as NAME]  gate decision (human, or a
+                                           delegate named in lab.toml; delegates need --note)
+    autolab reject LAB APR-0001 [--note] [--as NAME]
     autolab resume LAB PRJ --note "..."    human: leave HALTED and retry
     autolab halt LAB PRJ --note "..."      human: stop a project
     autolab show LAB RECORD [--protocol]   print a record (or just its protocol JSON)
@@ -40,6 +44,29 @@ def _project(lab: Lab, pid: str | None) -> str:
     return projects[-1].id
 
 
+def _refs(text: str) -> list[str]:
+    return [r.strip() for r in text.split(",") if r.strip()]
+
+
+def mandate_coverage(store) -> dict[str, list[str]]:
+    """Mandate ref -> what the lab produced for it (projects, deliveries, conclusions)."""
+    out: dict[str, list[str]] = {}
+    for proj in store.query("project"):
+        for ref in proj.data.get("mandate_refs", []):
+            out.setdefault(ref, []).append(
+                f"{proj.id} [{proj.data.get('kind', 'research')}] {proj.data['state']}: "
+                f"{proj.data['objective'][:80]}")
+    for dlv in store.query("delivery"):
+        for ref in dlv.data.get("mandate_refs", []):
+            out.setdefault(ref, []).append(f"{dlv.id} delivered at {dlv.data['commit'][:10]} "
+                                           f"(review {dlv.data['review']})")
+    for con in store.query("conclusion"):
+        for ref in con.data.get("mandate_refs", []):
+            out.setdefault(ref, []).append(f"{con.id} {con.data['outcome']} "
+                                           f"({con.data['confidence']})")
+    return out
+
+
 def _print_step(s) -> None:
     stamp = datetime.now().strftime("%H:%M:%S")
     took = f"{s.elapsed_s:>6.1f}s" if s.elapsed_s is not None else "       "
@@ -63,6 +90,13 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("new")
     p.add_argument("lab")
     p.add_argument("objective")
+    p.add_argument("--refs", default="")
+    p = sub.add_parser("task")
+    p.add_argument("lab")
+    p.add_argument("spec")
+    p.add_argument("--accept", action="append", required=True)
+    p.add_argument("--refs", default="")
+    sub.add_parser("mandate").add_argument("lab")
     for name in ("run", "step"):
         p = sub.add_parser(name)
         p.add_argument("lab")
@@ -75,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("lab")
         p.add_argument("approval")
         p.add_argument("--note", default="")
+        p.add_argument("--as", dest="by", default="human")
     p = sub.add_parser("resume")
     p.add_argument("lab")
     p.add_argument("project")
@@ -119,8 +154,16 @@ def main(argv: list[str] | None = None) -> int:
 
     lab = Lab(a.lab)
     if a.cmd == "new":
-        pid = Controller(lab, agents={}).new_project(a.objective)
+        pid = Controller(lab, agents={}).new_project(a.objective, _refs(a.refs))
         print(pid)
+    elif a.cmd == "task":
+        pid = Controller(lab, agents={}).new_engineering_project(a.spec, a.accept, _refs(a.refs))
+        print(pid)
+    elif a.cmd == "mandate":
+        for ref, items in sorted(mandate_coverage(lab.store).items()):
+            print(ref)
+            for line in items:
+                print(f"    {line}")
     elif a.cmd in ("run", "step"):
         ctl = Controller(lab)
         pid = _project(lab, a.project)
@@ -131,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "status":
         for proj in lab.store.query("project"):
             d = proj.data
-            print(f"{proj.id}  state={d['state']}  cycle={d['cycle']}  "
+            print(f"{proj.id}  [{d.get('kind', 'research')}]  state={d['state']}  cycle={d['cycle']}  "
                   f"blocked_on={d.get('blocked_on') or '-'}  halt={d.get('halt_reason') or '-'}")
             print(f"    {d['objective']}")
         for apr in Gates(lab.store).pending():
@@ -142,7 +185,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{apr.id}: {apr.data['gate']} on {apr.data['subject']}\n  {apr.data['summary']}")
             print("  details:", json.dumps(apr.data["details"])[:2000])
     elif a.cmd in ("approve", "reject"):
-        rec = Gates(lab.store).decide(a.approval, a.cmd == "approve", by="human", note=a.note)
+        rec = Gates(lab.store, lab.config["gates"].get("delegation")).decide(
+            a.approval, a.cmd == "approve", by=a.by, note=a.note)
         print(f"{rec.id}: {rec.data['status']}")
     elif a.cmd == "resume":
         Controller(lab, agents={}).resume(a.project, a.note)

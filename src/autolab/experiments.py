@@ -42,6 +42,7 @@ class Trial:
     metrics: dict
     out_dir: str
     error: str | None = None
+    resources: dict = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -86,9 +87,36 @@ def trial_params(protocol: dict, condition: dict) -> dict:
     return {**protocol.get("fixed_params", {}), **condition.get("params", {})}
 
 
+# Controller-measured resource metrics, injected into every trial's metrics. Code under
+# test cannot fake them: values it writes under these names are overwritten.
+RESOURCE_METRICS = ("autolab_wall_s", "autolab_cpu_s", "autolab_peak_mb")
+
+
+def dir_size_mb(path: Path) -> float:
+    return sum(f.stat().st_size for f in path.rglob("*") if f.is_file()) / 2**20
+
+
+def check_lock(lock_file: Path) -> list[str]:
+    """Compare a pinned ``name==version`` lock file with the running interpreter's packages."""
+    problems = []
+    for line in lock_file.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line or "==" not in line:
+            continue
+        name, want = (x.strip() for x in line.split("==", 1))
+        try:
+            have = importlib.metadata.version(name)
+        except importlib.metadata.PackageNotFoundError:
+            problems.append(f"{name}=={want} not installed")
+            continue
+        if have != want:
+            problems.append(f"{name}: locked {want}, installed {have}")
+    return problems
+
+
 def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
               seed: int, required_metrics: list[str], timeout_s: float,
-              params: dict | None = None) -> Trial:
+              params: dict | None = None, output_cap_mb: float | None = None) -> Trial:
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = build_command(entrypoint) + [
         "--condition", condition["name"], "--seed", str(seed),
@@ -101,6 +129,8 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
     error = None
     proc = run_tree(cmd, cwd=str(workdir), timeout=timeout_s, env=env)
     rc, stdout, stderr = proc.returncode, proc.stdout, proc.stderr
+    resources = {"autolab_wall_s": proc.wall_s, "autolab_cpu_s": proc.cpu_s,
+                 "autolab_peak_mb": proc.peak_mb}
     if proc.timed_out:
         error = f"timeout after {timeout_s}s"
     dur = time.perf_counter() - t0
@@ -113,6 +143,7 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
             metrics = json.loads(mpath.read_text(encoding="utf-8"))
             if not isinstance(metrics, dict):
                 raise ValueError("metrics.json is not an object")
+            metrics.update({k: v for k, v in resources.items() if v is not None})
             missing = [m for m in required_metrics if not _finite_number(metrics.get(m))]
             if missing:
                 error = f"missing/non-finite metrics: {missing}"
@@ -122,13 +153,18 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
             error = f"invalid metrics.json: {exc}"
     elif error is None:
         error = f"exit code {rc}"
+    if error is None and output_cap_mb is not None:
+        size = dir_size_mb(out_dir)
+        if size > output_cap_mb:
+            error = f"trial output {size:.1f} MB exceeds the {output_cap_mb} MB cap"
     return Trial(condition["name"], condition["role"], seed, rc, round(dur, 4),
-                 metrics, str(out_dir), error)
+                 metrics, str(out_dir), error, resources)
 
 
 def run_protocol(protocol: dict, workdir: Path, out_root: Path,
                  seeds: list[int] | None = None,
-                 conditions: list[str] | None = None) -> RunOutput:
+                 conditions: list[str] | None = None,
+                 output_cap_mb: float | None = None) -> RunOutput:
     """Run every (condition x seed). ``seeds``/``conditions`` override only for smoke tests."""
     timeout = float(protocol.get("budget", {}).get("timeout_s", 600))
     required = [protocol["metrics"]["primary"], *protocol["metrics"].get("secondary", [])]
@@ -140,7 +176,8 @@ def run_protocol(protocol: dict, workdir: Path, out_root: Path,
             out.trials.append(run_trial(protocol["entrypoint"], workdir,
                                         out_root / cond["name"] / f"seed-{seed}",
                                         cond, seed, required, timeout,
-                                        params=trial_params(protocol, cond)))
+                                        params=trial_params(protocol, cond),
+                                        output_cap_mb=output_cap_mb))
     return out
 
 

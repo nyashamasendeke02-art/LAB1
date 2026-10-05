@@ -114,6 +114,7 @@ PROTOCOL_SCHEMA = {
         "success_checks": {"type": "array", "items": REQUIREMENT_SCHEMA},
         "transfer_tests": _strs,
         "robustness_tests": _strs,
+        "mandate_refs": _strs,
     },
 }
 
@@ -173,6 +174,16 @@ STAGE_SCHEMAS: dict[str, dict] = {
         ["summary"],
         {"summary": _nstr, "files_changed": _strs, "tests_added": _strs,
          "design_notes": _str},
+    ),
+    "build": _obj(
+        ["summary"],
+        {"summary": _nstr, "files_changed": _strs, "tests_added": _strs,
+         "design_notes": _str, "mandate_refs": _strs},
+    ),
+    "rebuild": _obj(
+        ["summary", "architecture_change"],
+        {"summary": _nstr, "architecture_change": _nstr, "files_changed": _strs,
+         "tests_added": _strs},
     ),
     "redesign": _obj(
         ["summary", "architecture_change"],

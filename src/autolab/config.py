@@ -10,6 +10,9 @@ DEFAULT_TOML = """\
 # Autonomous Research Lab configuration.
 [lab]
 name = "autolab"
+# Optional: a file in the research repo given to the scientist as the lab charter
+# (e.g. "docs/MANDATE.md").
+charter = ""
 
 # Role -> backend. backends: "codex-cli", "claude-cli", "openai-api".
 # The scientist (ChatGPT) defaults to the Codex CLI in read-only mode, which
@@ -35,12 +38,21 @@ max_design_iterations = 4    # research DESIGN re-entries per cycle before HALTE
 max_cycles = 3               # research cycles (question -> report) per project
 max_trials_without_approval = 200
 test_timeout_s = 900
+max_trial_output_mb = 25     # raw output cap per trial (telemetry policy)
 
 [gates]
 # Human approval is ALWAYS required for protocols marked protected = true.
 confirmatory_protocol_freeze = true   # human approves pre-registration
 merge_to_main = false                 # human approves every merge
 compute_budget = true                 # trials > max_trials_without_approval
+# Path-based review gates: merges that change matching files need a decision.
+review_paths = []   # e.g. [{pattern = "src/safety/*", gate = "safety"}]
+
+# Gates the human delegates to a named (non-agent) decider. Decisions are recorded
+# as decided_by=<delegate>, delegated_by="human".
+[gates.delegation]
+delegate = ""
+gates = []
 
 [engineering]
 test_command = "python -m pytest -q"

@@ -17,7 +17,7 @@ KINDS = [
     "project", "problem", "background", "claim", "question", "hypothesis",
     "requirements", "design", "protocol", "eng_task", "review", "run", "result",
     "challenge", "conclusion", "failure", "report", "future_question", "task",
-    "approval", "cycle",
+    "approval", "cycle", "delivery",
 ]
 
 
@@ -102,8 +102,9 @@ def export_markdown(store: Store, out_dir: str | Path) -> list[Path]:
     lines = ["# Current State", "", "_Generated from the lab database. Do not edit._", ""]
     for p in projects:
         d = p.data
-        lines += [f"## {p.id}: {d['objective']}", "",
-                  f"- research state: **{d['state']}**",
+        lines += [f"## {p.id} [{d.get('kind', 'research')}]: {d['objective']}", "",
+                  f"- state: **{d['state']}**",
+                  f"- mandate refs: {', '.join(d.get('mandate_refs', [])) or '-'}",
                   f"- cycle: {d.get('cycle', 1)}",
                   f"- blocked on: {d.get('blocked_on') or '-'}",
                   f"- halted reason: {d.get('halt_reason') or '-'}", ""]
@@ -132,7 +133,14 @@ def export_markdown(store: Store, out_dir: str | Path) -> list[Path]:
     w("DECISIONS.md", "# Approval Decisions\n\n" + _md_list(
         store.query("approval"),
         lambda r: f"- **{r.id}** {r.data['gate']} on {r.data['subject']}: "
-                  f"**{r.data['status']}** {r.data.get('note', '')}"))
+                  f"**{r.data['status']}** by {r.data.get('decided_by', '-')}"
+                  f"{' (delegated by ' + r.data['delegated_by'] + ')' if r.data.get('delegated_by') else ''}"
+                  f" {r.data.get('note', '')}"))
+    w("DELIVERIES.md", "# Engineering Deliveries\n\n" + _md_list(
+        store.query("delivery"),
+        lambda r: f"- **{r.id}** {', '.join(r.data.get('mandate_refs', [])) or '-'}: "
+                  f"commit {r.data['commit'][:10]}, review {r.data['review']}: "
+                  f"{r.data['spec'][:120]}"))
     w("EXPERIMENTS.md", "# Experiment Runs\n\n" + _md_list(
         store.query("run"),
         lambda r: f"- **{r.id}** protocol={r.data['refs']['protocol']} "

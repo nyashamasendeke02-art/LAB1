@@ -62,3 +62,16 @@
   CLAUDE.md sets the method. Every component is earned by an experiment against its ablation;
   sequencing is Gate 0 (contracts) -> Gate 1 (simulation) -> E1 (S1 baseline), which is
   CLAUDE.md's first milestone. The Safety Kernel is never a research variable.
+- D21 (2026-10-04, human -> Claude Code): full control delegated ("100% in control ... start it end
+  to end, utilising the lab"). Claude Code decides the PROJECT_PLAN section 10 items:
+  (1) plan adopted as the programme baseline; (2) repo strategy A, a single lab `labs/robolab`
+  whose repo is the robot-brain code; (3) EnvA = Puck2D; (4) budgets: trial timeout 300 s, at most
+  200 trials per study, one active agent run at a time; (5) pilot -> one confirmatory study per
+  hypothesis; (6) no remote backup (pushing still needs explicit human approval). Gate decisions
+  taken under this delegation are recorded as decided_by="claude-code" with delegated_by="human",
+  never as the human. Acceptance of major scientific conclusions stays flagged for the human.
+- D22: P0 sequencing (smallest justified change). Before the validation run: L1 engineering track,
+  L2 path gates + recorded delegation, L3 resource metering, L6 pilot->confirmatory, L7 mandate
+  refs + lab charter in scientist context, L8 output cap, L9 dependency lock check. L4
+  (non-inferiority / co-primary / Holm) and L5 (power) come before the first confirmatory study or
+  E3. L10 (citation verification) is deferred: sources stay `sources_verified: false`.

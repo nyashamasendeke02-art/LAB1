@@ -125,6 +125,30 @@ verifier's tests passing in a hermetic run (no conftest, controller ini, JUnit-c
 protocol compliance confirmed. A "pass" verdict accompanied by a critical
 finding is treated as a fail.
 
+### 4a. Engineering track (v0.3.0)
+
+`autolab task LAB "spec" --accept "..." --refs "REQ-SAFE,Gate 0"` creates an
+*engineering* project for gate work with no hypothesis. It starts in ENGINEERING
+and runs the same engineering machine (build → controller tests → adversarial review
+with hermetic independent tests → review gates → merge), then ends COMPLETE with a
+`delivery` record (spec, acceptance criteria, mandate refs, commit, review). A
+research project can never go ENGINEERING → COMPLETE. Engineering tasks are not
+blinded: the spec is the objective.
+
+**Review gates on paths:** `[gates] review_paths` (e.g. `src/safety/*` → `safety`)
+blocks a merge that touches those files until the gate is decided. **Delegation:**
+`[gates.delegation]` names a non-agent delegate for chosen gates. Delegated decisions
+need a rationale and are recorded as `decided_by=<delegate>, delegated_by=human`.
+
+**Measurement and reproducibility:** each trial gets controller-measured
+`autolab_wall_s`, `autolab_cpu_s` and `autolab_peak_mb` (job-object accounting; the
+code under test cannot overwrite them), an output cap (`max_trial_output_mb`), and a
+check of `requirements.lock` against the interpreter before any data is collected
+(a mismatch HALTs). A confirmatory study after exploratory pilots counts as
+confirmatory; only one confirmatory study per hypothesis. Projects, protocols,
+deliveries and conclusions carry `mandate_refs`; `autolab mandate LAB` reports
+coverage. `[lab] charter` gives the scientist a charter file (the mandate digest).
+
 ## 5. Agent communication protocol
 
 * `TaskPacket` (`messages.py`): task_id, role, stage, objective, explicit

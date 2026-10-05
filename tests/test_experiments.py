@@ -1,8 +1,8 @@
 import random
 from pathlib import Path
 
-from autolab.experiments import (Trial, evaluate_decision, evaluate_requirements,
-                                 paired_t_ci, run_protocol, summarize, t_quantile, welch_ci)
+from autolab.experiments import (RESOURCE_METRICS, Trial, evaluate_decision,
+                                 evaluate_requirements, paired_t_ci, run_protocol, summarize, t_quantile, welch_ci)
 
 from scenario import EXPERIMENT, protocol
 
@@ -104,9 +104,14 @@ def test_runner_contract_and_failures(tmp_path):
     out = run_protocol(protocol(), wd, tmp_path / "runs")
     assert len(out.trials) == 8 and not out.failed
     assert (tmp_path / "runs" / "treat" / "seed-1" / "metrics.json").exists()
-    # same seed -> same data
+    # same seed -> same data (controller-measured resource metrics legitimately vary)
     out2 = run_protocol(protocol(), wd, tmp_path / "runs2")
-    assert [t.metrics for t in out.trials] == [t.metrics for t in out2.trials]
+
+    def data(o):
+        return [{k: v for k, v in t.metrics.items() if k not in RESOURCE_METRICS}
+                for t in o.trials]
+    assert data(out) == data(out2)
+    assert all(set(RESOURCE_METRICS) <= set(t.metrics) for t in out.trials)
     # missing metric is a failure, not silently ignored
     p = protocol()
     p["metrics"]["secondary"] = ["not_written"]

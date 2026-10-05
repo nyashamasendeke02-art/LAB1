@@ -16,6 +16,7 @@ HALTs for a human. A fresh Controller can resume any project from the DB.
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 import os
@@ -33,15 +34,15 @@ from xml.etree import ElementTree
 from . import __version__
 from .agents import Agent, make_backend
 from .config import DEFAULT_TOML, load_config
-from .experiments import (Trial, contrasts, environment_snapshot, evaluate_decision,
+from .experiments import (Trial, check_lock, contrasts, environment_snapshot, evaluate_decision,
                           evaluate_requirements, run_protocol, summarize)
 from .gates import (COMPUTE_BUDGET, CONFIRMATORY_FREEZE, MERGE_TO_MAIN,
-                    PROTECTED_EXPERIMENT, Gates)
+                    PROTECTED_EXPERIMENT, REVIEW_PREFIX, Gates)
 from .memory import export_markdown
 from .messages import TaskPacket, validate_protocol
 from .procs import run_tree
 from .report import build_report
-from .state_machines import (EngineeringState as E, ResearchState as R,
+from .state_machines import (EngineeringState as E, IllegalTransition, ResearchState as R,
                              check_engineering, check_research)
 from .store import ArtifactStore, Record, Store, canonical
 from .taxonomy import Evidence, Outcome, Role, validate_claim
@@ -165,21 +166,47 @@ class Controller:
         self.repo = lab.repo
         self.cfg = lab.config
         self.limits = self.cfg["limits"]
-        self.gates = Gates(self.store)
+        self.gates = Gates(self.store, self.cfg["gates"].get("delegation"))
         if agents is None:
             agents = {role: Agent(role, make_backend(self.cfg["agents"][role.value]))
                       for role in (Role.SCIENTIST, Role.ENGINEER, Role.VERIFIER)}
         self.agents = agents
 
     # ------------------------------------------------------------ projects
-    def new_project(self, objective: str) -> str:
+    def new_project(self, objective: str, mandate_refs: list[str] | None = None,
+                    author: str = "human") -> str:
         rec = self.store.create("project", {
-            "objective": objective, "state": R.DEFINE_PROBLEM.value, "cycle": 1,
-            "current": {}, "retries": {}, "design_iterations": 0, "feedback": [],
-            "blocked_on": None, "halt_reason": None, "halted_from": None, "refs": {},
-        }, prefix="PRJ", author="human", reason="research objective submitted")
+            "kind": "research", "objective": objective, "state": R.DEFINE_PROBLEM.value,
+            "cycle": 1, "current": {}, "retries": {}, "design_iterations": 0, "feedback": [],
+            "blocked_on": None, "halt_reason": None, "halted_from": None,
+            "mandate_refs": list(mandate_refs or []), "refs": {},
+        }, prefix="PRJ", author=author, reason="research objective submitted")
         self._export()
         return rec.id
+
+    def new_engineering_project(self, spec: str, acceptance: list[str],
+                                mandate_refs: list[str] | None = None,
+                                author: str = "human") -> str:
+        """Engineering track: gate work with no hypothesis (contracts, simulator, safety).
+        It goes through the same engineering machine (tests, adversarial review with
+        hermetic independent tests, path policies, review gates, merge) and ends COMPLETE
+        with a delivery record, without a research cycle."""
+        if not spec.strip() or not acceptance:
+            raise ValueError("an engineering task needs a spec and acceptance criteria")
+        rec = self.store.create("project", {
+            "kind": "engineering", "objective": spec, "acceptance_criteria": list(acceptance),
+            "state": R.ENGINEERING.value, "cycle": 1, "current": {}, "retries": {},
+            "design_iterations": 0, "feedback": [], "blocked_on": None, "halt_reason": None,
+            "halted_from": None, "mandate_refs": list(mandate_refs or []), "refs": {},
+        }, prefix="PRJ", author=author, reason="engineering task submitted")
+        eng = self._new_eng_task(rec.id, None, [])
+        self.store.update(rec.id, {"current": {"eng_task": eng.id}},
+                          reason=f"engineering task {eng.id} created")
+        self._export()
+        return rec.id
+
+    def _is_engineering(self, pid: str) -> bool:
+        return self.project(pid).data.get("kind") == "engineering"
 
     def project(self, pid: str) -> Record:
         return self.store.get(pid)
@@ -195,6 +222,9 @@ class Controller:
         proj = self.project(pid)
         cur = R(proj.data["state"])
         check_research(cur, target)
+        if (cur, target) == (R.ENGINEERING, R.COMPLETE) and proj.data.get("kind") != "engineering":
+            raise IllegalTransition("a research project cannot complete without validation, "
+                                    "data and evaluation")
         current = {**proj.data.get("current", {}), **(pointers or {})}
         self.store.update(pid, {"state": target.value, "current": current, "retries": {},
                                 **changes}, reason=f"{cur.value} -> {target.value}: {reason}")
@@ -391,7 +421,12 @@ class Controller:
               workdir: Path | None = None, writable: bool = False) -> tuple[dict, str]:
         proj = self.project(pid)
         task_id = self.store.next_id("TASK")
-        blind = role == Role.ENGINEER or (role == Role.VERIFIER and stage == "verify")
+        blind = proj.data.get("kind", "research") == "research" and (
+            role == Role.ENGINEER or (role == Role.VERIFIER and stage == "verify"))
+        if role == Role.SCIENTIST and self._charter():
+            context = {"lab_charter": self._charter(), **context}
+        if proj.data.get("mandate_refs"):
+            context = {"project_mandate_refs": proj.data["mandate_refs"], **context}
         packet = TaskPacket(task_id=task_id, role=role, stage=stage,
                             objective=self.BLINDED_OBJECTIVE if blind else proj.data["objective"],
                             context={"project": pid, "cycle": proj.data["cycle"], **context},
@@ -474,6 +509,14 @@ class Controller:
         if fb:
             ctx["feedback_from_previous_iterations"] = fb[-6:]
         return ctx
+
+    def _charter(self) -> str:
+        """The lab charter (e.g. the mandate digest) from the main checkout, if configured."""
+        rel = self.cfg["lab"].get("charter")
+        if not rel:
+            return ""
+        path = self.repo.path / rel
+        return path.read_text(encoding="utf-8")[:20000] if path.exists() else ""
 
     # Context the engineer and verifier do not get (blinding): which outcome is
     # hypothesised, how it will be decided, and earlier results.
@@ -634,6 +677,12 @@ class Controller:
         payload, tid = self._call(pid, Role.SCIENTIST, "design", ctx)
         protocol = payload["protocol"]
         errs = validate_protocol(protocol)
+        if protocol.get("kind") == "confirmatory" and any(
+                self.store.get(r.data["refs"]["run"]).data["experiment_kind"] == "confirmatory"
+                for r in self.store.query("result", project=pid)
+                if r.data["refs"].get("hypothesis") == cur["hypothesis"]):
+            errs.append("this hypothesis already had its one confirmatory study; further "
+                        "studies of it must be exploratory")
         used = self._seeds_used_for(pid, cur["hypothesis"])
         reused = sorted(used & set(protocol["seeds"]))
         if reused:
@@ -741,10 +790,30 @@ class Controller:
         cur = self._cur(pid)
         eng = self.store.get(cur["eng_task"])
         state = E(eng.data["state"])
+        engineering = self._is_engineering(pid)
+        if state == E.MERGED and engineering:
+            proj = self.project(pid)
+            dlv = self.store.create("delivery", {
+                "spec": proj.data["objective"],
+                "acceptance_criteria": proj.data["acceptance_criteria"],
+                "mandate_refs": proj.data.get("mandate_refs", []),
+                "commit": eng.data["merge_commit"], "review": eng.data["last_review"],
+                "project": pid, "refs": {"eng_task": eng.id, "review": eng.data["last_review"]}},
+                prefix="DLV", reason="engineering task delivered (merged after review)")
+            self._transition(pid, R.COMPLETE, f"{eng.id} merged as {eng.data['merge_commit'][:10]}",
+                             {"commit": eng.data["merge_commit"], "delivery": dlv.id})
+            return dlv.id
         if state == E.MERGED:
             self._transition(pid, R.SCIENTIFIC_VALIDATION, f"{eng.id} merged",
                              {"commit": eng.data["merge_commit"]})
             return "merged"
+        if state == E.ESCALATED and engineering:
+            self._failure(pid, "approach_inadequate",
+                          f"{eng.id} escalated after {eng.data['redesigns']} redesigns",
+                          {"eng_task": eng.id}, {"feedback": eng.data["feedback"][-5:]})
+            self._halt(pid, f"{eng.id} escalated: engineering spec could not be met after "
+                            f"redesigns; human/lead direction required")
+            return "escalated"
         if state == E.ESCALATED:
             self._failure(pid, "approach_inadequate",
                           f"{eng.id} escalated after {eng.data['redesigns']} redesigns",
@@ -802,16 +871,32 @@ class Controller:
         return branch
 
     def _eng_context(self, pid: str, eng: Record) -> dict:
-        ctx = self._blinded(self._context(pid))
-        req = ctx.pop("requirements", {})
-        ctx["engineering_requirements"] = req.get("engineering", [])
-        ctx["validity_criteria"] = req.get("validity_criteria", [])
+        if self._is_engineering(pid):
+            proj = self.project(pid)
+            ctx = {"engineering_spec": proj.data["objective"],
+                   "acceptance_criteria": proj.data["acceptance_criteria"],
+                   "mandate_refs": proj.data.get("mandate_refs", []),
+                   "mandate": "docs/MANDATE.md in this repository (read the relevant sections)"}
+        else:
+            ctx = self._blinded(self._context(pid))
+            req = ctx.pop("requirements", {})
+            ctx["engineering_requirements"] = req.get("engineering", [])
+            ctx["validity_criteria"] = req.get("validity_criteria", [])
         ctx["engineering_task"] = eng.id
         ctx["patch_attempt"] = eng.data["patch_attempts"]
         ctx["redesign_index"] = eng.data["redesigns"]
         if eng.data.get("feedback"):
             ctx["failures_to_address"] = eng.data["feedback"][-3:]
         return ctx
+
+    def _spec_trailer(self, eng: Record) -> dict:
+        """Provenance trailer: the frozen protocol (research) or the spec + mandate refs."""
+        if eng.data["refs"].get("protocol"):
+            prot = self.store.get(eng.data["refs"]["protocol"])
+            return {"Autolab-Protocol": f"{prot.id}@{prot.data.get('_freeze_hash', '')[:16]}"}
+        refs = self.project(eng.data["project"]).data.get("mandate_refs", [])
+        return {"Autolab-Spec": eng.data["project"],
+                **({"Autolab-Mandate": ", ".join(refs)} if refs else {})}
 
     def _restore_paths(self, wt: Path, base: str, paths: list[str], why: str, task: str) -> str:
         base_files = set(self.repo.git("ls-tree", "-r", "--name-only", base, cwd=wt).splitlines())
@@ -826,19 +911,22 @@ class Controller:
         return sha or self.repo.rev("HEAD", cwd=wt)
 
     def _eng_implementing(self, pid: str, eng: Record) -> str:
-        stage = "redesign" if eng.data.get("pending_redesign") else "implement"
+        redesign = bool(eng.data.get("pending_redesign"))
+        if self._is_engineering(pid):
+            stage = "rebuild" if redesign else "build"
+        else:
+            stage = "redesign" if redesign else "implement"
         wt = Path(eng.data["worktree"])
         ctx = self._eng_context(pid, eng)
-        if stage == "redesign":
+        if redesign:
             ctx["failure_history"] = eng.data["feedback"]
         payload, tid = self._call(pid, Role.ENGINEER, stage, ctx, workdir=wt, writable=True)
-        prot = self.store.get(eng.data["refs"]["protocol"])
         backend = self.agents[Role.ENGINEER].backend.describe()
         sha = self.repo.commit_all(
             wt, f"[{eng.id}] {stage}: {payload['summary'][:72]}", IDENTITIES[Role.ENGINEER],
             {"Autolab-Task": tid, "Autolab-Eng": eng.id, "Autolab-Role": "engineer",
              "Autolab-Backend": f"{backend['backend']}/{backend['model'] or 'default'}",
-             "Autolab-Protocol": f"{prot.id}@{prot.data.get('_freeze_hash', '')[:16]}"})
+             **self._spec_trailer(eng)})
         if sha is None:
             # No diff: the engineer may be disputing a finding, or main may already
             # implement the (revised) protocol. Either way the claim is checked by
@@ -888,9 +976,12 @@ class Controller:
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         with tempfile.TemporaryDirectory() as td:
             ini, xml = Path(td) / "pytest.ini", Path(td) / "junit.xml"
-            # quoted: pytest shlex-splits path lists, and lab paths may contain spaces
-            ini.write_text(f'[pytest]\npythonpath = "{Path(cwd).resolve().as_posix()}"\n',
-                           encoding="utf-8")
+            # quoted: pytest shlex-splits path lists, and lab paths may contain spaces.
+            # The repo root and, if present, its src/ (src layout) are importable.
+            roots = [Path(cwd).resolve()] + ([Path(cwd).resolve() / "src"]
+                                             if (Path(cwd) / "src").is_dir() else [])
+            paths = " ".join(f'"{r.as_posix()}"' for r in roots)
+            ini.write_text(f"[pytest]\npythonpath = {paths}\n", encoding="utf-8")
             cmd = [sys.executable, "-P", "-E", "-B", "-m", "pytest", "-q", "-c", str(ini),
                    "--rootdir", str(cwd), "--noconftest", "-p", "no:cacheprovider",
                    f"--junitxml={xml}", "tests/verification"]
@@ -1020,6 +1111,24 @@ class Controller:
         return branch
 
     def _eng_merge(self, pid: str, eng: Record) -> str:
+        cand = eng.data["merge_candidate"]
+        head = self.repo.rev(cand)
+        changed = self.repo.changed_files(eng.data["base"], head)
+        for rule in self.cfg["gates"].get("review_paths", []):
+            hits = [f for f in changed if fnmatch.fnmatch(f, rule["pattern"])]
+            if not hits:
+                continue
+            gate = REVIEW_PREFIX + rule["gate"]
+            diff = "\n".join(self.repo.git("diff", f"{eng.data['base']}..{head}", "--", f)
+                             for f in hits)
+            status, apr = self._gate(pid, gate, f"{eng.id}@{head[:12]}",
+                                     f"{rule['gate']} review: {cand} changes {hits}",
+                                     {"files": hits, "diff": _tail(diff, 30000)})
+            if status == "pending":
+                return self._block(pid, apr)
+            if status == "rejected":
+                return self._eng_fail(pid, eng, f"{rule['gate']} review rejected ({apr.id}): "
+                                                f"{apr.data.get('note', '')}", "review_rejected")
         if self.cfg["gates"]["merge_to_main"]:
             status, apr = self._gate(pid, MERGE_TO_MAIN, eng.id,
                                      f"Merge {eng.data['merge_candidate']} into main")
@@ -1028,14 +1137,12 @@ class Controller:
             if status == "rejected":
                 return self._eng_fail(pid, eng, f"human rejected merge ({apr.id}): "
                                                 f"{apr.data.get('note', '')}", "merge_rejected")
-        prot = self.store.get(eng.data["refs"]["protocol"])
         try:
             sha = self.repo.merge_into_main(
                 eng.data["merge_candidate"],
                 f"Merge {eng.data['merge_candidate']} ({eng.id})",
                 {"Autolab-Eng": eng.id, "Autolab-Review": eng.data["last_review"],
-                 "Autolab-Ledger-Head": self.store.head(),
-                 "Autolab-Protocol": f"{prot.id}@{prot.data.get('_freeze_hash', '')[:16]}"})
+                 "Autolab-Ledger-Head": self.store.head(), **self._spec_trailer(eng)})
         except GitError as exc:
             return self._eng_fail(pid, eng, f"merge failed: {exc}", "merge_conflict")
         self.repo.remove_worktree(eng.data["worktree"])
@@ -1054,7 +1161,8 @@ class Controller:
             smoke_seed += 1
         wt = self._scratch_checkout(f"smoke-{eng.id}", commit)
         try:
-            out = run_protocol(p, wt, self.lab.runs / "_smoke" / eng.id, seeds=[smoke_seed])
+            out = run_protocol(p, wt, self.lab.runs / "_smoke" / eng.id, seeds=[smoke_seed],
+                               output_cap_mb=self.limits["max_trial_output_mb"])
         finally:
             self.repo.remove_worktree(wt)
         smoke = [{"condition": t.condition, "ok": t.ok, "error": t.error,
@@ -1144,7 +1252,16 @@ class Controller:
         env_sha = self.lab.artifacts.put_text(canonical(env))
         wt = self._scratch_checkout(run_id, commit)
         try:
-            out = run_protocol(p, wt, out_root)
+            lock = wt / "requirements.lock"
+            lock_problems = check_lock(lock) if lock.exists() else []
+            lock_sha = self.lab.artifacts.put_file(lock) if lock.exists() else None
+            if lock_problems:
+                self._failure(pid, "environment_mismatch", "; ".join(lock_problems)[:500])
+                self._halt(pid, "installed packages do not match requirements.lock: "
+                                + "; ".join(lock_problems)[:400])
+                return "environment mismatch"
+            out = run_protocol(p, wt, out_root,
+                               output_cap_mb=self.limits["max_trial_output_mb"])
         finally:
             self.repo.remove_worktree(wt)
         trials = []
@@ -1158,10 +1275,12 @@ class Controller:
             trials.append({"condition": t.condition, "role": t.role, "seed": t.seed,
                            "returncode": t.returncode, "duration_s": t.duration_s,
                            "metrics": t.metrics, "error": t.error, "files": hashes,
+                           "resources": t.resources,
                            "out_dir": str(d.relative_to(self.lab.root))})
         manifest = {"run_id": run_id, "protocol": prot.id, "protocol_version": prot.version,
                     "freeze_hash": prot.data["_freeze_hash"], "commit": commit,
                     "command_template": out.command_template, "env_hash": env_sha,
+                    "requirements_lock": "sha256:" + lock_sha if lock_sha else None,
                     "trials": trials}
         man_sha = a.put_text(canonical(manifest))
         n_failed = sum(1 for t in trials if t["error"] or t["returncode"] != 0)
@@ -1189,7 +1308,8 @@ class Controller:
     @staticmethod
     def _trials(run: Record) -> list[Trial]:
         return [Trial(t["condition"], t["role"], t["seed"], t["returncode"], t["duration_s"],
-                      t["metrics"], t["out_dir"], t["error"]) for t in run.data["trials"]]
+                      t["metrics"], t["out_dir"], t["error"], t.get("resources", {}))
+                for t in run.data["trials"]]
 
     def _h_analyze(self, pid: str) -> str:
         cur = self._cur(pid)
@@ -1277,21 +1397,30 @@ class Controller:
         # Multiplicity: every analysed run of this hypothesis is a "look". Redesigning
         # after an inconclusive look and testing again is optional stopping, so only a
         # first look can count as confirmatory; later looks are exploratory evidence.
-        looks = sum(1 for r in self.store.query("result", project=pid)
-                    if r.data["refs"].get("hypothesis") == hyp.id)
-        evidence_kind = kind if looks <= 1 else "exploratory"
+        prior = [r for r in self.store.query("result", project=pid)
+                 if r.data["refs"].get("hypothesis") == hyp.id and r.id != res.id]
+        looks = len(prior) + 1
+        prior_confirmatory = [r for r in prior if self.store.get(
+            r.data["refs"]["run"]).data["experiment_kind"] == "confirmatory"]
+        # Pilot -> confirmatory (L6): a confirmatory study after exploratory pilots counts as
+        # confirmatory, but only ONE confirmatory study per hypothesis.
+        evidence_kind = kind if not prior_confirmatory else "exploratory"
         contested = chl.data["verdict"] == "challenged"
         confidence = ("contested" if contested else
                       "confirmatory" if evidence_kind == "confirmatory" else
                       "preliminary (exploratory)" if looks <= 1 else
                       f"preliminary (exploratory; look {looks} at this hypothesis, "
                       f"not corrected for multiple looks)")
+        if evidence_kind == "confirmatory" and prior:
+            confidence = f"confirmatory (after {len(prior)} exploratory pilot look(s))"
         kind = evidence_kind
         interp = self.store.get(cur["interpretation"]).data
         con = self.store.create("conclusion", {
             "hypothesis": hyp.id, "statement": hyp.data["statement"], "outcome": outcome,
             "label": Evidence.EXPERIMENTAL_RESULT.value, "experiment_kind": kind,
             "protocol_kind": prot.data["protocol"]["kind"], "look": looks,
+            "mandate_refs": sorted(set(self.project(pid).data.get("mandate_refs", []))
+                                   | set(prot.data["protocol"].get("mandate_refs", []))),
             "confidence": confidence, "decision": res.data["decision"],
             "scientific_criteria": res.data["scientific"],
             "caveats": [i["description"] for i in chl.data["issues"]] + interp.get("limitations", []),

@@ -5,7 +5,7 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** 0.2.0 (code-review fixes R1-R12), 86/86 tests passing (~10.5 min on Windows).
+- **Version:** 0.3.0 (P0 lab upgrades), 99 tests passing (~17 min on Windows).
 - **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). pilot-002 ran the first
   full live pass (RUN-0001: INCONCLUSIVE, paired effect -0.00008 MSE, CI [-0.00075, 0.00059]),
   then redesigned twice; the review exposed lab gaps that are now fixed (D11-D13).
@@ -43,12 +43,13 @@ and `project_state/` (decisions, failures, open questions)._
 - [ ] Full suite run after D13 (68/68 passed up to D12; D13's targeted tests pass).
 
 ### Next (priority order)
-0. [ ] Human: review docs/PROJECT_PLAN.md (DRAFT) and answer its section 10 decisions
-       (approve plan, repo strategy, EnvA, budgets, confirmatory policy, backup).
-0b. [ ] After approval: P0 lab upgrades L1-L10 (engineering track, path gates, resource
-       metering, non-inferiority/co-primary/Holm, power, pilot->confirmatory policy,
-       mandate_refs, telemetry policy, dependency lock, citation verification), then the
-       lab validation run (needs go-ahead). NO experiments before that.
+0. [x] Plan adopted under delegation (D21). P0 upgrades L1-L3, L6-L9 DONE (v0.3.0, da94322);
+       L4 + L5 due before the first confirmatory study / E3; L10 deferred (D22).
+0b. [~] Lab validation run: labs/pilot-003, positive control (heavy-ball momentum vs GD,
+       expected 'supported'), exploratory, RUNNING since 2026-10-05 00:12.
+0c. [ ] Then: scripts/init_robolab.py -> labs/robolab; submit docs/gates/GATE0_GATE1_TASKS.md
+       (G0-1..G0-4, G1-1, G1-2) through the engineering track.
+
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
 2. [x] `autolab amend` CLI: recorded protocol amendments; amending after data

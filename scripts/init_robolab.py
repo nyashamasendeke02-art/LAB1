@@ -114,6 +114,8 @@ def main() -> int:
         "experiments/README.md": "Experiment entrypoints (one per frozen protocol).\n",
         "configs/README.md": "Versioned configuration files.\n",
         "tests/__init__.py": "",
+        # L9: checked against the interpreter before any data is collected.
+        "requirements.lock": "numpy==2.5.3\npytest==9.1.1\n",
     }
     for pkg in PACKAGES:
         files[f"src/{pkg}/__init__.py"] = f'"""{pkg} (see docs/MANDATE.md)."""\n'

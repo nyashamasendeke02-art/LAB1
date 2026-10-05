@@ -1,0 +1,330 @@
+"""Agent communication protocol.
+
+Every interaction is a *TaskPacket* (controller -> agent) answered by a
+*Completion* (agent -> controller). Both are JSON, schema-validated, stored
+as artifacts and linked in the ledger. The controller never acts on free
+text: the stage-specific ``payload`` must validate against
+``STAGE_SCHEMAS[stage]`` or the completion is rejected.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from dataclasses import asdict, dataclass, field
+from typing import Any
+
+import jsonschema
+
+from .taxonomy import Evidence, Role
+
+_str = {"type": "string"}
+_nstr = {"type": "string", "minLength": 1}
+_strs = {"type": "array", "items": {"type": "string"}}
+_num = {"type": "number"}
+_sev = {"enum": ["critical", "major", "minor"]}
+_issue = {
+    "type": "object",
+    "required": ["severity", "description"],
+    "properties": {"severity": _sev, "description": _nstr, "location": _str},
+}
+
+CLAIM_SCHEMA = {
+    "type": "object",
+    "required": ["type", "statement"],
+    "properties": {
+        "type": {"enum": [e.value for e in Evidence]},
+        "statement": _nstr,
+        "sources": _strs,
+        "run_ids": _strs,
+    },
+}
+
+REQUIREMENT_SCHEMA = {
+    "type": "object",
+    "required": ["id", "description", "metric", "condition", "op", "value"],
+    "properties": {
+        "id": _nstr,
+        "description": _nstr,
+        "metric": _nstr,
+        "condition": _nstr,
+        "op": {"enum": [">", ">=", "<", "<=", "==", "!="]},
+        "value": _num,
+        "aggregate": {"enum": ["mean", "median", "min", "max"]},
+    },
+}
+
+PROTOCOL_SCHEMA = {
+    "type": "object",
+    "required": ["title", "kind", "entrypoint", "conditions", "seeds", "metrics",
+                 "decision_rule"],
+    "properties": {
+        "title": _nstr,
+        "kind": {"enum": ["exploratory", "confirmatory"]},
+        "protected": {"type": "boolean"},
+        "entrypoint": _nstr,
+        "conditions": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+                "type": "object",
+                "required": ["name", "role"],
+                "properties": {
+                    "name": {"type": "string", "pattern": "^[A-Za-z0-9_\\-]+$"},
+                    "role": {"enum": ["baseline", "intervention", "ablation", "null",
+                                      "transfer", "robustness"]},
+                    "params": {"type": "object"},
+                },
+            },
+        },
+        "seeds": {"type": "array", "minItems": 1, "items": {"type": "integer"}},
+        "metrics": {
+            "type": "object",
+            "required": ["primary"],
+            "properties": {"primary": _nstr, "secondary": _strs},
+        },
+        "decision_rule": {
+            "type": "object",
+            "required": ["metric", "treatment", "control", "direction", "min_effect"],
+            "properties": {
+                "metric": _nstr,
+                "treatment": _nstr,
+                "control": _nstr,
+                "direction": {"enum": ["greater", "less"]},
+                "min_effect": {"type": "number", "minimum": 0},
+                "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+                "n_boot": {"type": "integer", "minimum": 100},
+            },
+        },
+        "budget": {
+            "type": "object",
+            "properties": {"timeout_s": _num, "max_runs": {"type": "integer"}},
+        },
+        "transfer_tests": _strs,
+        "robustness_tests": _strs,
+    },
+}
+
+
+def _obj(required: list[str], props: dict) -> dict:
+    return {"type": "object", "required": required, "properties": props}
+
+
+STAGE_SCHEMAS: dict[str, dict] = {
+    "define_problem": _obj(
+        ["problem_statement", "scope"],
+        {"problem_statement": _nstr, "scope": _nstr, "out_of_scope": _strs,
+         "success_notion": _str},
+    ),
+    "background_research": _obj(
+        ["findings"],
+        {"findings": {"type": "array", "items": CLAIM_SCHEMA},
+         "known_methods": _strs, "gaps": _strs},
+    ),
+    "research_question": _obj(["question", "rationale"],
+                              {"question": _nstr, "rationale": _nstr}),
+    "hypothesis": _obj(
+        ["hypotheses"],
+        {"hypotheses": {
+            "type": "array", "minItems": 1,
+            "items": _obj(["statement", "prediction", "null_hypothesis"],
+                          {"statement": _nstr, "prediction": _nstr,
+                           "null_hypothesis": _nstr, "falsification": _str}),
+        }},
+    ),
+    "requirements": _obj(
+        ["validity", "engineering"],
+        {"validity": {"type": "array", "items": REQUIREMENT_SCHEMA},
+         "scientific": {"type": "array", "items": REQUIREMENT_SCHEMA},
+         "engineering": _strs},
+    ),
+    "design": _obj(
+        ["options", "chosen", "rationale", "protocol"],
+        {"options": {"type": "array", "minItems": 1,
+                     "items": _obj(["name", "description"],
+                                   {"name": _nstr, "description": _nstr,
+                                    "pros": _strs, "cons": _strs})},
+         "chosen": _nstr, "rationale": _nstr, "protocol": PROTOCOL_SCHEMA},
+    ),
+    "solution_design": _obj(
+        ["solution_design", "feasible"],
+        {"solution_design": _nstr, "feasible": {"type": "boolean"},
+         "files": _strs, "risks": _strs},
+    ),
+    "scientific_review": _obj(
+        ["verdict", "issues"],
+        {"verdict": {"enum": ["approve", "revise"]},
+         "issues": {"type": "array", "items": _issue},
+         "required_changes": _strs},
+    ),
+    "implement": _obj(
+        ["summary"],
+        {"summary": _nstr, "files_changed": _strs, "tests_added": _strs,
+         "design_notes": _str},
+    ),
+    "redesign": _obj(
+        ["summary", "architecture_change"],
+        {"summary": _nstr, "architecture_change": _nstr, "files_changed": _strs,
+         "tests_added": _strs},
+    ),
+    "verify": _obj(
+        ["verdict", "findings", "reproducibility_ok", "protocol_compliance_ok"],
+        {"verdict": {"enum": ["pass", "fail"]},
+         "findings": {"type": "array", "items": _issue},
+         "tests_added": _strs,
+         "reproducibility_ok": {"type": "boolean"},
+         "protocol_compliance_ok": {"type": "boolean"}},
+    ),
+    "scientific_validation": _obj(
+        ["verdict", "issues"],
+        {"verdict": {"enum": ["approve", "reject"]},
+         "issues": {"type": "array", "items": _issue},
+         "send_back_to": {"enum": ["engineering", "design"]}},
+    ),
+    "interpret": _obj(
+        ["interpretation", "alternative_explanations", "limitations"],
+        {"interpretation": _nstr, "alternative_explanations": _strs,
+         "limitations": _strs},
+    ),
+    "challenge": _obj(
+        ["verdict", "issues", "alternative_explanations"],
+        {"verdict": {"enum": ["upheld", "challenged"]},
+         "issues": {"type": "array", "items": _issue},
+         "alternative_explanations": _strs, "requested_controls": _strs},
+    ),
+    "communicate": _obj(["summary"], {"summary": _nstr, "audience_notes": _str}),
+    "next_question": _obj(
+        ["questions", "continue"],
+        {"questions": {"type": "array",
+                       "items": _obj(["question", "rationale"],
+                                     {"question": _nstr, "rationale": _nstr,
+                                      "priority": {"type": "integer"}})},
+         "continue": {"type": "boolean"}},
+    ),
+}
+
+COMPLETION_SCHEMA = {
+    "type": "object",
+    "required": ["status", "summary", "payload"],
+    "properties": {
+        "status": {"enum": ["complete", "blocked", "needs_review", "failed"]},
+        "summary": _str,
+        "payload": {"type": "object"},
+        "research_claims": {"type": "array", "items": CLAIM_SCHEMA},
+        "risks": _strs,
+        "next_action": _str,
+    },
+}
+
+
+class ProtocolError(Exception):
+    """An agent response violated the communication protocol."""
+
+
+@dataclass
+class TaskPacket:
+    task_id: str
+    role: Role
+    stage: str
+    objective: str
+    context: dict = field(default_factory=dict)
+    constraints: list[str] = field(default_factory=list)
+    acceptance_criteria: list[str] = field(default_factory=list)
+    workdir: str | None = None
+    writable: bool = False
+    attempt: int = 1
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        d["role"] = self.role.value
+        d["output_schema"] = completion_schema_for(self.stage)
+        return d
+
+
+def completion_schema_for(stage: str) -> dict:
+    schema = json.loads(json.dumps(COMPLETION_SCHEMA))
+    schema["properties"]["payload"] = STAGE_SCHEMAS[stage]
+    return schema
+
+
+def validate_completion(stage: str, completion: Any) -> dict:
+    if not isinstance(completion, dict):
+        raise ProtocolError("completion must be a JSON object")
+    try:
+        jsonschema.validate(completion, completion_schema_for(stage))
+    except jsonschema.ValidationError as exc:
+        path = "/".join(str(p) for p in exc.absolute_path)
+        raise ProtocolError(f"stage {stage}: {exc.message} at /{path}") from None
+    return completion
+
+
+def validate_protocol(protocol: dict) -> list[str]:
+    """Schema + semantic checks for an experiment protocol."""
+    errors: list[str] = []
+    try:
+        jsonschema.validate(protocol, PROTOCOL_SCHEMA)
+    except jsonschema.ValidationError as exc:
+        return [exc.message]
+    names = [c["name"] for c in protocol["conditions"]]
+    if len(set(names)) != len(names):
+        errors.append("condition names must be unique")
+    roles = {c["role"] for c in protocol["conditions"]}
+    if "baseline" not in roles:
+        errors.append("protocol needs a baseline condition")
+    if "intervention" not in roles:
+        errors.append("protocol needs an intervention condition")
+    rule = protocol["decision_rule"]
+    for key in ("treatment", "control"):
+        if rule[key] not in names:
+            errors.append(f"decision_rule.{key}={rule[key]!r} is not a condition")
+    if rule["metric"] != protocol["metrics"]["primary"]:
+        errors.append("decision_rule.metric must be the pre-specified primary metric")
+    if len(set(protocol["seeds"])) != len(protocol["seeds"]):
+        errors.append("seeds must be unique")
+    if protocol["kind"] == "confirmatory" and len(protocol["seeds"]) < 3:
+        errors.append("confirmatory protocols need >= 3 seeds")
+    return errors
+
+
+_FENCE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.S)
+
+
+def extract_json(text: str) -> dict:
+    """Pull the final JSON object out of an LLM response.
+
+    Preference order: whole text is JSON; last fenced ```json block; last
+    balanced top-level ``{...}`` in the text.
+    """
+    text = text.strip()
+    try:
+        obj = json.loads(text)
+        if isinstance(obj, dict):
+            return obj
+    except json.JSONDecodeError:
+        pass
+    blocks = _FENCE.findall(text)
+    for block in reversed(blocks):
+        try:
+            return json.loads(block)
+        except json.JSONDecodeError:
+            continue
+    # last balanced object
+    end = text.rfind("}")
+    while end != -1:
+        depth = 0
+        for i in range(end, -1, -1):
+            ch = text[i]
+            if ch == "}":
+                depth += 1
+            elif ch == "{":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        obj = json.loads(text[i:end + 1])
+                        if isinstance(obj, dict):
+                            return obj
+                    except json.JSONDecodeError:
+                        pass
+                    break
+        end = text.rfind("}", 0, end)
+    raise ProtocolError("no JSON object found in agent response")

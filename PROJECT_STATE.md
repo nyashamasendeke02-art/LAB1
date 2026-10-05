@@ -57,8 +57,9 @@ and `project_state/` (decisions, failures, open questions)._
        pilot-003 HALTED at design (4 rejections; lab gaps, fixed) is kept as a record.
 0c. [~] robolab initialised 2026-10-05 (labs/robolab). G0-1 contracts DONE: PRJ-0002 merged
        09ef14d (DLV-0001); verifier caught 2 defects, fixed; APR-0001 approved by claude-code.
-       (PRJ-0001 HALTED: verifier sandbox bug, fixed 7ea88b2.) G0-2 telemetry submitted as
-       PRJ-0003. Then G0-3, G0-4, G1-1, G1-2 (docs/gates/GATE0_GATE1_TASKS.md), in order.
+       (PRJ-0001 HALTED: verifier sandbox bug, fixed 7ea88b2.) G0-2 telemetry DONE: PRJ-0003
+       merged 3bf4a43 (DLV-0002; verifier caught a size-cap bypass, fixed). G0-3 Safety Kernel
+       RUNNING as PRJ-0004. Then G0-4, G1-1, G1-2 (docs/gates/GATE0_GATE1_TASKS.md), in order.
 
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.

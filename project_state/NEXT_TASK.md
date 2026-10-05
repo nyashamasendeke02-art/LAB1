@@ -1,9 +1,7 @@
 # Next Task
 
-1. Human: review docs/ARCHITECTURE.md and lab.toml defaults (gates, budgets).
-2. Live pilot (needs human go-ahead; consumes ChatGPT/Claude quota):
-   `autolab init ../pilot-lab && autolab new ../pilot-lab "<small, unprotected, exploratory objective>" && autolab run ../pilot-lab`
-   Watch the first cycle, inspect handoffs/ and the report, and record any failures.
-3. Then use the lab for the Developmental Intelligence first milestone:
-   a minimal predictive agent baseline (HYP-001 / EXP-001), as a confirmatory
-   protocol behind the pre-registration gate.
+1. Human: review docs/PROJECT_PLAN.md and decide its section 10 items.
+2. Claude Code (after approval): P0 lab upgrades L1-L10, with tests. No experiments.
+3. Human go-ahead: lab validation run (toy objective, exploratory) to COMMUNICATE.
+4. P1 / Gate 0 (contracts, cycle runner, telemetry, Safety Kernel v1) through the lab's
+   engineering track; human safety review.

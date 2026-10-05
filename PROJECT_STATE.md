@@ -17,6 +17,8 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Reference documents
 
+- `docs/PROJECT_PLAN.md`: programme plan (DRAFT, awaiting approval): phases P0-P11 mapped to
+  gates 0-8 and experiments WM-1, E1-E6; design and engineering standards; budget; risks.
 - **`AI_Robotics_Full_Documentation.pdf` is the lab's FOUNDATION (D20, 2026-10-04):** the
   research and engineering mandate. Digest, traceable IDs and reconciliation with CLAUDE.md:
   `docs/MANDATE.md`. Direction: H1-H5, E1-E6, gates 0-8. Method: CLAUDE.md invariants;
@@ -41,7 +43,12 @@ and `project_state/` (decisions, failures, open questions)._
 - [ ] Full suite run after D13 (68/68 passed up to D12; D13's targeted tests pass).
 
 ### Next (priority order)
-0. [ ] Human: choose the first experiment under the mandate (own proposal, or E1 baseline).
+0. [ ] Human: review docs/PROJECT_PLAN.md (DRAFT) and answer its section 10 decisions
+       (approve plan, repo strategy, EnvA, budgets, confirmatory policy, backup).
+0b. [ ] After approval: P0 lab upgrades L1-L10 (engineering track, path gates, resource
+       metering, non-inferiority/co-primary/Holm, power, pilot->confirmatory policy,
+       mandate_refs, telemetry policy, dependency lock, citation verification), then the
+       lab validation run (needs go-ahead). NO experiments before that.
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
 2. [x] `autolab amend` CLI: recorded protocol amendments; amending after data

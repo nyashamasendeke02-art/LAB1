@@ -67,6 +67,9 @@ and `project_state/` (decisions, failures, open questions)._
        defect, re-submit as a fresh project once the limit resets. Then G1-3 (stopping-distance check, added from the
        safety review: v1 is one-step lookahead with a zero-force safe action) (docs/gates/GATE0_GATE1_TASKS.md), in order.
 
+0d. [ ] robolab gaps vs the "Frontier Robotics Architecture" schematic (2026-10-05): add an
+       episode visualiser (trajectory/telemetry plots) after G1-2; perception layer and a
+       ROS 2 hardware abstraction are needed before Gate 7, not now.
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
 2. [x] `autolab amend` CLI: recorded protocol amendments; amending after data

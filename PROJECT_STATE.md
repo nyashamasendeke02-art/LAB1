@@ -48,9 +48,9 @@ and `project_state/` (decisions, failures, open questions)._
       Resume after any stop: `.venv/Scripts/autolab.exe status labs/robolab`; review with
       `autolab approvals`; restart: `autolab queue labs/robolab docs/gates/gate1_queue.toml
       [--retry G1-x]` (log labs/robolab-run.log). Usage limits wait automatically (D35).
-- [ ] GitHub backup: `gh` login did not complete from this session (connection aborted by local
-      software). Human runs `gh auth login` in their own terminal; then create private repos
-      LAB1 + robolab and push (authorised by the human 2026-10-06).
+- [x] GitHub backup DONE 2026-10-06 (D38): private repos github.com/nyashamasendeke02-art/LAB1
+      (main) and github.com/nyashamasendeke02-art/robolab (all 29 branches). Push after each
+      commit/gate. Not in git: labs/robolab/.autolab (ledger DB, artifacts) - backup TODO.
 
 ### Next (priority order)
 0. [x] Plan adopted under delegation (D21). P0 upgrades L1-L3, L6-L9 DONE (v0.3.0, da94322);
@@ -174,8 +174,6 @@ Residual risks the fixes do NOT remove:
 
 ## Human tasks (only what Claude cannot do)
 
-- **Backup (important):** neither LAB1 nor labs/robolab/repo has a remote; everything is only on
-  this PC. Create a private GitHub repo (or two) and tell Claude to push.
 - Choose the project licence (recommended Apache-2.0; D34).
 - Nothing blocking: the lab runs unattended (D35).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.

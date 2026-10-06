@@ -163,3 +163,7 @@
   CycleRunner calls tick()/emergency_stop() without velocity and actuates nothing on abstain, so a
   moving body would coast on hardware. Folded into the G1-5 spec (runner passes observed velocity;
   safe action actuated every cycle without an approved command) with a new acceptance criterion.
+- D38 (2026-10-06, human: "Connect to Github", "Create the repo and commit"): private GitHub repos
+  nyashamasendeke02-art/LAB1 and nyashamasendeke02-art/robolab created and pushed (SW-BACKUP).
+  Pushing to these two remotes is now routine. The ledger DB and artifacts (.autolab) are not in
+  git yet; a snapshot backup is the next step.

@@ -179,3 +179,11 @@
   (official text via the GitHub licenses API), pyproject license field, README section; the mandate
   PDF keeps its own terms. robolab: queued as G1-8 (its main checkout belongs to the lab controller,
   so the change goes through the engineering track, not a direct commit).
+- D41 (2026-10-06, claude-code; from the human's question "are embodiments programmed or does the MHS tell the
+  modules?"): explicit rule: per-body code is allowed ONLY in the body itself (simulator/hardware), its
+  embodiment adapter and its reflexes; everything else reads the MHS; dynamics are learned (D27, D31).
+  Found: the Safety Kernel v1.1 still assumes a point mass with Cartesian force actions, so the G1-6 spec
+  (Car2D, 'do not modify src/safety') was contradictory. G1-6 now makes the kernel body-agnostic: bounds
+  declared in the MHS safety envelope (max speed, max acceleration, guaranteed braking deceleration) and
+  a declared safe-action kind (oppose_velocity | fixed); static test forbids body-specific branches in
+  src/safety. G1-6 will pass a safety review gate.

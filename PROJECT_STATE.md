@@ -41,13 +41,15 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Todo
 
-### In Progress (2026-10-06 00:30)
-- [ ] robolab Gate 1 queue running detached (restarted 00:26 after APR-0003):
-      G1-2 DONE (PRJ-0009, DLV-0006). G1-3 APPROVED (APR-0003, D37), merging; then G1-4..G1-7.
-      Next stop: G1-5 contracts/safety review (claude-code reviews, approves, restarts the queue).
-      Resume after any stop: `.venv/Scripts/autolab.exe status labs/robolab`; review with
-      `autolab approvals`; restart: `autolab queue labs/robolab docs/gates/gate1_queue.toml
-      [--retry G1-x]` (log labs/robolab-run.log). Usage limits wait automatically (D35).
+### In Progress (2026-10-06 02:40)
+- [ ] AUTOPILOT running (D39): scripts/autopilot.py (start: scripts/start_autopilot.cmd). It runs the
+      queue named in docs/gates/ACTIVE_QUEUE; when it stops it starts headless Claude Code here to do
+      reviews/fixes/next queue, waits out Claude usage limits, and stops on NEEDS_HUMAN, DONE or no
+      progress. Status: labs/AUTOPILOT_STATUS.txt; log: labs/autopilot.log; queue log: labs/robolab-run.log.
+- [ ] robolab Gate 1: G1-2 DONE (DLV-0006), G1-3 DONE (APR-0003 approved, DLV-0007), G1-4 DONE (DLV-0008),
+      G1-5 RUNNING as PRJ-0012 (waiting out a Claude session limit, D35), then G1-6, G1-7.
+      Manual resume if the autopilot is not running: `.venv/Scripts/autolab.exe status labs/robolab`;
+      `autolab approvals`; `autolab queue labs/robolab docs/gates/gate1_queue.toml [--retry G1-x]`.
 - [x] GitHub backup DONE 2026-10-06 (D38): private repos github.com/nyashamasendeke02-art/LAB1
       (main) and github.com/nyashamasendeke02-art/robolab (all 29 branches). Push after each
       commit/gate. Not in git: labs/robolab/.autolab (ledger DB, artifacts) - backup TODO.

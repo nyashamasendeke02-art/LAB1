@@ -167,3 +167,11 @@
   nyashamasendeke02-art/LAB1 and nyashamasendeke02-art/robolab created and pushed (SW-BACKUP).
   Pushing to these two remotes is now routine. The ledger DB and artifacts (.autolab) are not in
   git yet; a snapshot backup is the next step.
+- D39 (2026-10-06, human: "Create a script that automatically continues after session limit removed"):
+  scripts/autopilot.py supervises the lab: runs the active queue (docs/gates/ACTIVE_QUEUE), and when
+  it stops runs headless Claude Code in LAB1 (`claude -p`, permission-mode acceptEdits, tools Read/
+  Edit/Write/Glob/Grep/Bash; memory and PROJECT_STATE give it the rules) to do gate reviews, fixes and
+  next queues, ending with an AUTOPILOT directive. Claude usage limits: wait 15 min and retry (up to
+  a week). Stops on NEEDS_HUMAN, DONE, or the same queue stop repeating. Single instance via lock
+  file; never starts a second queue. Optional logon start: scripts/install_autopilot_at_logon.ps1.
+  Risk accepted under D35: an unattended agent with Bash runs on the user's PC.

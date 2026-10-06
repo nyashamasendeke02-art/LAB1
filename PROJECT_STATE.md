@@ -62,7 +62,9 @@ and `project_state/` (decisions, failures, open questions)._
        PRJ-0004 merged 4087f5b (DLV-0003; verifier caught e-stop reset + tamper defects;
        APR-0002 safety review by claude-code with fault injection). G0-4 runner DONE: PRJ-0005
        merged af95831 (DLV-0004). **GATE 0 PASSED (D26)**: 186 tests on robolab main; every
-       actuation audited to pass the kernel. G1-1 Puck2D RUNNING as PRJ-0006. Then G1-2, then G1-3 (stopping-distance check, added from the
+       actuation audited to pass the kernel. G1-1 Puck2D DONE: PRJ-0006 merged 8d04f05 (DLV-0005).
+       **G1-2 HALTED** 11:42 at implement: Claude session limit (resets 3:10pm PT); not a code
+       defect, re-submit as a fresh project once the limit resets. Then G1-3 (stopping-distance check, added from the
        safety review: v1 is one-step lookahead with a zero-force safe action) (docs/gates/GATE0_GATE1_TASKS.md), in order.
 
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
@@ -99,6 +101,10 @@ and `project_state/` (decisions, failures, open questions)._
 - [x] Git repository initialised and v0.1.0 committed.
 
 ## Known bugs / technical debt
+
+- UNCOMMITTED WIP (config.py, controller.py): optional `[agents.reviewer]` backend that runs
+  `scientific_review` on a different model family than the designer. Wiring looks complete;
+  no tests yet. Needs a test before commit.
 
 - robolab Safety Kernel v1: one-step workspace lookahead + zero-force safe action, so a fast
   body can coast out of the workspace. Fix specified as G1-3 (docs/gates/GATE0_GATE1_TASKS.md).

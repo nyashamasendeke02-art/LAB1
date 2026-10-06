@@ -76,6 +76,8 @@ and `project_state/` (decisions, failures, open questions)._
        (self-directed exploration vs passive data) after WM-1.
 0f. [ ] D28 generalised brain: G1-5 Model Hardware Standard (MHS) v0, G1-6 Car2D (RC-car-like
        second body). Gate 1 order: G1-2, G1-3, G1-4, G1-5, G1-6.
+0g. [ ] D33 software baseline (G1-7, after G1-6): robobrain namespace package + pyproject, type
+       checking + ruff, kernel 100% branch coverage, fast test marker, Linux test run.
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
 2. [x] `autolab amend` CLI: recorded protocol amendments; amending after data
@@ -164,6 +166,8 @@ Residual risks the fixes do NOT remove:
 
 ## Human tasks (only what Claude cannot do)
 
+- **Backup (important):** neither LAB1 nor labs/robolab/repo has a remote; everything is only on
+  this PC. Create a private GitHub repo (or two) and tell Claude to push.
 - Nothing blocking. G1-2 resumes after the Claude usage limit resets (3:10pm PT).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.

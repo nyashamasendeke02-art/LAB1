@@ -129,3 +129,8 @@
   the first task family. New: REQ-MHS, REQ-ISO, REQ-NAV, REQ-SAFE+, REQ-SAFE-H, REQ-RT,
   REQ-COMPUTE, REQ-COST, REQ-REPRO, REQ-WM+. Hypotheses stay out of requirements. Changes only by
   recorded amendment.
+- D33 (2026-10-05, claude-code): software requirements SW-* added to docs/REQUIREMENTS.md. Gaps found:
+  no packaging/namespace (SW-PKG), Windows-only testing (SW-OS, SW-CI), no type/lint checks
+  (SW-STATIC), kernel coverage unmeasured (SW-SAFETY-CODE), and NO REMOTE BACKUP of either
+  repository (SW-BACKUP; pushing needs the human's choice of remote). Planned as G1-7 software
+  baseline after G1-6.

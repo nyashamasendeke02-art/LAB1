@@ -80,3 +80,49 @@ Exact thresholds for each experiment are fixed at its pre-registration.
 | REQ-PER | Perception from raw sensors (camera, LiDAR): estimation, mapping | before Gate 7 |
 | REQ-ROS | ROS 2 integration below the embodiment adapter | Gate 7 |
 | REQ-UI | Operator interface, language goals | after Gate 5 |
+
+## Software requirements (D33)
+
+Status today: Python 3.13 + NumPy 2.5 only (`requirements.lock`), src-layout packages imported
+by bare names (`from contracts import ...`), pytest, Windows only, no packaging, no type or
+lint checks, no remote backup.
+
+### Language, platform and runtime
+
+| ID | Requirement | Now |
+|---|---|---|
+| SW-LANG | Brain, kernel, harness and simulators: Python ≥ 3.11 + NumPy. Body reflex loops (≥ 200 Hz: balance, motor current, ABS) live in the body's firmware or a C/C++ adapter, never in the Python brain. | met |
+| SW-OS | Develop on Windows; the target is Linux (Raspberry Pi OS / Ubuntu, Jetson L4T). Tests must pass on both. | Windows only |
+| SW-RUNTIME | The fast-loop runtime has minimal dependencies (NumPy; ONNX Runtime when learned models need it). Training dependencies (e.g. PyTorch) are separate and never imported by the fast loop. Learned models ship as versioned, hash-checked files. | met (NumPy only) |
+| SW-RT | The fast loop does no unbounded work per cycle: no network, disk sync or allocation-heavy calls on the cycle path; System 2 and logging I/O run off the cycle path. | partly (sync runner) |
+| SW-ROS | Core logic is testable without ROS 2; ROS 2 (Jazzy) appears only in adapters at Gate 7. | met |
+
+### Structure and interfaces
+
+| ID | Requirement | Now |
+|---|---|---|
+| SW-PKG | One installable package (`pyproject.toml`) with a namespace (`robobrain.contracts`, `robobrain.safety`, ...) so names cannot collide with third-party packages and the brain installs on an edge board with `pip install`. | not met |
+| SW-IFACE | Modules talk only through versioned contracts (SCHEMA_VERSION, MHS_VERSION, KERNEL_VERSION); a breaking change bumps the version and updates `docs/contracts.md`. | met |
+| SW-CONFIG | All configuration (modules, seeds, MHS, limits, evaluation sets) in validated files (TOML/JSON); no magic constants in brain code. | partly |
+| SW-DEP | The brain packages may not import `simulation` (REQ-ISO) and `safety` may not import any learned module. Enforced by an import test. | not yet (G1-4) |
+
+### Quality
+
+| ID | Requirement | Now |
+|---|---|---|
+| SW-TEST | The mandate's test levels: unit, contract, component, integration, simulation, fault injection, regression, research benchmark. A fast subset runs in < 1 min. | unit to fault injection; no fast marker |
+| SW-SAFETY-CODE | `src/safety`: 100% branch coverage, no dynamic code, no third-party dependency beyond NumPy, every change through the safety review gate. | review gate met; coverage not measured |
+| SW-STATIC | Type hints on public APIs, checked by a type checker (pyright or mypy); a linter (ruff) runs in CI. | not met |
+| SW-DET | Same seed gives bit-identical results on the same platform; across platforms, results agree within a stated tolerance (floating-point differences are expected). | same-platform met |
+| SW-PERF | Benchmarks for per-module latency and memory, tracked across commits (REQ-RT, REQ-COMPUTE). | telemetry only |
+
+### Process, versioning and delivery
+
+| ID | Requirement | Now |
+|---|---|---|
+| SW-VCS | All code in git with provenance trailers; changes only through autolab tasks (engineer → tests → verifier → gated merge). | met |
+| SW-BACKUP | Both repositories (LAB1 and labs/robolab/repo) are pushed to a private remote. Today they exist only on this PC. | **not met** |
+| SW-CI | CI runs the test suite on Windows and Linux for every merge. | not met (local controller tests only) |
+| SW-LOCK | Every dependency pinned in `requirements.lock`, recorded per run (L9). | met |
+| SW-RELEASE | Brain releases are semantic-versioned; each records the contract, MHS and kernel versions and the model hashes it contains; rollback is one version back. | not yet |
+| SW-DOCS | Every public module documented; architecture and requirements docs updated with every design change. | met |

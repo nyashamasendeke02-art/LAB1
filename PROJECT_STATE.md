@@ -18,6 +18,8 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Reference documents
 
+- `docs/ROBOT_BRAIN_ARCHITECTURE.md`: the robot brain's full architecture (layers, MHS, components,
+  control cycle, safety, code map, build order). `docs/ARCHITECTURE.md` is the lab (autolab).
 - `docs/PROJECT_PLAN.md`: programme plan (DRAFT, awaiting approval): phases P0-P11 mapped to
   gates 0-8 and experiments WM-1, E1-E6; design and engineering standards; budget; risks.
 - **`AI_Robotics_Full_Documentation.pdf` is the lab's FOUNDATION (D20, 2026-10-04):** the

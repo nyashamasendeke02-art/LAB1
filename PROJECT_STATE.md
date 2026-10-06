@@ -41,10 +41,16 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Todo
 
-### In Progress
-- [ ] robolab Gate 1 running unattended (D35): `autolab queue labs/robolab docs/gates/gate1_queue.toml`
-      (G1-2..G1-7; log labs/robolab-run.log). Stops at safety/contracts review gates for Claude Code.
-      G1-2 now PRJ-0009 (PRJ-0008 HALTED: Codex default model unavailable, fixed by pinning gpt-6-luna, D36/F7).
+### In Progress (2026-10-06 00:30)
+- [ ] robolab Gate 1 queue running detached (restarted 00:26 after APR-0003):
+      G1-2 DONE (PRJ-0009, DLV-0006). G1-3 APPROVED (APR-0003, D37), merging; then G1-4..G1-7.
+      Next stop: G1-5 contracts/safety review (claude-code reviews, approves, restarts the queue).
+      Resume after any stop: `.venv\Scriptsutolab.exe status labs/robolab`; review with
+      `autolab approvals`; restart: `autolab queue labs/robolab docs/gates/gate1_queue.toml
+      [--retry G1-x]` (log labs/robolab-run.log). Usage limits wait automatically (D35).
+- [ ] GitHub backup: `gh` login did not complete from this session (connection aborted by local
+      software). Human runs `gh auth login` in their own terminal; then create private repos
+      LAB1 + robolab and push (authorised by the human 2026-10-06).
 
 ### Next (priority order)
 0. [x] Plan adopted under delegation (D21). P0 upgrades L1-L3, L6-L9 DONE (v0.3.0, da94322);

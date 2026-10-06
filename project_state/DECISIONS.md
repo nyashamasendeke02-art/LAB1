@@ -122,3 +122,10 @@
   must be a generic prior parameterised by the MHS (e.g. Newtonian rigid body with declared
   actuator kinds), never per-body code; otherwise the brain is not body-agnostic. Open as
   OPEN_QUESTION 13 until WM v1 is designed.
+- D32 (2026-10-05, claude-code under delegation; human: "no preference" on all four): requirements
+  v0.1 adopted in docs/REQUIREMENTS.md. Scope: edge-board-class target compute for the fast loop
+  (Pi 5 / Jetson Orin Nano class), "figured out a new body" = fast adaptation within a fixed
+  experience budget vs a tuned body-specific controller with zero safety violations, navigation as
+  the first task family. New: REQ-MHS, REQ-ISO, REQ-NAV, REQ-SAFE+, REQ-SAFE-H, REQ-RT,
+  REQ-COMPUTE, REQ-COST, REQ-REPRO, REQ-WM+. Hypotheses stay out of requirements. Changes only by
+  recorded amendment.

@@ -15,6 +15,8 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Reference documents
 
+- `docs/REQUIREMENTS.md`: robot brain requirements v0.1 (D32): functional, safety, performance,
+  reproducibility; research measures kept separate from pass/fail requirements.
 - `docs/ROBOT_BRAIN_ARCHITECTURE.md`: the robot brain's full architecture (layers, MHS, components,
   control cycle, safety, code map, build order). `docs/ARCHITECTURE.md` is the lab (autolab).
 - `docs/PROJECT_PLAN.md`: programme plan (DRAFT, awaiting approval): phases P0-P11 mapped to
@@ -165,3 +167,4 @@ Residual risks the fixes do NOT remove:
 - Nothing blocking. G1-2 resumes after the Claude usage limit resets (3:10pm PT).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.
+- Any time: change the D32 requirement defaults (target compute, adaptation budget, task family).

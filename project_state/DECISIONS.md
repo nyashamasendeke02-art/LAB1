@@ -155,3 +155,11 @@
   in labs/robolab/lab.toml (newest generation available to the account). Added `autolab queue
   --retry ID` to submit a HALTED task again as a fresh project once its cause is fixed (the HALTED
   project stays as a record). PRJ-0008 kept HALTED; G1-2 re-submitted.
+- D37 (2026-10-06, claude-code under delegation): APR-0003 (G1-3 Safety Kernel v1.1) APPROVED after a
+  real review: diff read, 268 tests pass on the branch, independent Puck2D fault injection (clamp and
+  reject modes, random / push-to-wall / bang-bang, with and without damping+friction, 40 seeds x 400
+  steps): never left the workspace. Confirmed limitation: a configured mass below the true mass can
+  exit (2x mass: 2.452 m vs 2 m bound), so the MHS mass_kg is an upper bound. Integration gap found:
+  CycleRunner calls tick()/emergency_stop() without velocity and actuates nothing on abstain, so a
+  moving body would coast on hardware. Folded into the G1-5 spec (runner passes observed velocity;
+  safe action actuated every cycle without an approved command) with a new acceptance criterion.

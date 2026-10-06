@@ -139,3 +139,18 @@ def test_network_errors_wait_briefly_and_are_not_failures(tmp_path):
     assert ctl.run(pid)[-1].after == "COMPLETE"
     assert slept == [120.0] * 4
     assert len([f for f in lab.store.query("failure") if f.data["category"] == "network"]) == 4
+
+
+def test_wall_sleep_follows_the_wall_clock(monkeypatch):
+    import autolab.controller as c
+    clock = {"t": 1000.0}
+    naps = []
+
+    def fake_sleep(s):  # each nap "takes" 10x longer on the wall clock (computer was asleep)
+        naps.append(s)
+        clock["t"] += 10 * s
+
+    monkeypatch.setattr(c.time, "time", lambda: clock["t"])
+    monkeypatch.setattr(c.time, "sleep", fake_sleep)
+    c.wall_sleep(900)
+    assert clock["t"] >= 1900 and len(naps) <= 4  # ends at the wall deadline, not 900 s of naps

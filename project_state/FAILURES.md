@@ -28,3 +28,8 @@
   CLI's default model (gpt-6.1-sol) is not available to the ChatGPT-account login. Not a code
   defect; the engineer's build had passed tests. Fixed by pinning the model (D36). Lesson: pin
   agent models in lab.toml instead of relying on CLI defaults, which change with CLI updates.
+- F8 (2026-10-06): robolab G1-6 (PRJ-0013) sat idle from 04:14 to ~09:55 although the Claude limit reset at
+  07:30: the controller's 15-minute usage-limit wait used time.sleep, whose timer paused while the PC slept
+  overnight. Fixed (D47): waits are wall-clock based (30 s naps against a time.time() deadline) in autolab and
+  the autopilot. Also found: commit 6e4c0c6 broke scripts/autopilot.py (a newline escape became a literal line
+  break via a heredoc); fixed and now compiled before commit.

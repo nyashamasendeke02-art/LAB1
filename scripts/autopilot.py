@@ -82,6 +82,13 @@ AUTOPILOT: DONE <reason>
 
 
 # ------------------------------------------------------------------ helpers
+def wall_sleep(seconds: float, step: float = 30.0) -> None:
+    """Sleep by the wall clock (time.sleep can pause while the computer sleeps)."""
+    deadline = time.time() + seconds
+    while (left := deadline - time.time()) > 0:
+        time.sleep(min(step, left))
+
+
 def now() -> str:
     return dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -194,7 +201,7 @@ def claude_with_wait(prompt: str) -> str:
             return "AUTOPILOT: NEEDS_HUMAN Claude usage limit persisted for a week"
         set_status(f"waiting for the Claude usage limit to reset (waited {waited // 60} min)")
         log(f"claude usage limit; sleeping {LIMIT_WAIT_S // 60} min: {text[-160:]!r}")
-        time.sleep(LIMIT_WAIT_S)
+        wall_sleep(LIMIT_WAIT_S)
         waited += LIMIT_WAIT_S
 
 
@@ -203,7 +210,7 @@ def cycle(state: dict) -> str | None:
     """One autopilot cycle. Returns a stop reason, or None to keep going."""
     while external_queue_running():
         set_status("a queue started elsewhere is running; waiting for it")
-        time.sleep(EXTERNAL_POLL_S)
+        wall_sleep(EXTERNAL_POLL_S)
     set_status(f"running queue {active_queue()}")
     code, last = run_queue(state.pop("retry", []))
     if last and last == state.get("last_stop"):
@@ -215,9 +222,7 @@ def cycle(state: dict) -> str | None:
     set_status(f"queue stopped ({last or code}); Claude Code is handling it")
     reply = claude_with_wait(PROMPT.format(queue=active_queue(), result=last or f"exit {code}"))
     with (ROOT / "labs" / "autopilot-replies.log").open("a", encoding="utf-8") as fh:
-        fh.write(f"===== {now()} =====
-{reply}
-")
+        fh.write(f"===== {now()} =====\n{reply}\n")
     kind, detail, retry = parse_directive(reply)
     log(f"claude directive: {kind} {detail[:200]}")
     if kind == "CONTINUE":

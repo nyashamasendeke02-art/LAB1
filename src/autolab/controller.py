@@ -100,6 +100,15 @@ class StepResult:
     wait_kind: str | None = None   # 'usage_limit' or 'network'
 
 
+def wall_sleep(seconds: float, step: float = 30.0) -> None:
+    """Sleep by the wall clock. time.sleep's timer can pause while the computer sleeps, which
+    turned a 15-minute usage-limit wait into hours (2026-10-06); short naps against a
+    time.time() deadline end on time after a resume."""
+    deadline = time.time() + seconds
+    while (left := deadline - time.time()) > 0:
+        time.sleep(min(step, left))
+
+
 def _tail(text: str, n: int = 4000) -> str:
     return text if len(text) <= n else "...[truncated]...\n" + text[-n:]
 
@@ -171,7 +180,7 @@ class Controller:
         self.repo = lab.repo
         self.cfg = lab.config
         self.limits = self.cfg["limits"]
-        self.sleep: Callable[[float], None] = time.sleep  # injectable for tests
+        self.sleep: Callable[[float], None] = wall_sleep  # injectable for tests
         self.gates = Gates(self.store, self.cfg["gates"].get("delegation"))
         if agents is None:
             agents = {role: Agent(role, make_backend(self.cfg["agents"][role.value]))

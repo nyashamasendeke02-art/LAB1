@@ -209,3 +209,5 @@
   network_max_wait_s 1 h per run) and retried without counting as a stage failure, like usage limits (D35).
   G1-5 came within one failure of a HALT from two such errors on 2026-10-06. Our own agent timeouts still count
   as failures. Test: test_network_errors_wait_briefly_and_are_not_failures.
+- D47 (2026-10-06, claude-code): all lab waits (usage limit, network, autopilot polling) sleep by the wall clock,
+  so they end on time after the PC wakes (F8). The sleeping queue process was restarted (no agent was running).

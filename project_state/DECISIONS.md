@@ -134,3 +134,8 @@
   (SW-STATIC), kernel coverage unmeasured (SW-SAFETY-CODE), and NO REMOTE BACKUP of either
   repository (SW-BACKUP; pushing needs the human's choice of remote). Planned as G1-7 software
   baseline after G1-6.
+- D34 (2026-10-05, claude-code): open-source stack mapped to the user's schematic layers in
+  docs/REQUIREMENTS.md, each with licence and gate. Licence policy SW-LICENSE-DEP: permissive or
+  weak-copyleft inside the brain; GPL only as separate processes/firmware; AGPL excluded. Isaac Sim
+  excluded (proprietary, GPU). Nav2/MoveIt 2 used as baselines, not as the brain. Project licence
+  (recommended Apache-2.0) is the human's decision.

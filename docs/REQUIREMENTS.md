@@ -126,3 +126,51 @@ lint checks, no remote backup.
 | SW-LOCK | Every dependency pinned in `requirements.lock`, recorded per run (L9). | met |
 | SW-RELEASE | Brain releases are semantic-versioned; each records the contract, MHS and kernel versions and the model hashes it contains; rollback is one version back. | not yet |
 | SW-DOCS | Every public module documented; architecture and requirements docs updated with every design change. | met |
+
+## Open-source stack, mapped to the schematic layers (D34)
+
+Selection rules: fits the lab PC (4 cores, 8 GB, no GPU) or the edge-board target; keeps
+the brain body-agnostic (ROS/vendor code only below the adapter); permissive licence
+preferred. Licences are as understood on 2026-10-05; re-check each one when adopting it.
+
+### Licence policy
+
+| ID | Requirement |
+|---|---|
+| SW-LICENSE | robolab code is released under one permissive licence (recommended: Apache-2.0; the human decides). |
+| SW-LICENSE-DEP | Inside the brain process: only permissive (MIT, BSD, Apache-2.0) or weak-copyleft (LGPL, MPL) dependencies. GPL components (e.g. ArduPilot, ORB-SLAM3, VESC firmware) are allowed only as separate processes or firmware behind a protocol (MAVLink, ROS 2 topics). AGPL is excluded (e.g. Ultralytics YOLO). Every dependency's licence is recorded in the lock file review. |
+| SW-MODEL-LICENSE | Open-weight models (System 2) are checked individually; some popular ones are not OSI-open (e.g. the Llama licence). |
+
+### By layer
+
+| Schematic layer | Need | Recommended | Licence | When |
+|---|---|---|---|---|
+| 1 User interfaces | voice in / out (offline) | whisper.cpp or Vosk; Piper TTS | MIT; Apache-2.0; MIT | after Gate 5 |
+| 1 | dashboard | Lichtblick (open fork of Foxglove Studio) | MPL-2.0 | Gate 7 |
+| 2 AI & decision | local LLM for System 2 | llama.cpp (or Ollama) with a small open-weight model | MIT | Gate 5 |
+| 2 | task planner / mission sequencing | py_trees (behaviour trees); Unified Planning (PDDL) | BSD; Apache-2.0 | Gate 5 |
+| 2 | World Model, Awareness, Safety | our own (NumPy) | - | Gates 0-4 |
+| 3 Perception | image processing, detection | OpenCV; YOLOX or NanoDet (not Ultralytics: AGPL) | Apache-2.0 | before Gate 7 |
+| 3 | sensor fusion / state estimation | FilterPy (Python); robot_localization (ROS 2) | MIT; BSD | Gate 3 / Gate 7 |
+| 3 | SLAM, maps | RTAB-Map or slam_toolbox; OctoMap; Open3D | BSD; LGPL-2.1; BSD; MIT | before Gate 7 |
+| 4 Control & planning | MPC / trajectory optimisation | acados or CasADi; OSQP | BSD-2; LGPL-3.0; Apache-2.0 | Gate 5 (S2 planner) |
+| 4 | motion / manipulation planning | OMPL; MoveIt 2; Nav2 (also as the "tuned body-specific baseline" for REQ-GEN) | BSD; BSD; Apache-2.0 | baselines from Gate 3 |
+| 4 | RL training | Gymnasium API for our environments; Stable-Baselines3 or CleanRL (training only) | MIT | Gate 3 |
+| 5 Hardware abstraction | middleware | ROS 2 Jazzy, ros2_control, micro-ROS (microcontrollers) | Apache-2.0 | Gate 7 |
+| 5 | communication | python-can, pyserial, pymavlink | LGPL-3.0; BSD; LGPL-3.0 | Gate 7 |
+| 6 Physical (RC car) | low-level firmware / reflexes below the adapter | ArduPilot Rover or PX4 (via MAVLink); VESC motor firmware | GPL-3.0; BSD-3; GPL-3.0 | Gate 7 |
+| 6 | reference RC-car platforms | Donkey Car; F1TENTH | MIT; open | Gate 7 |
+| Data & infra | datasets, logs | MCAP (also ROS 2 bags); Apache Parquet via pyarrow; DVC for dataset versions | MIT; Apache-2.0; Apache-2.0 | Gate 2 |
+| | model training / deployment | PyTorch (training only); ONNX + ONNX Runtime (edge inference) | BSD; MIT | Gate 2-3 |
+| | simulation | own NumPy sims now; MuJoCo for contact, arms, humanoids (the mandate's choice); Gazebo with ROS 2 for hardware rehearsal; CARLA for road cars (needs a GPU). Isaac Sim is not open source and needs an RTX GPU: excluded | Apache-2.0; Apache-2.0; MIT | MuJoCo when a gate needs contact |
+| | CI | pre-commit; nox; GitHub Actions (service) | MIT; Apache-2.0 | G1-7 |
+| Monitoring & tools | visualisation | Rerun (Python, no ROS needed; fits the episode visualiser); matplotlib; RViz2 with ROS 2 | MIT/Apache-2.0; PSF-based; BSD | Rerun after G1-2 |
+| | system health, resources | psutil; ROS 2 diagnostics | BSD | G1-7 / Gate 7 |
+| | parameter tuning | Optuna (with the same tuning budget for baseline and intervention); pydantic for config validation | MIT | Gate 3 |
+| Quality (SW-*) | lint, types, coverage, property tests, benchmarks | ruff; pyright or mypy; coverage.py; Hypothesis (safety property tests); pytest-benchmark | MIT; MIT; Apache-2.0; MPL-2.0; BSD | G1-7 |
+
+### Deliberately not adopted
+
+- **Isaac Sim / Isaac Lab:** proprietary simulator, RTX GPU required.
+- **Ultralytics YOLO:** AGPL-3.0.
+- **Full Nav2 / MoveIt 2 as the brain:** they would replace the components we are testing; they are used as conventional baselines instead.

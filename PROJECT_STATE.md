@@ -168,6 +168,7 @@ Residual risks the fixes do NOT remove:
 
 - **Backup (important):** neither LAB1 nor labs/robolab/repo has a remote; everything is only on
   this PC. Create a private GitHub repo (or two) and tell Claude to push.
+- Choose the project licence (recommended Apache-2.0; D34).
 - Nothing blocking. G1-2 resumes after the Claude usage limit resets (3:10pm PT).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.

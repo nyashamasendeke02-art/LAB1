@@ -1,0 +1,378 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1450" viewBox="0 0 2000 1450">
+<defs>
+<marker id="m2f6fd0" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#2f6fd0"/></marker>
+<marker id="s2f6fd0" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#2f6fd0"/></marker>
+<marker id="mc43c3c" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#c43c3c"/></marker>
+<marker id="sc43c3c" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#c43c3c"/></marker>
+<marker id="m2e8f57" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#2e8f57"/></marker>
+<marker id="s2e8f57" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#2e8f57"/></marker>
+<marker id="md98a2b" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#d98a2b"/></marker>
+<marker id="sd98a2b" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#d98a2b"/></marker>
+<marker id="m7a5cc9" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#7a5cc9"/></marker>
+<marker id="s7a5cc9" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#7a5cc9"/></marker>
+<marker id="m1f2937" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#1f2937"/></marker>
+<marker id="s1f2937" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#1f2937"/></marker>
+<marker id="m5b6472" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M0,0 L12,6 L0,12 z" fill="#5b6472"/></marker>
+<marker id="s5b6472" markerUnits="userSpaceOnUse" markerWidth="12" markerHeight="12" refX="2" refY="6" orient="auto"><path d="M12,0 L0,6 L12,12 z" fill="#5b6472"/></marker>
+</defs>
+<rect x="0" y="0" width="2000" height="1450" rx="0" fill="#ffffff" stroke="#ffffff" stroke-width="0"/>
+<text x="1000.0" y="46" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="32" font-weight="800" text-anchor="middle" fill="#1f2937">LAB1 – Whole Project Schematic</text>
+<text x="1000.0" y="72" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="middle" fill="#5b6472">An autonomous research lab building and testing a generalised robot brain (one brain for any body described by a Model Hardware Standard) · status 2026-10-06</text>
+<rect x="30" y="95" width="310" height="905" rx="14" fill="#fff4e0" stroke="#d98a00" stroke-width="2.2"/>
+<text x="46" y="122" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18.5" font-weight="700" text-anchor="start" fill="#1f2937">People &amp; Control</text>
+<rect x="45" y="140" width="280" height="150" rx="10" fill="#ffffff" stroke="#d98a00" stroke-width="1.6"/>
+<text x="57" y="164" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">You (human)</text>
+<text x="57" y="184" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">direction, goals, north star</text>
+<text x="57" y="200" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">hardware safety sign-off</text>
+<text x="57" y="216" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">money, accounts, publishing</text>
+<text x="57" y="232" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">accept major conclusions</text>
+<rect x="271.0" y="148" width="46.0" height="18" rx="9" fill="#d98a00" stroke="#d98a00" stroke-width="1"/>
+<text x="294.0" y="161" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">HUMAN</text>
+<rect x="45" y="330" width="280" height="150" rx="10" fill="#ffffff" stroke="#d98a00" stroke-width="1.6"/>
+<text x="57" y="354" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Claude Code (PM)</text>
+<text x="57" y="374" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">architecture, requirements</text>
+<text x="57" y="390" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">task specs and queues</text>
+<text x="57" y="406" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">real gate reviews (delegated)</text>
+<text x="57" y="422" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">decisions D1–D41, fixes</text>
+<rect x="45" y="520" width="280" height="150" rx="10" fill="#ffffff" stroke="#d98a00" stroke-width="1.6"/>
+<text x="57" y="544" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Autopilot</text>
+<text x="57" y="564" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">scripts/autopilot.py</text>
+<text x="57" y="580" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">runs the active task queue</text>
+<text x="57" y="596" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">on stop: starts Claude Code</text>
+<text x="57" y="612" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">waits out usage limits</text>
+<rect x="271.0" y="528" width="46.0" height="18" rx="9" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="294.0" y="541" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">BUILT</text>
+<rect x="45" y="710" width="280" height="150" rx="10" fill="#ffffff" stroke="#d98a00" stroke-width="1.6"/>
+<text x="57" y="734" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Mandate</text>
+<text x="57" y="754" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">AI_Robotics_Full_Documentation</text>
+<text x="57" y="770" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">H1–H5 · E1–E6 · gates 0–8</text>
+<text x="57" y="786" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">+ north star D28 (MHS)</text>
+<text x="57" y="802" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">every component earned</text>
+<rect x="45" y="885" width="280" height="100" rx="10" fill="#ffffff" stroke="#d98a00" stroke-width="1.6"/>
+<text x="57" y="909" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Licence</text>
+<text x="57" y="929" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">Apache-2.0 (D40)</text>
+<text x="57" y="945" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">robolab: task G1-8</text>
+<path d="M 185,290 L 185,328" fill="none" stroke="#d98a2b" stroke-width="2.2" marker-end="url(#md98a2b)"/>
+<rect x="198.65" y="300" width="66.69999999999999" height="17" rx="4" fill="#ffffff" stroke="#d98a2b" stroke-width="1"/>
+<text x="232" y="313" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#d98a2b">delegates</text>
+<path d="M 185,518 L 185,482" fill="none" stroke="#d98a2b" stroke-width="2.2" marker-end="url(#md98a2b)"/>
+<rect x="204.95" y="488" width="54.1" height="17" rx="4" fill="#ffffff" stroke="#d98a2b" stroke-width="1"/>
+<text x="232" y="501" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#d98a2b">on stop</text>
+<rect x="1660" y="95" width="310" height="905" rx="14" fill="#eef0f3" stroke="#7b8594" stroke-width="2.2"/>
+<text x="1676" y="122" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18.5" font-weight="700" text-anchor="start" fill="#1f2937">Records &amp; Backup</text>
+<rect x="1675" y="140" width="280" height="150" rx="10" fill="#ffffff" stroke="#7b8594" stroke-width="1.6"/>
+<text x="1687" y="164" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">GitHub (private)</text>
+<text x="1687" y="184" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">LAB1: lab, docs, decisions</text>
+<text x="1687" y="200" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">robolab: brain code,</text>
+<text x="1687" y="216" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">all branches + provenance</text>
+<text x="1687" y="232" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">pushed after each commit</text>
+<rect x="1901.0" y="148" width="46.0" height="18" rx="9" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="1924.0" y="161" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">BUILT</text>
+<rect x="1675" y="330" width="280" height="150" rx="10" fill="#ffffff" stroke="#7b8594" stroke-width="1.6"/>
+<text x="1687" y="354" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Lab ledger</text>
+<text x="1687" y="374" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">hash-chained event log</text>
+<text x="1687" y="390" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">records, artifacts, raw runs</text>
+<text x="1687" y="406" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">tamper-evident</text>
+<text x="1687" y="422" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">(backup to git: TODO)</text>
+<rect x="1907.4" y="338" width="39.6" height="18" rx="9" fill="#c43c3c" stroke="#c43c3c" stroke-width="1"/>
+<text x="1927.2" y="351" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">TODO</text>
+<rect x="1675" y="520" width="280" height="150" rx="10" fill="#ffffff" stroke="#7b8594" stroke-width="1.6"/>
+<text x="1687" y="544" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Project records</text>
+<text x="1687" y="564" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">PROJECT_STATE.md</text>
+<text x="1687" y="580" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">DECISIONS · FAILURES</text>
+<text x="1687" y="596" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">OPEN_QUESTIONS</text>
+<text x="1687" y="612" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">per-cycle reports</text>
+<rect x="1675" y="710" width="280" height="150" rx="10" fill="#ffffff" stroke="#7b8594" stroke-width="1.6"/>
+<text x="1687" y="734" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Design documents</text>
+<text x="1687" y="754" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">ROBOT_BRAIN_ARCHITECTURE</text>
+<text x="1687" y="770" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">REQUIREMENTS (REQ-*, SW-*)</text>
+<text x="1687" y="786" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">PROJECT_PLAN · gate specs</text>
+<text x="1687" y="802" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">schematics (this one)</text>
+<rect x="1675" y="885" width="280" height="100" rx="10" fill="#ffffff" stroke="#7b8594" stroke-width="1.6"/>
+<text x="1687" y="909" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Telemetry &amp; runs</text>
+<text x="1687" y="929" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">per-cycle JSONL, latency</text>
+<text x="1687" y="945" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">trial metrics, raw data</text>
+<rect x="370" y="95" width="1260" height="175" rx="14" fill="#f1ebff" stroke="#7a5cc9" stroke-width="2.2"/>
+<text x="386" y="122" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18.5" font-weight="700" text-anchor="start" fill="#1f2937">Programme: gates and experiments</text>
+<text x="1614" y="122" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="end" fill="#5b6472" font-style="italic">each brain component must beat its ablation</text>
+<rect x="385" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="449.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 0</text>
+<text x="449.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">contracts, safety</text>
+<text x="449.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic"></text>
+<rect x="424.4" y="226" width="49.2" height="17" rx="8" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="449.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PASSED</text>
+<path d="M 513,197 L 521,197" fill="none" stroke="#7a5cc9" stroke-width="1.6" marker-end="url(#m7a5cc9)"/>
+<rect x="523" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="587.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 1</text>
+<text x="587.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">simulation, MHS</text>
+<text x="587.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic">G1-1..G1-8</text>
+<rect x="546.9" y="226" width="80.2" height="17" rx="8" fill="#e0a100" stroke="#e0a100" stroke-width="1"/>
+<text x="587.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">IN PROGRESS</text>
+<path d="M 651,197 L 659,197" fill="none" stroke="#7a5cc9" stroke-width="1.6" marker-end="url(#m7a5cc9)"/>
+<rect x="661" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="725.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 2</text>
+<text x="725.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">World Model</text>
+<text x="725.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic">WM-1, WM-2</text>
+<rect x="697.3" y="226" width="55.4" height="17" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="725.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<path d="M 789,197 L 797,197" fill="none" stroke="#7a5cc9" stroke-width="1.6" marker-end="url(#m7a5cc9)"/>
+<rect x="799" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="863.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 3</text>
+<text x="863.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">System 1</text>
+<text x="863.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic">E1 milestone</text>
+<rect x="835.3" y="226" width="55.4" height="17" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="863.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<path d="M 927,197 L 935,197" fill="none" stroke="#7a5cc9" stroke-width="1.6" marker-end="url(#m7a5cc9)"/>
+<rect x="937" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="1001.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 4</text>
+<text x="1001.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">Awareness</text>
+<text x="1001.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic">E3a, E4</text>
+<rect x="973.3" y="226" width="55.4" height="17" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="1001.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<path d="M 1065,197 L 1073,197" fill="none" stroke="#7a5cc9" stroke-width="1.6" marker-end="url(#m7a5cc9)"/>
+<rect x="1075" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="1139.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 5</text>
+<text x="1139.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">System 2 (LLM)</text>
+<text x="1139.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic">E2, E3</text>
+<rect x="1111.3" y="226" width="55.4" height="17" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="1139.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<path d="M 1203,197 L 1211,197" fill="none" stroke="#7a5cc9" stroke-width="1.6" marker-end="url(#m7a5cc9)"/>
+<rect x="1213" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="1277.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 6</text>
+<text x="1277.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">memory, learning</text>
+<text x="1277.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic">E5, E6</text>
+<rect x="1249.3" y="226" width="55.4" height="17" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="1277.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<path d="M 1341,197 L 1349,197" fill="none" stroke="#7a5cc9" stroke-width="1.6" marker-end="url(#m7a5cc9)"/>
+<rect x="1351" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="1415.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 7</text>
+<text x="1415.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">hardware</text>
+<text x="1415.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic">you decide</text>
+<rect x="1393.5" y="226" width="43.0" height="17" rx="8" fill="#d98a00" stroke="#d98a00" stroke-width="1"/>
+<text x="1415.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">HUMAN</text>
+<path d="M 1479,197 L 1487,197" fill="none" stroke="#7a5cc9" stroke-width="1.6" marker-end="url(#m7a5cc9)"/>
+<rect x="1489" y="140" width="128" height="115" rx="9" fill="#ffffff" stroke="#7a5cc9" stroke-width="1.4"/>
+<text x="1553.0" y="162" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="800" text-anchor="middle" fill="#1f2937">Gate 8</text>
+<text x="1553.0" y="181" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">synthesis</text>
+<text x="1553.0" y="198" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472" font-style="italic">you accept</text>
+<rect x="1531.5" y="226" width="43.0" height="17" rx="8" fill="#d98a00" stroke="#d98a00" stroke-width="1"/>
+<text x="1553.0" y="239" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">HUMAN</text>
+<rect x="370" y="295" width="1260" height="480" rx="14" fill="#e8f1fd" stroke="#3b78c4" stroke-width="2.2"/>
+<text x="386" y="322" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18.5" font-weight="700" text-anchor="start" fill="#1f2937">autolab – the research lab</text>
+<text x="1614" y="322" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="end" fill="#5b6472" font-style="italic">the controller, not any AI, owns the truth</text>
+<rect x="390" y="337" width="1220" height="92" rx="10" fill="#ffffff" stroke="#3b78c4" stroke-width="2"/>
+<text x="406" y="363" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="800" text-anchor="start" fill="#1f2937">Controller (plain code, no AI)</text>
+<rect x="1556.0" y="345" width="46.0" height="18" rx="9" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="1579.0" y="358" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">BUILT</text>
+<text x="406" y="387" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">owns project state · research + engineering state machines · schema-checked task packets · one git worktree per agent task</text>
+<text x="406" y="409" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">runs tests and trials itself · controlled merges with provenance · mechanical verdicts (CI, p) · approval gates · hash-chained ledger</text>
+<rect x="390.0" y="465" width="290" height="105" rx="10" fill="#ffffff" stroke="#3b78c4" stroke-width="1.6"/>
+<text x="402.0" y="489" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="700" text-anchor="start" fill="#1f2937">Scientist</text>
+<text x="402.0" y="509" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">ChatGPT via Codex (read-only)</text>
+<text x="402.0" y="524" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">questions, hypotheses, designs,</text>
+<text x="402.0" y="539" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">interpretation</text>
+<rect x="626.0" y="473" width="46.0" height="18" rx="9" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="649.0" y="486" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">BUILT</text>
+<path d="M 535.0,431 L 535.0,463" fill="none" stroke="#2f6fd0" stroke-width="1.8" marker-end="url(#m2f6fd0)" marker-start="url(#s2f6fd0)"/>
+<rect x="693.3" y="465" width="290" height="105" rx="10" fill="#ffffff" stroke="#3b78c4" stroke-width="1.6"/>
+<text x="705.3" y="489" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="700" text-anchor="start" fill="#1f2937">Engineer</text>
+<text x="705.3" y="509" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">Claude (claude -p)</text>
+<text x="705.3" y="524" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">writes code + tests in its</text>
+<text x="705.3" y="539" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">own worktree</text>
+<rect x="929.3" y="473" width="46.0" height="18" rx="9" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="952.3" y="486" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">BUILT</text>
+<path d="M 838.3,431 L 838.3,463" fill="none" stroke="#2f6fd0" stroke-width="1.8" marker-end="url(#m2f6fd0)" marker-start="url(#s2f6fd0)"/>
+<rect x="996.6" y="465" width="290" height="105" rx="10" fill="#ffffff" stroke="#3b78c4" stroke-width="1.6"/>
+<text x="1008.6" y="489" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="700" text-anchor="start" fill="#1f2937">Verifier</text>
+<text x="1008.6" y="509" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">Codex (sandboxed)</text>
+<text x="1008.6" y="524" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">adversarial review +</text>
+<text x="1008.6" y="539" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">independent tests</text>
+<rect x="1232.6" y="473" width="46.0" height="18" rx="9" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="1255.6" y="486" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">BUILT</text>
+<path d="M 1141.6,431 L 1141.6,463" fill="none" stroke="#2f6fd0" stroke-width="1.8" marker-end="url(#m2f6fd0)" marker-start="url(#s2f6fd0)"/>
+<rect x="1299.9" y="465" width="290" height="105" rx="10" fill="#ffffff" stroke="#3b78c4" stroke-width="1.6"/>
+<text x="1311.9" y="489" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14.5" font-weight="700" text-anchor="start" fill="#1f2937">Independent reviewer</text>
+<text x="1311.9" y="509" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">different model family</text>
+<text x="1311.9" y="524" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">scientific review</text>
+<text x="1311.9" y="539" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12" font-weight="400" text-anchor="start" fill="#5b6472">(off by default, D29)</text>
+<rect x="1516.7" y="473" width="65.2" height="18" rx="9" fill="#c9ced6" stroke="#c9ced6" stroke-width="1"/>
+<text x="1549.3000000000002" y="486" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">OPTIONAL</text>
+<path d="M 1444.9,431 L 1444.9,463" fill="none" stroke="#2f6fd0" stroke-width="1.8" marker-end="url(#m2f6fd0)" marker-start="url(#s2f6fd0)"/>
+<rect x="540.1" y="435" width="173.79999999999998" height="17" rx="4" fill="#ffffff" stroke="#2f6fd0" stroke-width="1"/>
+<text x="627.0" y="448" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f6fd0">task packets ⇄ completions</text>
+<rect x="390" y="595" width="600" height="165" rx="10" fill="#ffffff" stroke="#3b78c4" stroke-width="1.4"/>
+<text x="406" y="621" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Engineering track (gate tasks)</text>
+<rect x="406" y="643" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="496" y="666" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">spec + acceptance</text>
+<path d="M 586,661 L 599,661" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<rect x="601" y="643" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="691" y="666" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">build</text>
+<path d="M 781,661 L 794,661" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<rect x="796" y="643" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="886" y="666" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">tests</text>
+<rect x="406" y="698" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="496" y="721" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">adversarial review</text>
+<path d="M 586,716 L 599,716" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<rect x="601" y="698" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="691" y="721" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">[safety/contracts review]</text>
+<path d="M 781,716 L 794,716" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<rect x="796" y="698" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="886" y="721" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">merge → delivery</text>
+<path d="M 886,679 L 886,685 L 496,685 L 496,696" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<text x="406" y="750" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472" font-style="italic">fail → patch (×3) → redesign · queue: docs/gates/*.toml</text>
+<rect x="1010" y="595" width="600" height="165" rx="10" fill="#ffffff" stroke="#3b78c4" stroke-width="1.4"/>
+<text x="1026" y="621" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" text-anchor="start" fill="#1f2937">Research track (experiments WM-1, E1–E6)</text>
+<rect x="1026" y="643" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="1116" y="666" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">question → hypothesis</text>
+<path d="M 1206,661 L 1219,661" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<rect x="1221" y="643" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="1311" y="666" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">design ⇄ review</text>
+<path d="M 1401,661 L 1414,661" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<rect x="1416" y="643" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="1506" y="666" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">FREEZE protocol</text>
+<rect x="1026" y="698" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="1116" y="721" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">engineering track</text>
+<path d="M 1206,716 L 1219,716" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<rect x="1221" y="698" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="1311" y="721" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">run trials (all seeds)</text>
+<path d="M 1401,716 L 1414,716" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<rect x="1416" y="698" width="180" height="36" rx="18" fill="#e8f1fd" stroke="#3b78c4" stroke-width="1.2"/>
+<text x="1506" y="721" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="600" text-anchor="middle" fill="#1f2937">verdict → challenge → report</text>
+<path d="M 1506,679 L 1506,685 L 1116,685 L 1116,696" fill="none" stroke="#1f2937" stroke-width="1.4" marker-end="url(#m1f2937)"/>
+<text x="1026" y="750" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="start" fill="#5b6472" font-style="italic">pilot, then one confirmatory study · negative results kept</text>
+<rect x="370" y="800" width="1260" height="385" rx="14" fill="#eaf6ec" stroke="#3f9a55" stroke-width="2.2"/>
+<text x="386" y="827" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18.5" font-weight="700" text-anchor="start" fill="#1f2937">robolab – the robot brain (code built by the lab)</text>
+<text x="1614" y="827" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="end" fill="#5b6472" font-style="italic">same brain code for every body</text>
+<rect x="390.0" y="845" width="196" height="78" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="488.0" y="867" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">State estimator</text>
+<text x="488.0" y="885" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">belief state</text>
+<rect x="454.1" y="901" width="67.80000000000001" height="16" rx="8" fill="#5a9bd8" stroke="#5a9bd8" stroke-width="1"/>
+<text x="488.0" y="913" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">INTERFACE</text>
+<rect x="594.8" y="845" width="196" height="78" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="692.8" y="867" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">World Model</text>
+<text x="692.8" y="885" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">predicts, learns</text>
+<rect x="665.0999999999999" y="901" width="55.4" height="16" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="692.8" y="913" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<rect x="799.6" y="845" width="196" height="78" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="897.6" y="867" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">System 1</text>
+<text x="897.6" y="885" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">fast reflex policy</text>
+<rect x="869.9" y="901" width="55.4" height="16" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="897.6" y="913" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<rect x="1004.4000000000001" y="845" width="196" height="78" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="1102.4" y="867" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">Awareness</text>
+<text x="1102.4" y="885" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">decides when to think</text>
+<rect x="1074.7" y="901" width="55.4" height="16" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="1102.4" y="913" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<rect x="1209.2" y="845" width="196" height="78" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="1307.2" y="867" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">System 2</text>
+<text x="1307.2" y="885" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">planner · LLM slot</text>
+<rect x="1279.5" y="901" width="55.4" height="16" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="1307.2" y="913" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<rect x="1414.0" y="845" width="196" height="78" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="1512.0" y="867" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">Memory &amp; learning</text>
+<text x="1512.0" y="885" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" font-weight="400" text-anchor="middle" fill="#5b6472">skills, replay</text>
+<rect x="1484.3" y="901" width="55.4" height="16" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="1512.0" y="913" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<rect x="390" y="940" width="1220" height="52" rx="10" fill="#fde8e8" stroke="#c43c3c" stroke-width="2"/>
+<text x="406" y="972" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="start" fill="#1f2937">Safety Kernel – deterministic, final say: limits · workspace · stopping distance · watchdog · e-stop · nothing reaches a motor without it</text>
+<rect x="1556.0" y="957" width="46.0" height="18" rx="9" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="1579.0" y="970" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">BUILT</text>
+<rect x="390" y="1008" width="600" height="62" rx="10" fill="#ffffff" stroke="#d98a2b" stroke-width="1.6"/>
+<text x="402" y="1032" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="start" fill="#1f2937">Embodiment adapter (thin, one per body)</text>
+<text x="402" y="1052" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">generic action/observation vectors ↔ body I/O, reflexes</text>
+<rect x="942.4" y="1016" width="39.6" height="18" rx="9" fill="#e0a100" stroke="#e0a100" stroke-width="1"/>
+<text x="962.2" y="1029" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">NEXT</text>
+<rect x="1010" y="1008" width="600" height="62" rx="10" fill="#ffffff" stroke="#d98a2b" stroke-width="1.6"/>
+<text x="1022" y="1032" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" text-anchor="start" fill="#1f2937">MHS – Model Hardware Standard</text>
+<text x="1022" y="1052" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.2" font-weight="400" text-anchor="start" fill="#5b6472">declares actuators, sensors, body, timing, safety envelope</text>
+<rect x="1472.8" y="1016" width="129.2" height="18" rx="9" fill="#e0a100" stroke="#e0a100" stroke-width="1"/>
+<text x="1537.4" y="1029" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">IN PROGRESS · G1-5</text>
+<path d="M 1010,1039 L 994,1039" fill="none" stroke="#d98a2b" stroke-width="2.2" marker-end="url(#md98a2b)"/>
+<rect x="390.0" y="1085" width="196" height="82" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="488.0" y="1107" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">Puck2D</text>
+<rect x="466.5" y="1145" width="43.0" height="16" rx="8" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="488.0" y="1157" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">BUILT</text>
+<rect x="594.8" y="1085" width="196" height="82" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="692.8" y="1107" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">Car2D</text>
+<rect x="674.4" y="1145" width="36.8" height="16" rx="8" fill="#e0a100" stroke="#e0a100" stroke-width="1"/>
+<text x="692.8" y="1157" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">NEXT</text>
+<rect x="799.6" y="1085" width="196" height="82" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="897.6" y="1107" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">Diff-drive</text>
+<rect x="869.9" y="1145" width="55.4" height="16" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="897.6" y="1157" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<rect x="1004.4000000000001" y="1085" width="196" height="82" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="1102.4" y="1107" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">Arm</text>
+<rect x="1080.9" y="1145" width="43.0" height="16" rx="8" fill="#c9ced6" stroke="#c9ced6" stroke-width="1"/>
+<text x="1102.4" y="1157" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1f2937">LATER</text>
+<rect x="1209.2" y="1085" width="196" height="82" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="1307.2" y="1107" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">Humanoid (sim)</text>
+<rect x="1285.7" y="1145" width="43.0" height="16" rx="8" fill="#c9ced6" stroke="#c9ced6" stroke-width="1"/>
+<text x="1307.2" y="1157" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#1f2937">LATER</text>
+<rect x="1414.0" y="1085" width="196" height="82" rx="9" fill="#ffffff" stroke="#3f9a55" stroke-width="1.4"/>
+<text x="1512.0" y="1107" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" text-anchor="middle" fill="#1f2937">RC car (real)</text>
+<rect x="1490.5" y="1145" width="43.0" height="16" rx="8" fill="#d98a00" stroke="#d98a00" stroke-width="1"/>
+<text x="1512.0" y="1157" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">HUMAN</text>
+<path d="M 382,1126 L 374,1126 L 374,884 L 388,884" fill="none" stroke="#2f6fd0" stroke-width="2.4" marker-end="url(#m2f6fd0)"/>
+<rect x="346.95" y="993" width="54.1" height="17" rx="4" fill="#ffffff" stroke="#2f6fd0" stroke-width="1"/>
+<text x="374" y="1006" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2f6fd0">sensors</text>
+<path d="M 1622,884 L 1636,884 L 1636,1126 L 1612,1126" fill="none" stroke="#c43c3c" stroke-width="2.4" marker-end="url(#mc43c3c)"/>
+<rect x="1605.8" y="993" width="60.4" height="17" rx="4" fill="#ffffff" stroke="#c43c3c" stroke-width="1"/>
+<text x="1636" y="1006" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#c43c3c">commands</text>
+<path d="M 1000.0,270 L 1000.0,293" fill="none" stroke="#7a5cc9" stroke-width="2.6" marker-end="url(#m7a5cc9)"/>
+<rect x="995.7" y="272" width="148.6" height="17" rx="4" fill="#ffffff" stroke="#7a5cc9" stroke-width="1"/>
+<text x="1070.0" y="285" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#7a5cc9">next gate → task queue</text>
+<path d="M 1000.0,775 L 1000.0,798" fill="none" stroke="#2e8f57" stroke-width="2.6" marker-end="url(#m2e8f57)"/>
+<rect x="982.9" y="777" width="224.2" height="17" rx="4" fill="#ffffff" stroke="#2e8f57" stroke-width="1"/>
+<text x="1095.0" y="790" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#2e8f57">builds, tests, merges, runs trials</text>
+<path d="M 325,405 L 388,405" fill="none" stroke="#d98a2b" stroke-width="2.4" marker-end="url(#md98a2b)"/>
+<rect x="326.25" y="383" width="41.5" height="17" rx="4" fill="#ffffff" stroke="#d98a2b" stroke-width="1"/>
+<text x="347" y="396" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#d98a2b">specs</text>
+<path d="M 325,595 L 388,595" fill="none" stroke="#d98a2b" stroke-width="2.4" marker-end="url(#md98a2b)"/>
+<rect x="329.4" y="573" width="35.2" height="17" rx="4" fill="#ffffff" stroke="#d98a2b" stroke-width="1"/>
+<text x="347" y="586" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#d98a2b">runs</text>
+<path d="M 325,785 L 362,785 L 362,182 L 382,182" fill="none" stroke="#7a5cc9" stroke-width="2.2" stroke-dasharray="6 4" marker-end="url(#m7a5cc9)"/>
+<path d="M 1632,382 L 1673,382" fill="none" stroke="#5b6472" stroke-width="2.2" marker-end="url(#m5b6472)"/>
+<rect x="1621.1" y="360" width="47.8" height="17" rx="4" fill="#ffffff" stroke="#5b6472" stroke-width="1"/>
+<text x="1645" y="373" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#5b6472">ledger</text>
+<path d="M 1632,525 L 1650,525 L 1650,595 L 1673,595" fill="none" stroke="#5b6472" stroke-width="2.2" stroke-dasharray="6 4" marker-end="url(#m5b6472)"/>
+<rect x="30" y="1210" width="1270" height="220" rx="12" fill="#fafafa" stroke="#d1d5db" stroke-width="1.4"/>
+<text x="48" y="1240" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="start" fill="#1f2937">How the project flows</text>
+<text x="48" y="1268" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start" fill="#1f2937">1. You set the direction: the mandate, the north star (one brain, any MHS body), key choices.</text>
+<text x="48" y="1293" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start" fill="#1f2937">2. Claude Code turns the next gate into a task queue (specs + acceptance criteria) and records decisions.</text>
+<text x="48" y="1318" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start" fill="#1f2937">3. The autopilot runs the queue; the controller dispatches each task to the agents in isolated worktrees.</text>
+<text x="48" y="1343" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start" fill="#1f2937">4. Engineer builds, controller tests, verifier attacks, review gates check safety/contracts, controller merges.</text>
+<text x="48" y="1368" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start" fill="#1f2937">5. Experiments run from the exact merged commit; verdicts are computed, challenged and reported.</text>
+<text x="48" y="1393" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" text-anchor="start" fill="#1f2937">6. Stops go to Claude Code; anything that needs you is escalated. Everything is recorded and pushed.</text>
+<rect x="1320" y="1210" width="650" height="220" rx="12" fill="#fafafa" stroke="#d1d5db" stroke-width="1.4"/>
+<text x="1338" y="1240" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="17" font-weight="700" text-anchor="start" fill="#1f2937">Legend</text>
+<path d="M 1340,1266 L 1385,1266" fill="none" stroke="#7a5cc9" stroke-width="2.2" marker-end="url(#m7a5cc9)"/>
+<text x="1395" y="1270" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">programme → work</text>
+<path d="M 1340,1292 L 1385,1292" fill="none" stroke="#d98a2b" stroke-width="2.2" marker-end="url(#md98a2b)"/>
+<text x="1395" y="1296" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">people / control</text>
+<path d="M 1340,1318 L 1385,1318" fill="none" stroke="#2f6fd0" stroke-width="2.2" marker-end="url(#m2f6fd0)"/>
+<text x="1395" y="1322" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">agent messages · sensor data</text>
+<path d="M 1340,1344 L 1385,1344" fill="none" stroke="#c43c3c" stroke-width="2.2" marker-end="url(#mc43c3c)"/>
+<text x="1395" y="1348" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">motor commands</text>
+<path d="M 1340,1370 L 1385,1370" fill="none" stroke="#2e8f57" stroke-width="2.2" marker-end="url(#m2e8f57)"/>
+<text x="1395" y="1374" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">lab builds the brain</text>
+<path d="M 1340,1396 L 1385,1396" fill="none" stroke="#5b6472" stroke-width="2.2" marker-end="url(#m5b6472)"/>
+<text x="1395" y="1400" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13" font-weight="400" text-anchor="start" fill="#1f2937">records / backup</text>
+<rect x="1640" y="1256" width="52.400000000000006" height="17" rx="8" fill="#2e8f57" stroke="#2e8f57" stroke-width="1"/>
+<text x="1666.2" y="1268.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">PASSED</text>
+<rect x="1640" y="1282" width="84.4" height="17" rx="8" fill="#e0a100" stroke="#e0a100" stroke-width="1"/>
+<text x="1682.2" y="1294.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">IN PROGRESS</text>
+<rect x="1640" y="1308" width="71.6" height="17" rx="8" fill="#5a9bd8" stroke="#5a9bd8" stroke-width="1"/>
+<text x="1675.8" y="1320.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">INTERFACE</text>
+<rect x="1640" y="1334" width="58.800000000000004" height="17" rx="8" fill="#9aa3af" stroke="#9aa3af" stroke-width="1"/>
+<text x="1669.4" y="1346.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">PLANNED</text>
+<rect x="1640" y="1360" width="46.0" height="17" rx="8" fill="#c9ced6" stroke="#c9ced6" stroke-width="1"/>
+<text x="1663.0" y="1372.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1f2937">LATER</text>
+<rect x="1640" y="1386" width="46.0" height="17" rx="8" fill="#d98a00" stroke="#d98a00" stroke-width="1"/>
+<text x="1663.0" y="1398.5" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="10.5" font-weight="700" text-anchor="middle" fill="#fff">HUMAN</text>
+<text x="1765" y="1269" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#5b6472">done / built</text>
+<text x="1765" y="1295" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#5b6472">running now</text>
+<text x="1765" y="1321" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#5b6472">interface, stub</text>
+<text x="1765" y="1347" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#5b6472">later gate</text>
+<text x="1765" y="1373" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#5b6472">beyond current plan</text>
+<text x="1765" y="1399" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" font-weight="400" text-anchor="start" fill="#5b6472">needs you</text>
+</svg>

@@ -97,6 +97,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--accept", action="append", required=True)
     p.add_argument("--refs", default="")
     sub.add_parser("mandate").add_argument("lab")
+    p = sub.add_parser("queue")
+    p.add_argument("lab")
+    p.add_argument("file")
+    p.add_argument("--as", dest="by", default="claude-code")
     for name in ("run", "step"):
         p = sub.add_parser(name)
         p.add_argument("lab")
@@ -159,6 +163,13 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "task":
         pid = Controller(lab, agents={}).new_engineering_project(a.spec, a.accept, _refs(a.refs))
         print(pid)
+    elif a.cmd == "queue":
+        from .queue import load_queue, run_queue
+        out = run_queue(Controller(lab), load_queue(a.file), author=a.by,
+                        on_step=_print_step)
+        print(f"QUEUE {out.status.upper()}"
+              + (f": {out.task_id} {out.project} {out.detail}" if out.task_id else ""))
+        return {"done": 0, "blocked": 2}.get(out.status, 1)
     elif a.cmd == "mandate":
         for ref, items in sorted(mandate_coverage(lab.store).items()):
             print(ref)

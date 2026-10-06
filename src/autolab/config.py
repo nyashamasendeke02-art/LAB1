@@ -46,6 +46,8 @@ max_trials_without_approval = 200
 test_timeout_s = 900
 max_trial_output_mb = 25     # raw output cap per trial (telemetry policy)
 require_pilot_for_confirmatory = false   # true: confirmatory only after an exploratory pilot
+usage_limit_wait_s = 900     # agent usage/rate limit: wait this long, then retry (no retry counted)
+usage_limit_max_wait_s = 43200   # total wait per run before HALTED
 
 [gates]
 # Human approval is ALWAYS required for protocols marked protected = true.

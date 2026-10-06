@@ -139,3 +139,13 @@
   weak-copyleft inside the brain; GPL only as separate processes/firmware; AGPL excluded. Isaac Sim
   excluded (proprietary, GPU). Nav2/MoveIt 2 used as baselines, not as the brain. Project licence
   (recommended Apache-2.0) is the human's decision.
+- D35 (2026-10-05, human: "I want full agentic autonomy on this project"): the lab runs unattended.
+  (a) Agent usage/rate limits no longer HALT a run: the controller records a usage_limit failure,
+  waits usage_limit_wait_s (900 s) and retries without counting a stage retry, up to
+  usage_limit_max_wait_s (12 h). (b) `autolab queue LAB FILE.toml` runs engineering tasks in order,
+  submitted as claude-code; it stops at a HALT or an approval gate and never re-submits a HALTED
+  task by itself. (c) Gate 1 queue: docs/gates/gate1_queue.toml (G1-2..G1-7). (d) Claude Code
+  decides research-direction defaults, reviews gates (real reviews, evidence in the note), and
+  restarts the queue. Kept with the human: physical hardware runs (Gate 7, REQ-SAFE-H), spending
+  money or creating accounts, publishing or pushing to a remote, deleting research artifacts, and
+  acceptance of major scientific conclusions.

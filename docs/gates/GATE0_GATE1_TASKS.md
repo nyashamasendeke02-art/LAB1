@@ -204,3 +204,11 @@ impulses, payload change), implementing the Environment protocol and publishing 
 **Acceptance:** G1-1-style determinism and physics-sanity tests (turning radius matches
 wheelbase/steering; no sideways motion without slip); the G1-2 harness runs it unchanged;
 the Safety Kernel built from its MHS keeps it inside the workspace (property test).
+
+## G1-7 Software baseline
+**Refs:** Gate 1, SW-PKG, SW-STATIC, SW-SAFETY-CODE, SW-TEST. Added 2026-10-05 (D33, D35).
+**Spec and acceptance:** see `docs/gates/gate1_queue.toml` (pyproject, ruff, `slow` marker with a
+fast subset under 60 s, 100% branch coverage of `src/safety` without behaviour change). The
+`robobrain` namespace move is a separate later task.
+
+The queue file `docs/gates/gate1_queue.toml` is the runnable form of G1-2..G1-7.

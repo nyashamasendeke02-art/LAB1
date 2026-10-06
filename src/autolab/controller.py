@@ -33,7 +33,7 @@ from typing import Callable
 from xml.etree import ElementTree
 
 from . import __version__
-from .agents import Agent, AgentBackend, make_backend
+from .agents import Agent, AgentBackend, is_usage_limit, make_backend
 from .config import DEFAULT_TOML, load_config
 from .experiments import (Trial, check_lock, contrasts, environment_snapshot, evaluate_rule,
                           required_seeds,
@@ -96,6 +96,7 @@ class StepResult:
     error: str | None = None
     blocked_on: str | None = None
     elapsed_s: float | None = None
+    waiting: bool = False   # agent usage limit: retry after a wait
 
 
 def _tail(text: str, n: int = 4000) -> str:
@@ -169,6 +170,7 @@ class Controller:
         self.repo = lab.repo
         self.cfg = lab.config
         self.limits = self.cfg["limits"]
+        self.sleep: Callable[[float], None] = time.sleep  # injectable for tests
         self.gates = Gates(self.store, self.cfg["gates"].get("delegation"))
         if agents is None:
             agents = {role: Agent(role, make_backend(self.cfg["agents"][role.value]))
@@ -374,6 +376,12 @@ class Controller:
             self._export()
             return StepResult(pid, state.value, R.HALTED.value, "", error=str(exc))
         except Exception as exc:  # recorded, retried, then HALT
+            if is_usage_limit(exc):  # quota, not a defect: wait and retry, no retry counted
+                msg = f"{type(exc).__name__}: {exc}"
+                self._failure(pid, "usage_limit", msg[:500])
+                self._export()
+                return StepResult(pid, state.value, state.value,
+                                  "agent usage limit; waiting", error=msg[:300], waiting=True)
             return self._stage_failed(pid, state, exc)
         after = self.project(pid)
         self._export()
@@ -403,6 +411,7 @@ class Controller:
             on_step: Callable[[StepResult], None] | None = None) -> list[StepResult]:
         out: list[StepResult] = []
         self.cleanup_stale_worktrees()
+        waited = 0.0
         for _ in range(max_steps):
             t0 = time.perf_counter()
             res = self.step(pid)
@@ -410,6 +419,17 @@ class Controller:
             out.append(res)
             if on_step:
                 on_step(res)
+            if res.waiting:
+                wait = float(self.limits.get("usage_limit_wait_s", 900))
+                if waited + wait > float(self.limits.get("usage_limit_max_wait_s", 43200)):
+                    self._halt(pid, f"agent usage limit persisted for {waited:.0f}s; "
+                                    f"last: {res.error}"[:500])
+                    self._export()
+                    out.append(StepResult(pid, res.after, R.HALTED.value, "usage limit timeout"))
+                    break
+                waited += wait
+                self.sleep(wait)
+                continue
             if res.after in (R.COMPLETE.value, R.HALTED.value) or res.blocked_on:
                 break
         return out

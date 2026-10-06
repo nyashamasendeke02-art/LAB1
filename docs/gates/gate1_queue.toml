@@ -1,0 +1,69 @@
+# Gate 1 task queue for labs/robolab (D35). Run unattended with:
+#   autolab queue labs/robolab docs/gates/gate1_queue.toml
+# Specs mirror docs/gates/GATE0_GATE1_TASKS.md; keep both in step. Tasks run in order;
+# the queue stops at a HALT or an approval gate (safety/contracts review).
+
+[[task]]
+id = "G1-2"
+refs = ["Gate 1", "REQ-SIM", "REQ-LOG", "REQ-REPRO"]
+spec = """G1-2 Episode harness and scripted baselines. In `src/simulation/harness.py`, run N episodes of an environment with a policy through the cycle runner, writing telemetry and returning per-episode metrics: success, steps, time-to-goal, path length, collisions, safety interventions. Add two reference policies in `src/simulation/policies.py`: `RandomPolicy` (uniform force) and `PDController` (gains in config). Add an evaluation-set builder: a frozen list of task instances (start, goal, obstacles, disturbance schedule) generated from a seed and saved as JSON. Run episodes through the merged cycle runner (src/robot/runner.py) with Puck2D (src/simulation/puck2d.py) and the Safety Kernel (src/safety/kernel.py), so every action passes the kernel; count safety interventions from KernelResult verdicts. Policies plug in as the runner's System1 module. The harness injects the simulation clock (episode step x dt) into the CycleRunner and the Safety Kernel; the runner's default wall clock makes staleness and watchdog decisions non-reproducible. Do not modify src/safety, src/contracts or src/robot."""
+accept = [
+  "Determinism: the same seeds give identical episode metrics and identical telemetry decision sequences (simulation clock injected).",
+  "The PD controller reaches the goal in the no-disturbance, no-obstacle case.",
+  "The random policy mostly fails (sanity of the instrument).",
+  "Evaluation sets round-trip through JSON unchanged.",
+]
+
+[[task]]
+id = "G1-3"
+refs = ["Gate 1", "REQ-SAFE", "REQ-SAFE+", "ADR-003"]
+spec = """G1-3 Safety Kernel v1.1: stopping-distance workspace check. Why: v1 checks only the next control step and its safe action is zero force, so a fast body is approved two steps from a wall and then coasts through it (reproduced in review: x = 9, v = 50 m/s, wall at 10, dt = 0.01 -> approved). In `src/safety/kernel.py`, reject (or, in clamp mode, replace with a braking action) any command after which the body could not stop inside the workspace: per axis, with the predicted next position p' and velocity v', require that the stopping distance v'^2 / (2 * a_brake) in the direction of motion fits between p' and the workspace bound, where a_brake = max |action| on that axis / mass_kg (configured; conservative: ignore friction and damping). Replace "zero force" as the only safe action with a braking safe action (opposing velocity, at the action limit, clamped to zero once stopped). Bump KERNEL_VERSION. Keep every G0-3 behaviour and test. Do not modify src/contracts unless strictly needed."""
+accept = [
+  "The review case (x = 9, v = 50, wall 10) is rejected or braked.",
+  "In Puck2D, random high-speed commands through the kernel never leave the workspace over many seeded episodes (property test).",
+  "Commands that can still stop in time are approved unchanged.",
+  "All G0-3 tests still pass.",
+]
+
+[[task]]
+id = "G1-4"
+refs = ["Gate 1", "REQ-ISO", "REQ-SIM", "ADR-001", "ADR-004"]
+spec = """G1-4 Ground-truth isolation: the brain learns physics only from consequences. Puck2D's `info` carries the true state, parameters and active disturbances; if any brain module can read them, learned-physics results are invalid. The cycle runner passes brain modules (StateEstimator, WorldModel, System1, System2, Awareness) only the noisy observation, their own past actions and telemetry they produced. Ground truth goes only to the harness metrics and to telemetry under a `ground_truth` key that brain modules never receive. Brain packages (`src/world_model`, `src/system1`, `src/system2`, `src/awareness`, `src/memory`, `src/skills`, `src/learning`) must not import `simulation`. Keep every existing runner, kernel and harness test passing."""
+accept = [
+  "A spy module asserts it never receives ground-truth fields over seeded episodes.",
+  "A static test fails if any brain package imports `simulation`.",
+  "Harness metrics still use ground truth correctly (G1-2 tests pass).",
+]
+
+[[task]]
+id = "G1-5"
+refs = ["Gate 1", "REQ-MHS", "REQ-SAFE+", "H5", "ADR-001", "ADR-003", "ADR-005"]
+spec = """G1-5 Model Hardware Standard (MHS) v0. The brain must be the same code for every body; what differs is a declared, machine-readable description of the body. In `src/contracts/mhs.py` (plus `docs/mhs.md`), define `MHS` (frozen dataclass, versioned `MHS_VERSION`, JSON round-trip, `validate()` raising `ContractError`) with: identity (body name, body class such as point_mass / wheeled / legged, MHS version); actuators (name, kind such as force / torque / velocity / steering, units, min/max, rate limit, latency) and the action vector layout the brain must produce; sensors (name, kind, units, shape, rate, noise model, frame) and the observation layout; body (mass and inertia if known, else "unknown"; geometry/footprint; frames); control (control period, timing requirements, which low-level reflexes the body provides itself below the adapter); safety envelope (workspace or operating domain, speed limits, braking capability, safe action, e-stop semantics). The Safety Kernel is configured FROM the MHS (add a constructor such as `SafetyKernel.from_mhs`, no per-body code). Safety independence: the kernel's workspace and stopping-distance checks use position/velocity read from the raw Observation via the MHS sensor layout, not the brain's StateUpdate, so a faulty or learned state estimator cannot fool the kernel. Puck2D publishes its MHS; the runner hands the MHS to brain modules at construction. Contract changes bump SCHEMA_VERSION and update docs/contracts.md."""
+accept = [
+  "Round-trip and malformed-MHS tests (missing actuator limits, unknown units, inconsistent layouts) raise ContractError.",
+  "A SafetyKernel built from Puck2D's MHS behaves identically to the hand-configured one (all G0-3/G1-3 tests pass).",
+  "Brain-side code reads action/observation layouts only from the MHS (static test: no Puck2D constants in brain packages).",
+  "A state estimator that reports a false in-bounds position cannot get a workspace-exiting command approved (fault-injection test).",
+]
+
+[[task]]
+id = "G1-6"
+refs = ["Gate 1", "REQ-MHS", "REQ-NAV", "REQ-SIM", "H5"]
+spec = """G1-6 Car2D: a second body (RC-car-like) behind the same MHS. A brain designed against one body silently overfits to it; a non-holonomic car (it cannot move sideways) differs from the puck in exactly the way that exposes that. In `src/simulation/car2d.py`, implement a deterministic kinematic-bicycle car (wheelbase, max steering angle and rate, throttle/brake force, speed limit, rolling resistance) in the same 2D world and task format as Puck2D (goals, obstacles, disturbances: slippery patches, impulses, payload change), implementing the runner's Environment protocol and publishing an MHS (src/contracts/mhs.py). Every random draw comes from the passed numpy Generator. Do not modify src/safety or src/contracts; adding Car2D must need no brain-package changes."""
+accept = [
+  "Same seed + same actions give bit-identical trajectories.",
+  "Physics sanity: turning radius matches wheelbase and steering angle; no sideways motion without slip.",
+  "The G1-2 harness runs Car2D unchanged.",
+  "The Safety Kernel built from Car2D's MHS keeps it inside the workspace (property test over seeded random commands).",
+]
+
+[[task]]
+id = "G1-7"
+refs = ["Gate 1", "SW-PKG", "SW-STATIC", "SW-SAFETY-CODE", "SW-TEST"]
+spec = """G1-7 Software baseline. Add a `pyproject.toml` that makes the repository installable (`pip install -e .`, packages under `src/`, Python >= 3.11, runtime dependency numpy only; dev extras for pytest, ruff, coverage). Configure ruff (pyflakes + pycodestyle errors + isort) and make the codebase pass it without changing behaviour. Add pytest markers `slow` (property tests and benchmarks) and register them, so `python -m pytest -q -m "not slow"` runs in under a minute. Measure branch coverage of `src/safety` with coverage.py and add tests until it reaches 100% branch coverage; do not change kernel behaviour, limits or safe actions to do so. Pin any new dev dependency in requirements.lock. Do not rename packages (the robobrain namespace move is a separate task)."""
+accept = [
+  "`pip install -e .` succeeds in a clean virtual environment and the full test suite passes.",
+  "`ruff check .` reports no errors.",
+  "`python -m pytest -q -m \"not slow\"` passes in under 60 seconds.",
+  "Branch coverage of src/safety is 100% and kernel behaviour is unchanged (all existing safety tests pass unmodified).",
+]

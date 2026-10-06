@@ -42,7 +42,8 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress
-- [ ] robolab G1-2 (episode harness): re-submit after the Claude limit resets (3:10pm PT).
+- [ ] robolab Gate 1 running unattended (D35): `autolab queue labs/robolab docs/gates/gate1_queue.toml`
+      (G1-2..G1-7; log labs/robolab-run.log). Stops at safety/contracts review gates for Claude Code.
 
 ### Next (priority order)
 0. [x] Plan adopted under delegation (D21). P0 upgrades L1-L3, L6-L9 DONE (v0.3.0, da94322);
@@ -87,7 +88,7 @@ and `project_state/` (decisions, failures, open questions)._
 4. [x] Statistics: paired t intervals, non-inferiority, co-primary endpoints, Holm, power check.
 5. [x] Ledger anchoring: commit the ledger head hash into the research repo
        at each merge/run.
-5b. [ ] autolab: pause on agent usage-limit errors until the reset time, instead of HALT.
+5b. [x] autolab: agent usage limits wait and retry instead of HALT (D35).
 6. [ ] Citation verification step for background research (mark as verified
        or unverified with the method used).
 7. [ ] Start the Developmental Intelligence EXP-001 project in a dedicated lab.
@@ -169,7 +170,7 @@ Residual risks the fixes do NOT remove:
 - **Backup (important):** neither LAB1 nor labs/robolab/repo has a remote; everything is only on
   this PC. Create a private GitHub repo (or two) and tell Claude to push.
 - Choose the project licence (recommended Apache-2.0; D34).
-- Nothing blocking. G1-2 resumes after the Claude usage limit resets (3:10pm PT).
+- Nothing blocking: the lab runs unattended (D35).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.
 - Any time: change the D32 requirement defaults (target compute, adaptation budget, task family).

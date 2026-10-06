@@ -12,6 +12,8 @@ Default role -> backend mapping (configurable in lab.toml):
 
 from __future__ import annotations
 
+import re
+
 import json
 import os
 import shutil
@@ -31,6 +33,16 @@ from .taxonomy import Role
 
 class BackendError(Exception):
     pass
+
+
+_USAGE_LIMIT = re.compile(
+    r"hit your (?:\w+ )?limit|usage limit|rate[ _-]?limit|quota exceeded|too many requests"
+    r"|\b429\b", re.IGNORECASE)
+
+
+def is_usage_limit(exc: BaseException) -> bool:
+    """True for agent quota/rate-limit errors: transient, wait and retry, not a stage failure."""
+    return isinstance(exc, BackendError) and bool(_USAGE_LIMIT.search(str(exc)))
 
 
 class AgentBackend(ABC):

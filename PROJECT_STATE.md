@@ -42,13 +42,12 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress (2026-10-06 03:55)
-- [ ] robolab Gate 1 queue (started 03:49 by claude-code): G1-2..G1-5 DONE (G1-5 = DLV-0009, MHS v0.1 +
-      kernel v1.2; APR-0004 safety + APR-0005 contracts approved, D44). G1-6 Car2D + body-agnostic kernel
-      RUNNING as PRJ-0013; then G1-7, G1-8. G1-6 will stop at a safety review.
-- [ ] AUTOPILOT STOPPED 03:32 (NEEDS_HUMAN): its headless Claude session had no tool permissions (autolab
-      CLI, git and edits denied), so it could not review APR-0004 and correctly refused to approve blind.
-      Needs the human's choice: allow those tools for headless sessions in LAB1 (permission allowlist), or
-      keep reviews interactive. Replies are now logged to labs/autopilot-replies.log.
+- [ ] robolab Gate 1 queue (restarted 09:58 after the PC-sleep stall, F8/D47): G1-2..G1-5 DONE. G1-6 Car2D +
+      body-agnostic kernel RUNNING as PRJ-0013 (engineer working); then G1-7, G1-8. G1-6 stops at a safety review.
+      Waits now survive PC sleep (D47); network blips no longer count as failures (D46).
+- [ ] AUTOPILOT not running. Unattended reviews need headless sessions without approval prompts; Claude Code
+      will not configure that itself (classifier: Create Unsafe Agents). The human may make the one-line change
+      in scripts/autopilot.py (see the 2026-10-06 conversation) and start it; until then reviews are interactive.
       Manual resume: `.venv/Scripts/autolab.exe status labs/robolab`; `autolab approvals`;
       `autolab queue labs/robolab docs/gates/gate1_queue.toml [--retry G1-x]`.
 - [x] GitHub backup DONE 2026-10-06 (D38): private repos github.com/nyashamasendeke02-art/LAB1

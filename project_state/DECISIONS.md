@@ -94,3 +94,11 @@
   limitation carried to G1-3: one-step workspace lookahead with a zero-force safe action.
   Deviation from D21(4): pilot-004 and robolab G0-1 ran in parallel for ~15 min on 2026-10-05
   (no shared state; both completed correctly). Back to one active run at a time.
+- D27 (2026-10-05, claude-code under delegation; human: "no preference"): the simulation's role
+  is to teach the robot physics through consequences only. Keep WM-1 as planned (integrator +
+  learned residual; fully learned model as ablation) and add: (a) G1-4 ground-truth isolation,
+  brain modules see only observations and their own actions, enforced by test; (b) online
+  mass/friction estimation in World Model v1, scored on change-detection latency (links H3);
+  (c) a later WM-2: self-directed exploration vs passive logged data, by prediction-error
+  learning curve. Learn-from-scratch stays a comparison condition, not the default (mandate:
+  "physics-informed", "compared progressively with more learned physics").

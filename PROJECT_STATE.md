@@ -70,6 +70,9 @@ and `project_state/` (decisions, failures, open questions)._
 0d. [ ] robolab gaps vs the "Frontier Robotics Architecture" schematic (2026-10-05): add an
        episode visualiser (trajectory/telemetry plots) after G1-2; perception layer and a
        ROS 2 hardware abstraction are needed before Gate 7, not now.
+0e. [ ] D27 physics learning: G1-4 ground-truth isolation after G1-3 (spec in
+       docs/gates/GATE0_GATE1_TASKS.md); online mass/friction estimation in WM v1; WM-2
+       (self-directed exploration vs passive data) after WM-1.
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
 2. [x] `autolab amend` CLI: recorded protocol amendments; amending after data

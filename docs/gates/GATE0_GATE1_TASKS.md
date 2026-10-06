@@ -145,3 +145,18 @@ KERNEL_VERSION. Keep every G0-3 behaviour and test.
    workspace over many seeded episodes (property test).
 3. Commands that can still stop in time are approved unchanged.
 4. All G0-3 tests still pass.
+
+## G1-4 Ground-truth isolation (the brain learns physics only from consequences)
+**Refs:** Gate 1, REQ-SIM, REQ-STATE, ADR-001, ADR-004. Added 2026-10-05 (D27).
+**Why:** Puck2D's `info` carries the true state, parameters and active disturbances. If any
+brain module can read them, "learned physics" results are invalid.
+**Spec:** The cycle runner passes brain modules (StateEstimator, WorldModel, System1, System2,
+Awareness) only the noisy observation, their own past actions and telemetry they produced.
+Ground truth (`info`) goes only to the harness metrics and telemetry under a `ground_truth`
+key that brain modules never receive. Brain packages (`src/world_model`, `src/system1`,
+`src/system2`, `src/awareness`, `src/memory`, `src/skills`, `src/learning`) must not import
+`src/simulation`.
+**Acceptance:**
+1. A spy module asserts it never receives ground-truth fields over seeded episodes.
+2. A static test fails if any brain package imports `simulation`.
+3. Harness metrics still use ground truth correctly (G1-2 tests pass).

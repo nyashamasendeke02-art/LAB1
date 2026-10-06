@@ -198,3 +198,9 @@
   images; VLAs as an end-to-end baseline against the modular brain and as an E6 cross-embodiment
   comparison, which needs cameras and GPU-class compute (a REQ-COMPUTE change would be recorded).
   Section 13 of docs/ROBOT_BRAIN_ARCHITECTURE.md.
+- D44 (2026-10-06, claude-code under delegation, interactive): APR-0004 (G1-5: MHS v0.1, kernel v1.2, runner
+  braking) APPROVED after review: 388 tests pass on the branch; independent fault injection (lag 0-1 s, both
+  modes, three adversarial policies, lying estimator, abstain at speed) never left the workspace. Finding:
+  worst-case in-flight force during latency freezes bodies with lag >= 0.5 s; folded into G1-6 with an
+  acceptance test. The autopilot's headless Claude session had no tool permissions and correctly stopped with
+  NEEDS_HUMAN instead of approving unreviewed (03:32).

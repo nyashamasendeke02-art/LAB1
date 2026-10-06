@@ -33,7 +33,7 @@ from typing import Callable
 from xml.etree import ElementTree
 
 from . import __version__
-from .agents import Agent, AgentBackend, is_usage_limit, make_backend
+from .agents import Agent, AgentBackend, agent_wait_kind, make_backend
 from .config import DEFAULT_TOML, load_config
 from .experiments import (Trial, check_lock, contrasts, environment_snapshot, evaluate_rule,
                           required_seeds,
@@ -96,7 +96,8 @@ class StepResult:
     error: str | None = None
     blocked_on: str | None = None
     elapsed_s: float | None = None
-    waiting: bool = False   # agent usage limit: retry after a wait
+    waiting: bool = False   # transient agent error: retry after a wait
+    wait_kind: str | None = None   # 'usage_limit' or 'network'
 
 
 def _tail(text: str, n: int = 4000) -> str:
@@ -376,12 +377,14 @@ class Controller:
             self._export()
             return StepResult(pid, state.value, R.HALTED.value, "", error=str(exc))
         except Exception as exc:  # recorded, retried, then HALT
-            if is_usage_limit(exc):  # quota, not a defect: wait and retry, no retry counted
+            kind = agent_wait_kind(exc)
+            if kind:  # quota or network blip, not a defect: wait and retry, no retry counted
                 msg = f"{type(exc).__name__}: {exc}"
-                self._failure(pid, "usage_limit", msg[:500])
+                self._failure(pid, kind, msg[:500])
                 self._export()
                 return StepResult(pid, state.value, state.value,
-                                  "agent usage limit; waiting", error=msg[:300], waiting=True)
+                                  f"agent {kind.replace('_', ' ')}; waiting", error=msg[:300],
+                                  waiting=True, wait_kind=kind)
             return self._stage_failed(pid, state, exc)
         after = self.project(pid)
         self._export()
@@ -411,7 +414,7 @@ class Controller:
             on_step: Callable[[StepResult], None] | None = None) -> list[StepResult]:
         out: list[StepResult] = []
         self.cleanup_stale_worktrees()
-        waited = 0.0
+        waited = {"usage_limit": 0.0, "network": 0.0}
         for _ in range(max_steps):
             t0 = time.perf_counter()
             res = self.step(pid)
@@ -420,14 +423,17 @@ class Controller:
             if on_step:
                 on_step(res)
             if res.waiting:
-                wait = float(self.limits.get("usage_limit_wait_s", 900))
-                if waited + wait > float(self.limits.get("usage_limit_max_wait_s", 43200)):
-                    self._halt(pid, f"agent usage limit persisted for {waited:.0f}s; "
-                                    f"last: {res.error}"[:500])
+                kind = res.wait_kind or "usage_limit"
+                defaults = {"usage_limit": (900, 43200), "network": (120, 3600)}
+                wait = float(self.limits.get(f"{kind}_wait_s", defaults[kind][0]))
+                cap = float(self.limits.get(f"{kind}_max_wait_s", defaults[kind][1]))
+                if waited[kind] + wait > cap:
+                    self._halt(pid, f"agent {kind.replace('_', ' ')} persisted for "
+                                    f"{waited[kind]:.0f}s; last: {res.error}"[:500])
                     self._export()
-                    out.append(StepResult(pid, res.after, R.HALTED.value, "usage limit timeout"))
+                    out.append(StepResult(pid, res.after, R.HALTED.value, f"{kind} timeout"))
                     break
-                waited += wait
+                waited[kind] += wait
                 self.sleep(wait)
                 continue
             if res.after in (R.COMPLETE.value, R.HALTED.value) or res.blocked_on:

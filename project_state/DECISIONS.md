@@ -204,3 +204,8 @@
   worst-case in-flight force during latency freezes bodies with lag >= 0.5 s; folded into G1-6 with an
   acceptance test. The autopilot's headless Claude session had no tool permissions and correctly stopped with
   NEEDS_HUMAN instead of approving unreviewed (03:32).
+- D46 (2026-10-06, claude-code; human asked about limit detection): transient API/network errors (no response,
+  ECONNRESET, connection dropped/reset/refused, overloaded, 5xx) are now waited out (network_wait_s 120 s, up to
+  network_max_wait_s 1 h per run) and retried without counting as a stage failure, like usage limits (D35).
+  G1-5 came within one failure of a HALT from two such errors on 2026-10-06. Our own agent timeouts still count
+  as failures. Test: test_network_errors_wait_briefly_and_are_not_failures.

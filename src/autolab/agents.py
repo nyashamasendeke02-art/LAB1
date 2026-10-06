@@ -40,6 +40,25 @@ _USAGE_LIMIT = re.compile(
     r"|\b429\b", re.IGNORECASE)
 
 
+_TRANSIENT_NETWORK = re.compile(
+    r"no response from api|econnreset|connection (?:dropped|reset|refused|aborted|error)"
+    r"|network (?:error|is unreachable)|overloaded|service unavailable|bad gateway|gateway timeout"
+    r"|internal server error|\b(?:500|502|503|504|529)\b", re.IGNORECASE)
+
+
+def agent_wait_kind(exc: BaseException) -> str | None:
+    """'usage_limit' or 'network' for transient agent errors that should be waited out and
+    retried without counting as a stage failure; None otherwise (a real failure)."""
+    if not isinstance(exc, BackendError):
+        return None
+    text = str(exc)
+    if _USAGE_LIMIT.search(text):
+        return "usage_limit"
+    if _TRANSIENT_NETWORK.search(text):
+        return "network"
+    return None
+
+
 def is_usage_limit(exc: BaseException) -> bool:
     """True for agent quota/rate-limit errors: transient, wait and retry, not a stage failure."""
     return isinstance(exc, BackendError) and bool(_USAGE_LIMIT.search(str(exc)))

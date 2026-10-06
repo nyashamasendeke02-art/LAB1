@@ -115,3 +115,27 @@ def test_queue_retry_resubmits_a_halted_task_once(tmp_path):
     assert out.status == "done"
     projects = lab.store.query("project")
     assert [p.data["state"] for p in projects] == ["HALTED", "COMPLETE"]
+
+
+def test_network_errors_wait_briefly_and_are_not_failures(tmp_path):
+    from autolab.agents import agent_wait_kind
+    assert agent_wait_kind(BackendError("API Error: Connection dropped (ECONNRESET)")) == "network"
+    assert agent_wait_kind(BackendError("API Error: No response from API (waited 3m)")) == "network"
+    assert agent_wait_kind(BackendError("503 Service Unavailable")) == "network"
+    assert agent_wait_kind(BackendError(LIMIT_MSG)) == "usage_limit"
+    assert agent_wait_kind(BackendError("claude timed out after 1800s")) is None
+    calls = {"n": 0}
+
+    def build(t):
+        calls["n"] += 1
+        if calls["n"] <= 4:
+            raise BackendError("claude exited 1: API Error: Connection dropped (ECONNRESET)")
+        return build_ok(t)
+
+    lab, ctl = make(tmp_path, eng__build=build, ver__verify=verify_spec)
+    slept = []
+    ctl.sleep = slept.append
+    pid = ctl.new_engineering_project("contract module", ["tests pass"])
+    assert ctl.run(pid)[-1].after == "COMPLETE"
+    assert slept == [120.0] * 4
+    assert len([f for f in lab.store.query("failure") if f.data["category"] == "network"]) == 4

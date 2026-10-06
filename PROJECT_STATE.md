@@ -106,6 +106,9 @@ and `project_state/` (decisions, failures, open questions)._
   `scientific_review` on a different model family than the designer. Wiring looks complete;
   no tests yet. Needs a test before commit.
 
+- robolab cycle runner (G0-4) is synchronous. A slow System 2 (e.g. an LLM planner, Gate 5)
+  must run asynchronously while S1 keeps control; design this before Gate 5. Local vs cloud
+  LLM for S2 is an open research-direction decision for the human (not needed until Gate 5).
 - robolab Safety Kernel v1: one-step workspace lookahead + zero-force safe action, so a fast
   body can coast out of the workspace. Fix specified as G1-3 (docs/gates/GATE0_GATE1_TASKS.md).
 - FIXED d7f8c70: agents answered status=failed for negative verdicts (stage error/retry

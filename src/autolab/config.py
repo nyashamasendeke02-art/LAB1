@@ -30,6 +30,12 @@ backend = "claude-cli"
 backend = "codex-cli"
 # model = ""
 
+# Optional independent reviewer: these stages run on this backend instead of the role's
+# own (e.g. a different model family from the designing scientist). Empty = disabled.
+[agents.reviewer]
+backend = ""
+stages = ["scientific_review"]
+
 [limits]
 max_stage_retries = 2        # transient failures per state before HALTED
 max_patch_attempts = 3       # engineering patches before forced REDESIGN

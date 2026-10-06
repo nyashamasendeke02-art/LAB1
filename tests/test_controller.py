@@ -47,6 +47,30 @@ def test_full_loop_completes_with_traceable_result(tmp_path):
     assert (lab.repo.path / "tests" / "verification" / "test_v.py").exists()
 
 
+def test_independent_reviewer_runs_scientific_review(tmp_path):
+    from autolab import demo
+    from autolab.agents import ScriptedBackend
+    from autolab.taxonomy import Role
+
+    reviewer = ScriptedBackend({"scientific_review": demo.review_approve}, "independent")
+    lab = Lab.init(tmp_path / "lab", config_text=FAST_CONFIG)
+    ctl = Controller(lab, agents(), reviewer=reviewer)
+    pid = ctl.new_project("Investigate whether treat can produce higher score")
+    steps = ctl.run(pid)
+    assert steps[-1].after == "COMPLETE", steps[-1]
+    assert [s for s, _ in reviewer.calls] == ["scientific_review"] * len(reviewer.calls)
+    assert reviewer.calls
+    sci_stages = [s for s, _ in ctl.agents[Role.SCIENTIST].backend.calls]
+    assert "scientific_review" not in sci_stages and "design" in sci_stages
+    reviews = [t for t in lab.store.query("task") if t.data["stage"] == "scientific_review"]
+    assert reviews and all(t.data["backend"]["model"] == "independent" for t in reviews)
+
+
+def test_reviewer_disabled_by_default(tmp_path):
+    lab, ctl = make(tmp_path)
+    assert ctl.reviewer is None and ctl.review_stages == set()
+
+
 def test_unsupported_hypothesis_is_a_result_not_a_failure(tmp_path):
     lab, ctl = make(tmp_path, sci__design=scenario.design(effect=0.0))
     pid = ctl.new_project("Investigate whether a null treatment raises score")

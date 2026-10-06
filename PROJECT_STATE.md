@@ -6,7 +6,7 @@ and `project_state/` (decisions, failures, open questions)._
 ## Status
 
 - **Version:** autolab 0.3.0 + statistics + design-convergence fixes + independent-reviewer
-  option (D29). robolab: 223/223 tests pass on main 8d04f05 (2026-10-05 review).
+  option (D29); 111/111 passed 2026-10-05 (14 min) + 2 reviewer tests. robolab: 223/223 tests pass on main 8d04f05 (2026-10-05 review).
 - **Phase:** carrying out the mandate in labs/robolab. Lab validation PASSED (pilot-004).
   Gate 0 PASSED (D26); Gate 1 in progress (G1-1 merged; G1-2 halted on a Claude usage limit).
   North star: one generalised brain for any MHS-described body (D28).

@@ -33,7 +33,7 @@ from typing import Callable
 from xml.etree import ElementTree
 
 from . import __version__
-from .agents import Agent, make_backend
+from .agents import Agent, AgentBackend, make_backend
 from .config import DEFAULT_TOML, load_config
 from .experiments import (Trial, check_lock, contrasts, environment_snapshot, evaluate_rule,
                           required_seeds,
@@ -162,7 +162,8 @@ class Lab:
 
 # =============================================================== Controller
 class Controller:
-    def __init__(self, lab: Lab, agents: dict[Role, Agent] | None = None):
+    def __init__(self, lab: Lab, agents: dict[Role, Agent] | None = None,
+                 reviewer: AgentBackend | None = None):
         self.lab = lab
         self.store = lab.store
         self.repo = lab.repo
@@ -173,6 +174,14 @@ class Controller:
             agents = {role: Agent(role, make_backend(self.cfg["agents"][role.value]))
                       for role in (Role.SCIENTIST, Role.ENGINEER, Role.VERIFIER)}
         self.agents = agents
+        # Independent review: stages listed in [agents.reviewer] run on a different backend
+        # (ideally another model family) than the designer, so the design is not reviewed
+        # by the model that wrote it.
+        rv = self.cfg["agents"].get("reviewer") or {}
+        if reviewer is None and rv.get("backend"):
+            reviewer = make_backend(rv)
+        self.reviewer = reviewer
+        self.review_stages = set(rv.get("stages", ["scientific_review"])) if reviewer else set()
 
     # ------------------------------------------------------------ projects
     def new_project(self, objective: str, mandate_refs: list[str] | None = None,
@@ -435,6 +444,8 @@ class Controller:
                             constraints=self._constraints(role),
                             workdir=str(workdir) if workdir else None, writable=writable)
         agent = self.agents[role]
+        if stage in self.review_stages:
+            agent = Agent(role, self.reviewer, agent.max_protocol_retries)
         hdir = self.lab.handoffs / task_id
         hdir.mkdir(parents=True, exist_ok=True)
         (hdir / "task.json").write_text(json.dumps(packet.to_dict(), indent=2, default=str),

@@ -160,3 +160,39 @@ key that brain modules never receive. Brain packages (`src/world_model`, `src/sy
 1. A spy module asserts it never receives ground-truth fields over seeded episodes.
 2. A static test fails if any brain package imports `simulation`.
 3. Harness metrics still use ground truth correctly (G1-2 tests pass).
+
+## G1-5 Model Hardware Standard (MHS) v0
+**Refs:** Gate 1, H5, ADR-001, ADR-003, ADR-005, REQ-SAFE, REQ-ROS. Added 2026-10-05 (D28).
+**Why:** the brain must be the same code for every body; what differs is a declared,
+machine-readable description of the body. The brain reads it; it never hard-codes a body.
+**Spec:** In `src/contracts/mhs.py` (+ `docs/mhs.md`), define `MHS` (frozen, versioned
+`MHS_VERSION`, JSON round-trip, `validate()` raising `ContractError`) with:
+- identity: body name, body class (e.g. point_mass, wheeled, legged), MHS version;
+- actuators: name, kind (force, torque, velocity, steering, ...), units, min/max, rate limit,
+  latency; the action vector layout the brain must produce;
+- sensors: name, kind, units, shape, rate, noise model, frame; the observation layout;
+- body: mass and inertia if known (or "unknown"), geometry/footprint, frames;
+- control: control period, timing requirements, which low-level reflexes the body provides
+  itself (below the adapter, e.g. balance or motor current loops);
+- safety envelope: workspace or operating domain, speed limits, braking capability, safe
+  action, e-stop semantics. The Safety Kernel is configured FROM the MHS (no per-body code).
+Puck2D publishes its MHS; the runner hands the MHS to brain modules at construction.
+**Acceptance:**
+1. Round-trip and malformed-MHS tests (missing actuator limits, unknown units, inconsistent
+   layouts) raise `ContractError`.
+2. A `SafetyKernel` built from Puck2D's MHS behaves identically to the hand-configured one
+   (all G0-3/G1-3 tests pass).
+3. Brain-side code reads action/observation layouts only from the MHS (static test: no
+   Puck2D constants in brain packages).
+
+## G1-6 Car2D: a second body (RC-car-like) behind the same MHS
+**Refs:** Gate 1, H5, REQ-SIM. Added 2026-10-05 (D28).
+**Why:** a brain designed against one body silently overfits to it. A non-holonomic car
+(it cannot move sideways) differs from the puck in exactly the way that exposes that.
+**Spec:** In `src/simulation/car2d.py`, a deterministic kinematic-bicycle car (wheelbase,
+max steering angle and rate, throttle/brake force, speed limit, rolling resistance) in the
+same 2D world and task format as Puck2D (goals, obstacles, disturbances: slippery patches,
+impulses, payload change), implementing the Environment protocol and publishing an MHS.
+**Acceptance:** G1-1-style determinism and physics-sanity tests (turning radius matches
+wheelbase/steering; no sideways motion without slip); the G1-2 harness runs it unchanged;
+the Safety Kernel built from its MHS keeps it inside the workspace (property test).

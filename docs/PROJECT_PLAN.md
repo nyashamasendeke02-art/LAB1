@@ -151,6 +151,9 @@ a fast controller fails.
 - **Instrument checks** (tests, not hypotheses): energy/physics sanity, determinism across runs,
   and disturbance injection doing what its config says.
 - **Exit:** the Gate 1 evidence pack. EnvB (a different body) is deliberately postponed to P10.
+- **Revised by D28 (2026-10-05):** the Model Hardware Standard (MHS v0, G1-5) and a second,
+  RC-car-like body (Car2D, G1-6) move into Gate 1, so every brain component is built against
+  two bodies from the start. P10/E6 remains the formal transfer test (H5).
 
 ### P3: Gate 2, World Model v1, experiment WM-1 (research track)
 - **WM v1:** a hand-written integrator over object-centric physical variables + a small

@@ -31,7 +31,9 @@ and `project_state/` (decisions, failures, open questions)._
    engineering → experiment → evaluation → iteration → report → next question,
    with full provenance. **(built; validated offline only)**
 2. Prove it works with real agents on a small objective (live pilot).
-3. Carry out the mandate (docs/MANDATE.md), in order: Gate 0 contracts -> Gate 1 deterministic
+3. **North star (D28):** one generalised brain for any body described by a Model Hardware
+   Standard (RC car, humanoid, self-driving car). HYPOTHESIS, tested body by body.
+4. Carry out the mandate (docs/MANDATE.md), in order: Gate 0 contracts -> Gate 1 deterministic
    simulation -> **E1: S1 baseline** (= CLAUDE.md first milestone, a minimal predictive agent
    with a reproducible baseline) -> E4/E3 (World Model utility, H3 prediction error as a
    reconsideration signal) -> E2/E3 (S2, Awareness) -> E5 -> E6.
@@ -73,6 +75,8 @@ and `project_state/` (decisions, failures, open questions)._
 0e. [ ] D27 physics learning: G1-4 ground-truth isolation after G1-3 (spec in
        docs/gates/GATE0_GATE1_TASKS.md); online mass/friction estimation in WM v1; WM-2
        (self-directed exploration vs passive data) after WM-1.
+0f. [ ] D28 generalised brain: G1-5 Model Hardware Standard (MHS) v0, G1-6 Car2D (RC-car-like
+       second body). Gate 1 order: G1-2, G1-3, G1-4, G1-5, G1-6.
 1. [ ] Fix whatever the live pilot exposes (schema compliance, sandbox behaviour,
        timeouts); add regression tests for each.
 2. [x] `autolab amend` CLI: recorded protocol amendments; amending after data

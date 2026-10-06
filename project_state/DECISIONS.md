@@ -102,3 +102,12 @@
   (c) a later WM-2: self-directed exploration vs passive logged data, by prediction-error
   learning curve. Learn-from-scratch stays a comparison condition, not the default (mandate:
   "physics-informed", "compared progressively with more learned physics").
+- D28 (2026-10-05, human direction; plan changes by claude-code): GOAL: one generalised brain that
+  runs any body described by a Model Hardware Standard (MHS): RC car, humanoid, self-driving car.
+  Labelled HYPOTHESIS (cross-embodiment generality is an open problem); it is the mandate's
+  long-term direction (embodiment-agnostic brain, H5, ADR-005) made concrete. Plan changes:
+  G1-5 MHS v0 (body description; Safety Kernel configured from it), G1-6 Car2D second body,
+  both in Gate 1 so no component is designed against one body. Expectation set: "figure out"
+  = the same brain code learns a new body quickly from its MHS and its own experience, not
+  zero-shot competence; fast body-specific reflexes (balance, motor loops) may live below
+  the adapter and are declared in the MHS. Real vehicles stay deferred (Gate 7, human decision).

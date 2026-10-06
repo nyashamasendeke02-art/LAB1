@@ -1,5 +1,8 @@
 # Next Task
 
+> SUPERSEDED (2026-10-05): this file is historical. The live status and next tasks are in
+> `PROJECT_STATE.md` at the repository root.
+
 1. Human: review docs/PROJECT_PLAN.md and decide its section 10 items.
 2. Claude Code (after approval): P0 lab upgrades L1-L10, with tests. No experiments.
 3. Human go-ahead: lab validation run (toy objective, exploratory) to COMMUNICATE.

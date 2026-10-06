@@ -1,4 +1,8 @@
-# Open Questions (lab infrastructure)
+# Open Questions
+
+_Reviewed 2026-10-05: Q2 addressed by D29 (optional independent reviewer); Q4 answered (ledger head
+anchored in commit trailers); Q5 answered (L4/L5 statistics); Q6 answered (`autolab amend`);
+Q8 answered (Puck2D, then Car2D per D28)._
 
 1. OPEN_QUESTION: Do real LLM agents reliably produce schema-valid stage payloads,
    especially full protocols? The retry-with-error loop is untested live.
@@ -27,3 +31,7 @@
     was not hard-coded and alternatives were excluded.
 12. OPEN_QUESTION: should autolab expose the 13 mandate roles as more agent roles, or keep three
     agents with the role responsibilities folded in (current default, docs/MANDATE.md section 3)?
+13. OPEN_QUESTION (D31): what generic, MHS-parameterised physics prior can the World Model use
+    across bodies (point mass, car, humanoid) without per-body code? Decide before WM v1 (Gate 2).
+14. OPEN_QUESTION (D28): what representation is shared across bodies with different action and
+    observation spaces (ADR-005)? Decide before E6; Car2D (G1-6) gives the first test case.

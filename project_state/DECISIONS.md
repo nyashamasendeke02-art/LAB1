@@ -111,3 +111,14 @@
   = the same brain code learns a new body quickly from its MHS and its own experience, not
   zero-shot competence; fast body-specific reflexes (balance, motor loops) may live below
   the adapter and are declared in the MHS. Real vehicles stay deferred (Gate 7, human decision).
+- D29 (2026-10-05, claude-code): optional independent reviewer: `[agents.reviewer]` in lab.toml
+  runs the listed stages (default scientific_review) on a different backend from the designing
+  scientist (OPEN_QUESTION 2). Disabled by default; the reviewer's backend/model is recorded on
+  each task. Tests: test_independent_reviewer_runs_scientific_review, test_reviewer_disabled_by_default.
+- D30 (2026-10-05, review): the Safety Kernel must not depend on the brain's state estimate;
+  it reads position/velocity from the raw Observation via the MHS (folded into G1-5). The
+  harness injects the simulation clock (G1-2 spec).
+- D31 (2026-10-05, review): D27 and D28 reconciled: any hand-written physics in the World Model
+  must be a generic prior parameterised by the MHS (e.g. Newtonian rigid body with declared
+  actuator kinds), never per-body code; otherwise the brain is not body-agnostic. Open as
+  OPEN_QUESTION 13 until WM v1 is designed.

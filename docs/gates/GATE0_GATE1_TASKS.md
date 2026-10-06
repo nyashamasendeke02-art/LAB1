@@ -120,8 +120,11 @@ policies in `src/simulation/policies.py`: `RandomPolicy` (uniform force) and
 instances (start, goal, obstacles, disturbance schedule) generated from a seed and saved
 as JSON.
 
+The harness injects the simulation clock into the CycleRunner and Safety Kernel (the runner
+defaults to the wall clock, which makes staleness and watchdog decisions non-reproducible).
+
 **Acceptance:**
-1. Determinism of the episode metrics given seeds.
+1. Determinism of the episode metrics given seeds, including telemetry decision sequences.
 2. The PD controller reaches the goal in the no-disturbance, no-obstacle case.
 3. The random policy mostly fails (sanity of the instrument).
 4. Evaluation sets round-trip through JSON unchanged.
@@ -177,6 +180,9 @@ machine-readable description of the body. The brain reads it; it never hard-code
 - safety envelope: workspace or operating domain, speed limits, braking capability, safe
   action, e-stop semantics. The Safety Kernel is configured FROM the MHS (no per-body code).
 Puck2D publishes its MHS; the runner hands the MHS to brain modules at construction.
+Safety independence (review 2026-10-05): the kernel's workspace and stopping-distance checks
+use position/velocity read from the raw Observation via the MHS sensor layout, not the
+brain's StateUpdate, so a faulty or learned state estimator cannot fool the kernel.
 **Acceptance:**
 1. Round-trip and malformed-MHS tests (missing actuator limits, unknown units, inconsistent
    layouts) raise `ContractError`.
@@ -184,6 +190,8 @@ Puck2D publishes its MHS; the runner hands the MHS to brain modules at construct
    (all G0-3/G1-3 tests pass).
 3. Brain-side code reads action/observation layouts only from the MHS (static test: no
    Puck2D constants in brain packages).
+4. A state estimator that reports a false in-bounds position cannot get a workspace-exiting
+   command approved (fault-injection test).
 
 ## G1-6 Car2D: a second body (RC-car-like) behind the same MHS
 **Refs:** Gate 1, H5, REQ-SIM. Added 2026-10-05 (D28).

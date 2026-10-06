@@ -1,4 +1,7 @@
-# Current State — Autonomous Research Lab (LAB1)
+# Current State
+
+> SUPERSEDED (2026-10-05): this file is historical. The live status and next tasks are in
+> `PROJECT_STATE.md` at the repository root. — Autonomous Research Lab (LAB1)
 
 ## Phase
 Lab infrastructure v0.1.0 built and tested with scripted agents.

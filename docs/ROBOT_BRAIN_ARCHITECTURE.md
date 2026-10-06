@@ -136,6 +136,9 @@ before Gate 5. While S2 thinks, S1 keeps control; S2's plan is applied only if s
   workspace/operating domain, stopping-distance check with a braking safe action (G1-3),
   stale and malformed command rejection, watchdog → safe action, e-stop latch reset only by
   the operator API. Limits are immutable after construction; configured from the MHS.
+- **Independent state (D30):** the kernel reads position/velocity from the raw observation
+  via the MHS sensor layout, never from the brain's state estimate, so a faulty or learned
+  estimator cannot fool it (G1-5).
 - **Never ablated** in experiments that actuate; validated by fault injection (sensor
   dropout, stale state, malformed messages, actuator disconnect, component failure, timeouts).
 - **Deployment ladder** (mandate): simulation → hardware-in-the-loop → bench → constrained

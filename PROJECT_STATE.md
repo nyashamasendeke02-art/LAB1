@@ -5,14 +5,11 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** 0.3.0 + L4/L5 statistics + design-convergence fixes; 108/108 passed on e0f95d4
-  (15 min); re-run on 4c37a2b in progress.
-- **Phase:** live pilots. pilot-001 HALTED (F4, fixed by D8). pilot-002 ran the first
-  full live pass (RUN-0001: INCONCLUSIVE, paired effect -0.00008 MSE, CI [-0.00075, 0.00059]),
-  then redesigned twice; the review exposed lab gaps that are now fixed (D11-D13).
-  **pilot-002 STOPPED 2026-10-04 at the human's request** (still DESIGN, cycle 1, no data).
-  The code review's 12 findings (R1-R12) are FIXED (D14-D19). No experiment has been run since;
-  the next run needs the human's go-ahead.
+- **Version:** autolab 0.3.0 + statistics + design-convergence fixes + independent-reviewer
+  option (D29). robolab: 223/223 tests pass on main 8d04f05 (2026-10-05 review).
+- **Phase:** carrying out the mandate in labs/robolab. Lab validation PASSED (pilot-004).
+  Gate 0 PASSED (D26); Gate 1 in progress (G1-1 merged; G1-2 halted on a Claude usage limit).
+  North star: one generalised brain for any MHS-described body (D28).
 - **Agents:** ChatGPT scientist via `codex exec --sandbox read-only`; Claude engineer
   via `claude -p`; Codex verifier via `codex exec --sandbox workspace-write`.
 
@@ -43,9 +40,7 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress
-- [ ] pilot-002: check the outcome (`autolab status labs/pilot-002`, the log, the report);
-      fix and record anything it exposes.
-- [ ] Full suite run after D13 (68/68 passed up to D12; D13's targeted tests pass).
+- [ ] robolab G1-2 (episode harness): re-submit after the Claude limit resets (3:10pm PT).
 
 ### Next (priority order)
 0. [x] Plan adopted under delegation (D21). P0 upgrades L1-L3, L6-L9 DONE (v0.3.0, da94322);
@@ -88,6 +83,7 @@ and `project_state/` (decisions, failures, open questions)._
 4. [x] Statistics: paired t intervals, non-inferiority, co-primary endpoints, Holm, power check.
 5. [x] Ledger anchoring: commit the ledger head hash into the research repo
        at each merge/run.
+5b. [ ] autolab: pause on agent usage-limit errors until the reset time, instead of HALT.
 6. [ ] Citation verification step for background research (mark as verified
        or unverified with the method used).
 7. [ ] Start the Developmental Intelligence EXP-001 project in a dedicated lab.
@@ -114,10 +110,18 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Known bugs / technical debt
 
-- UNCOMMITTED WIP (config.py, controller.py): optional `[agents.reviewer]` backend that runs
-  `scientific_review` on a different model family than the designer. Wiring looks complete;
-  no tests yet. Needs a test before commit.
-
+- REVIEW 2026-10-05 (full review; details in DECISIONS D29-D31):
+  - robolab: the Safety Kernel's workspace check uses position/velocity from the brain's own
+    state estimate (runner `_kinematics`). A wrong or learned estimator can fool it (ADR-003).
+    Fix folded into G1-5: the kernel reads pos/vel from the raw Observation via the MHS layout.
+  - robolab: CycleRunner defaults to the wall clock; simulated runs must inject the simulation
+    clock or staleness/watchdog decisions are not reproducible. Added to the G1-2 spec.
+  - D27 vs D28 tension: a hand-written physics step per body is body-specific code. The World
+    Model's physics prior must be generic and parameterised by the MHS (OPEN_QUESTION 13).
+  - autolab: a Claude/Codex usage limit HALTs a run (F5, G1-2). Todo: detect usage-limit
+    errors and pause until the stated reset time instead of halting.
+  - All review gates so far were decided by claude-code under delegation (D21); no human has
+    reviewed the Safety Kernel. Required before any hardware (Gate 7).
 - robolab cycle runner (G0-4) is synchronous. A slow System 2 (e.g. an LLM planner, Gate 5)
   must run asynchronously while S1 keeps control; design this before Gate 5. Local vs cloud
   LLM for S2 is an open research-direction decision for the human (not needed until Gate 5).
@@ -158,7 +162,6 @@ Residual risks the fixes do NOT remove:
 
 ## Human tasks (only what Claude cannot do)
 
-
-
-- Decide when to resume experiments. pilot-002 was designed under the old rules; recommended:
-  start a fresh lab (pilot-003) with the same objective rather than resuming pilot-002.
+- Nothing blocking. G1-2 resumes after the Claude usage limit resets (3:10pm PT).
+- Before Gate 7 (hardware): a human safety review of the Safety Kernel.
+- By Gate 5: local vs cloud LLM for System 2.

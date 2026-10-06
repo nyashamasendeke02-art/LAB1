@@ -205,3 +205,35 @@ before Gate 5. While S2 thinks, S1 keeps control; S2's plan is applied only if s
 3. How much physics is learned vs given (D27: progressively, each step earned).
 4. Which reflexes belong below the adapter for legged bodies.
 5. First real body (Gate 7).
+
+## 12. ROS 2 integration (Gate 7; D42)
+
+ROS 2 stays at the edge, below the embodiment adapter (mandate: core logic testable without ROS 2).
+
+```text
+ ┌──────────────────── robobrain node (one ROS 2 process, rclpy) ────────────────────┐
+ │  CycleRunner (deterministic): estimator → World Model → S1 → Awareness [→ S2]       │
+ │  → Safety Kernel → ROS adapter                                                      │
+ │  timer at the MHS control period; clock = ROS clock (use_sim_time in Gazebo)        │
+ └──────▲──────────────────────────────────────────────────────────────┬──────────────┘
+        │ sensor topics (via MHS ros bindings)                         │ command topic
+        │ e.g. /odom, /imu, /scan, /camera/image                       ▼ e.g. /cmd_vel, /ackermann_cmd
+ ┌──────┴───────────────────────────────────────────────────────────────────────────────┐
+ │ drivers / ros2_control controllers / micro-ROS / MAVROS (ArduPilot Rover)            │
+ │ reflex loops (motor current, ABS, balance) · hardware e-stop independent of software │
+ └───────────────────────────────────────────────────────────────────────────────────────┘
+ Gazebo (+ ros_gz bridge) replaces the hardware for rehearsal; rosbag2/MCAP records;
+ RViz2 / Lichtblick visualise; telemetry may be republished as topics for monitoring.
+```
+
+- **One node, not one node per module:** the cycle stays deterministic, testable without ROS and
+  free of inter-process latency; modules keep talking through the contracts (section 7).
+- **MHS ROS bindings:** each MHS sensor/actuator may declare a topic, message type, field mapping
+  and QoS, so the generic ROS adapter needs no per-body code; only the MHS file changes.
+- **Safety:** the Safety Kernel runs in the same process, immediately before publishing; a stale
+  topic (no sensor message within the declared rate) is treated as invalid state; a hardware
+  e-stop below ROS stays independent of all software.
+- **Platform:** ROS 2 Jazzy on Ubuntu 24.04 (the edge board, or WSL2 on the lab PC for rehearsal);
+  Windows support for ROS 2 is limited.
+- **Order:** simulation (now) → Gazebo rehearsal through the ROS adapter → hardware-in-the-loop →
+  bench → constrained motion (mandate deployment ladder), each with the human safety review.

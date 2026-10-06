@@ -187,3 +187,8 @@
   declared in the MHS safety envelope (max speed, max acceleration, guaranteed braking deceleration) and
   a declared safe-action kind (oppose_velocity | fixed); static test forbids body-specific branches in
   src/safety. G1-6 will pass a safety review gate.
+- D42 (2026-10-06, claude-code): ROS 2 integration design (docs/ROBOT_BRAIN_ARCHITECTURE.md section 12):
+  ROS 2 Jazzy only below the embodiment adapter; the brain runs as ONE deterministic rclpy node (cycle
+  runner + Safety Kernel immediately before publishing), not one node per module; the MHS gains optional
+  ROS bindings (topic, type, field mapping, QoS) so the adapter is generic; ROS clock / use_sim_time
+  feeds the kernel; Gazebo via ros_gz for rehearsal; hardware e-stop independent of software. Gate 7.

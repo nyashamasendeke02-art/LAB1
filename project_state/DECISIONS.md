@@ -175,3 +175,7 @@
   a week). Stops on NEEDS_HUMAN, DONE, or the same queue stop repeating. Single instance via lock
   file; never starts a second queue. Optional logon start: scripts/install_autopilot_at_logon.ps1.
   Risk accepted under D35: an unattended agent with Bash runs on the user's PC.
+- D40 (2026-10-06, human: "use Apache-2.0"): project licence Apache-2.0 (SW-LICENSE). LAB1: LICENSE
+  (official text via the GitHub licenses API), pyproject license field, README section; the mandate
+  PDF keeps its own terms. robolab: queued as G1-8 (its main checkout belongs to the lab controller,
+  so the change goes through the engineering track, not a direct commit).

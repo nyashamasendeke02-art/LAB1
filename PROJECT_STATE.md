@@ -176,7 +176,6 @@ Residual risks the fixes do NOT remove:
 
 ## Human tasks (only what Claude cannot do)
 
-- Choose the project licence (recommended Apache-2.0; D34).
 - Nothing blocking: the lab runs unattended (D35).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.

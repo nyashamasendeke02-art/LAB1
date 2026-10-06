@@ -68,3 +68,13 @@ accept = [
   "`python -m pytest -q -m \"not slow\"` passes in under 60 seconds.",
   "Branch coverage of src/safety is 100% and kernel behaviour is unchanged (all existing safety tests pass unmodified).",
 ]
+
+[[task]]
+id = "G1-8"
+refs = ["SW-LICENSE"]
+spec = """G1-8 Licence. Add the Apache License 2.0 as `LICENSE` at the repository root (the exact, unmodified text from https://www.apache.org/licenses/LICENSE-2.0.txt; if a pyproject.toml exists, set `license = "Apache-2.0"`). Add a short "License" section to README.md: "Copyright 2026 Nyasha Msendeke. Licensed under the Apache License 2.0." Change nothing else."""
+accept = [
+  "LICENSE contains the full, unmodified Apache License 2.0 text.",
+  "README.md has a License section naming Apache-2.0 and the copyright holder.",
+  "The full test suite still passes.",
+]

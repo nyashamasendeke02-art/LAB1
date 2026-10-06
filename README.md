@@ -98,3 +98,9 @@ The scripted end-to-end loop works and is tested. The live `claude-cli` and
 `codex-cli` adapters have each passed a single-stage smoke test, but **a full
 live autonomous run has not yet been performed**. Start with an unprotected,
 exploratory objective and watch the first cycle.
+
+## License
+
+Copyright 2026 Nyasha Msendeke. The code and documentation written for this project are
+licensed under the [Apache License 2.0](LICENSE). `AI_Robotics_Full_Documentation.pdf` is the
+project's reference mandate and keeps its own terms.

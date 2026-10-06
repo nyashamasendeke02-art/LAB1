@@ -102,3 +102,16 @@ def test_queue_stops_on_a_previously_halted_task(tmp_path):
     out = run_queue(ctl, load_queue(qfile), log=lambda s: None)
     assert out.status == "halted" and out.project == pid
     assert len(lab.store.query("project")) == 1
+
+
+def test_queue_retry_resubmits_a_halted_task_once(tmp_path):
+    lab, ctl = make(tmp_path, eng__build=build_ok, ver__verify=verify_spec)
+    pid = ctl.new_engineering_project("contract module", ["tests pass"])
+    ctl.halt(pid, "backend misconfigured")
+    qfile = tmp_path / "q.toml"
+    qfile.write_text(QUEUE.split("[[task]]")[0] + "[[task]]" + QUEUE.split("[[task]]")[1],
+                     encoding="utf-8")
+    out = run_queue(ctl, load_queue(qfile), log=lambda s: None, retry={"T1"})
+    assert out.status == "done"
+    projects = lab.store.query("project")
+    assert [p.data["state"] for p in projects] == ["HALTED", "COMPLETE"]

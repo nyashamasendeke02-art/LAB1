@@ -24,3 +24,7 @@
   undercovered (R3, simulated); the engineer agent loaded the user's Claude memory index ("user
   granted 100% autonomy"), skills and MCP servers (R5, observed with a probe prompt). pilot-001/002
   results were produced before these fixes; RUN-0001 used the bootstrap CI.
+- F7 (2026-10-05): robolab G1-2 PRJ-0008 HALTED at ADVERSARIAL_REVIEW after 3 Codex errors: the
+  CLI's default model (gpt-6.1-sol) is not available to the ChatGPT-account login. Not a code
+  defect; the engineer's build had passed tests. Fixed by pinning the model (D36). Lesson: pin
+  agent models in lab.toml instead of relying on CLI defaults, which change with CLI updates.

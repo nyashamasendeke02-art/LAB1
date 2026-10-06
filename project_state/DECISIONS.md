@@ -149,3 +149,9 @@
   restarts the queue. Kept with the human: physical hardware runs (Gate 7, REQ-SAFE-H), spending
   money or creating accounts, publishing or pushing to a remote, deleting research artifacts, and
   acceptance of major scientific conclusions.
+- D36 (2026-10-05, claude-code): robolab G1-2 (PRJ-0008) HALTED at adversarial review: Codex 0.160's
+  default model gpt-6.1-sol is "not supported when using Codex with a ChatGPT account". Probed:
+  gpt-6-luna and gpt-5.6-terra both work; pinned model = "gpt-6-luna" for the scientist and verifier
+  in labs/robolab/lab.toml (newest generation available to the account). Added `autolab queue
+  --retry ID` to submit a HALTED task again as a fresh project once its cause is fixed (the HALTED
+  project stays as a record). PRJ-0008 kept HALTED; G1-2 re-submitted.

@@ -101,6 +101,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("lab")
     p.add_argument("file")
     p.add_argument("--as", dest="by", default="claude-code")
+    p.add_argument("--retry", action="append", default=[],
+                   help="task id whose HALTED project should be submitted again")
     for name in ("run", "step"):
         p = sub.add_parser(name)
         p.add_argument("lab")
@@ -166,7 +168,7 @@ def main(argv: list[str] | None = None) -> int:
     elif a.cmd == "queue":
         from .queue import load_queue, run_queue
         out = run_queue(Controller(lab), load_queue(a.file), author=a.by,
-                        on_step=_print_step)
+                        on_step=_print_step, retry=set(a.retry))
         print(f"QUEUE {out.status.upper()}"
               + (f": {out.task_id} {out.project} {out.detail}" if out.task_id else ""))
         return {"done": 0, "blocked": 2}.get(out.status, 1)

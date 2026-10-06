@@ -50,7 +50,10 @@ def load_queue(path: str | Path) -> list[dict]:
 
 def run_queue(ctl, tasks: list[dict], *, author: str = "claude-code",
               on_step: Callable | None = None,
-              log: Callable[[str], None] = print) -> QueueOutcome:
+              log: Callable[[str], None] = print,
+              retry: frozenset[str] | set[str] = frozenset()) -> QueueOutcome:
+    """``retry``: task ids whose latest project HALTED and whose cause has been fixed;
+    each is submitted again as a fresh project (the HALTED one is kept as a record)."""
     store = ctl.store
     for t in tasks:
         matches = [p for p in store.query("project") if p.data.get("objective") == t["spec"]]
@@ -59,8 +62,12 @@ def run_queue(ctl, tasks: list[dict], *, author: str = "claude-code",
             log(f"--- {t['id']} already COMPLETE ({latest.id}) ---")
             continue
         if latest is not None and latest.data["state"] == R.HALTED.value:
-            return QueueOutcome("halted", t["id"], latest.id,
-                                f"previously HALTED: {latest.data.get('halt_reason')}")
+            if t["id"] not in retry:
+                return QueueOutcome("halted", t["id"], latest.id,
+                                    f"previously HALTED: {latest.data.get('halt_reason')}")
+            log(f"--- {t['id']} retry: {latest.id} stays HALTED as a record ---")
+            latest = None
+            retry = set(retry) - {t["id"]}  # one fresh attempt per invocation
         if latest is None:
             pid = ctl.new_engineering_project(t["spec"], list(t["accept"]), list(t["refs"]),
                                               author=author)

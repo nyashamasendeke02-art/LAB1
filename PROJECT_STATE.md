@@ -41,15 +41,16 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Todo
 
-### In Progress (2026-10-06 02:40)
-- [ ] AUTOPILOT running (D39): scripts/autopilot.py (start: scripts/start_autopilot.cmd). It runs the
-      queue named in docs/gates/ACTIVE_QUEUE; when it stops it starts headless Claude Code here to do
-      reviews/fixes/next queue, waits out Claude usage limits, and stops on NEEDS_HUMAN, DONE or no
-      progress. Status: labs/AUTOPILOT_STATUS.txt; log: labs/autopilot.log; queue log: labs/robolab-run.log.
-- [ ] robolab Gate 1: G1-2 DONE (DLV-0006), G1-3 DONE (APR-0003 approved, DLV-0007), G1-4 DONE (DLV-0008),
-      G1-5 RUNNING as PRJ-0012 (waiting out a Claude session limit, D35), then G1-6, G1-7.
-      Manual resume if the autopilot is not running: `.venv/Scripts/autolab.exe status labs/robolab`;
-      `autolab approvals`; `autolab queue labs/robolab docs/gates/gate1_queue.toml [--retry G1-x]`.
+### In Progress (2026-10-06 03:55)
+- [ ] robolab Gate 1 queue (started 03:49 by claude-code): G1-2..G1-5 DONE (G1-5 = DLV-0009, MHS v0.1 +
+      kernel v1.2; APR-0004 safety + APR-0005 contracts approved, D44). G1-6 Car2D + body-agnostic kernel
+      RUNNING as PRJ-0013; then G1-7, G1-8. G1-6 will stop at a safety review.
+- [ ] AUTOPILOT STOPPED 03:32 (NEEDS_HUMAN): its headless Claude session had no tool permissions (autolab
+      CLI, git and edits denied), so it could not review APR-0004 and correctly refused to approve blind.
+      Needs the human's choice: allow those tools for headless sessions in LAB1 (permission allowlist), or
+      keep reviews interactive. Replies are now logged to labs/autopilot-replies.log.
+      Manual resume: `.venv/Scripts/autolab.exe status labs/robolab`; `autolab approvals`;
+      `autolab queue labs/robolab docs/gates/gate1_queue.toml [--retry G1-x]`.
 - [x] GitHub backup DONE 2026-10-06 (D38): private repos github.com/nyashamasendeke02-art/LAB1
       (main) and github.com/nyashamasendeke02-art/robolab (all 29 branches). Push after each
       commit/gate. Not in git: labs/robolab/.autolab (ledger DB, artifacts) - backup TODO.

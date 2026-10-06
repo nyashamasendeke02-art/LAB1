@@ -214,6 +214,10 @@ def cycle(state: dict) -> str | None:
         return f"no progress: the queue stopped the same way {state['same'] + 1} times: {last}"
     set_status(f"queue stopped ({last or code}); Claude Code is handling it")
     reply = claude_with_wait(PROMPT.format(queue=active_queue(), result=last or f"exit {code}"))
+    with (ROOT / "labs" / "autopilot-replies.log").open("a", encoding="utf-8") as fh:
+        fh.write(f"===== {now()} =====
+{reply}
+")
     kind, detail, retry = parse_directive(reply)
     log(f"claude directive: {kind} {detail[:200]}")
     if kind == "CONTINUE":

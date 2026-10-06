@@ -237,3 +237,21 @@ ROS 2 stays at the edge, below the embodiment adapter (mandate: core logic testa
   Windows support for ROS 2 is limited.
 - **Order:** simulation (now) → Gazebo rehearsal through the ROS adapter → hardware-in-the-loop →
   bench → constrained motion (mandate deployment ladder), each with the human safety review.
+
+## 13. Foundation models: LLMs, VLMs, VLAs (D43)
+
+Model families and versions change quickly: check the current release and licence (SW-MODEL-LICENSE)
+before adopting any of them. Each enters as an experimental CONDITION against the existing baseline,
+never as an assumed component (mandate research question: which frontier abstractions transfer
+into constrained robotics?).
+
+| Kind | What it does | Where it fits | Examples (open unless noted) | When |
+|---|---|---|---|---|
+| LLM | text reasoning, planning, task language | System 2 (plans, skill choice, language goals); never commands actuators | local: Qwen / Mistral / Phi / Gemma / Llama families via llama.cpp (check each licence); cloud (closed): Claude, GPT, Gemini | Gate 5 (E2, E3) |
+| VLM | images + text → description, detection, answers | perception / state estimation, scene understanding for S2 | SmolVLM, PaliGemma, Qwen-VL class | after cameras exist (before Gate 7) |
+| VLA | images + language → robot actions, end to end | a whole-policy BASELINE against the modular brain (S1+S2), and a cross-embodiment comparison for E6 / H5 | SmolVLA, Octo, OpenVLA, pi0 / openpi; GR00T (humanoid, NVIDIA licence); RT-2 and Gemini Robotics (closed) | after cameras + GPU-class compute |
+
+Constraints today: the simulators give state vectors, not images (VLMs/VLAs need rendering, e.g.
+MuJoCo cameras); the fast loop targets an edge board without a GPU (REQ-COMPUTE), so VLAs need a
+Jetson-class board or run off-board; most VLAs are trained on arms and need fine-tuning per body,
+which is exactly what the MHS + adapter design tests.

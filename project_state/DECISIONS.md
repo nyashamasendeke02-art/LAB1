@@ -192,3 +192,9 @@
   runner + Safety Kernel immediately before publishing), not one node per module; the MHS gains optional
   ROS bindings (topic, type, field mapping, QoS) so the adapter is generic; ROS clock / use_sim_time
   feeds the kernel; Gazebo via ros_gz for rehearsal; hardware e-stop independent of software. Gate 7.
+- D43 (2026-10-06, claude-code; human asked about VLAs/LLMs): foundation models enter only as experimental
+  conditions: LLM as a System 2 condition at Gate 5 (local open model via llama.cpp vs cloud vs classical
+  planner; local-vs-cloud still the human's choice); VLMs for perception once the simulators render
+  images; VLAs as an end-to-end baseline against the modular brain and as an E6 cross-embodiment
+  comparison, which needs cameras and GPU-class compute (a REQ-COMPUTE change would be recorded).
+  Section 13 of docs/ROBOT_BRAIN_ARCHITECTURE.md.

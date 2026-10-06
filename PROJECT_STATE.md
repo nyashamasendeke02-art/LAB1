@@ -45,7 +45,7 @@ and `project_state/` (decisions, failures, open questions)._
 - [ ] robolab Gate 1 queue running detached (restarted 00:26 after APR-0003):
       G1-2 DONE (PRJ-0009, DLV-0006). G1-3 APPROVED (APR-0003, D37), merging; then G1-4..G1-7.
       Next stop: G1-5 contracts/safety review (claude-code reviews, approves, restarts the queue).
-      Resume after any stop: `.venv\Scriptsutolab.exe status labs/robolab`; review with
+      Resume after any stop: `.venv/Scripts/autolab.exe status labs/robolab`; review with
       `autolab approvals`; restart: `autolab queue labs/robolab docs/gates/gate1_queue.toml
       [--retry G1-x]` (log labs/robolab-run.log). Usage limits wait automatically (D35).
 - [ ] GitHub backup: `gh` login did not complete from this session (connection aborted by local

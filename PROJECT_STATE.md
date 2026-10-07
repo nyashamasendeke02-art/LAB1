@@ -42,13 +42,11 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress (2026-10-06 03:55)
-- [ ] robolab Gate 1 queue (restarted 09:58): G1-2..G1-5 DONE. G1-6 (PRJ-0013) in REDESIGN after 3 failed
-      verifications (F9: spec gaps on disturbances vs MHS bounds; task too large); waiting out Claude limits.
-      If it HALTs: raise robolab engineer timeout to 3600 s (only while no queue runs: lab.toml is
-      integrity-checked), split G1-6 into G1-6a (body-agnostic kernel on Puck2D, latency liveness) and G1-6b
-      (Car2D: declared latency is simulated; MHS bounds hold for the plant excluding declared external
-      disturbances, which the MHS lists and the kernel guarantee excludes; safety property tests run without
-      impulses), and resubmit.
+- [ ] robolab Gate 1 PAUSED 20:32 (F10): Codex (verifier + scientist) is out of usage until 2026-11-03 on the
+      user's ChatGPT plan. G1-6 (PRJ-0013) redesign built (84f6a44) and tests passed; it waits at adversarial
+      review. Resume with `autolab queue labs/robolab docs/gates/gate1_queue.toml` once a verifier backend is
+      available (human decision: ChatGPT Plus, a Claude-based verifier, or wait). Split plan for G1-6 ready:
+      docs/gates/g1_6_split.toml.
 - [ ] AUTOPILOT not running. Unattended reviews need headless sessions without approval prompts; Claude Code
       will not configure that itself (classifier: Create Unsafe Agents). The human may make the one-line change
       in scripts/autopilot.py (see the 2026-10-06 conversation) and start it; until then reviews are interactive.
@@ -180,6 +178,7 @@ Residual risks the fixes do NOT remove:
 
 ## Human tasks (only what Claude cannot do)
 
+- **Decide the verifier backend (F10):** ChatGPT Plus for Codex, a Claude-based verifier, or wait until 2026-11-03.
 - Nothing blocking: the lab runs unattended (D35).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.

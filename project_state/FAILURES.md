@@ -39,3 +39,8 @@
   disturbances can exceed the MHS speed limits the kernel relies on. Lesson: the G1-6 spec did not say how
   external disturbances relate to the MHS bounds, and the task (car sim + kernel rewrite + latency liveness)
   is too large for one 30-minute engineer call.
+- F10 (2026-10-06 20:31): the Codex verifier hit the ChatGPT account's Codex usage limit: "Upgrade to Plus to
+  continue using Codex ... or try again at Nov 3rd, 2026". The lab classified it correctly as a usage limit, but
+  its 12 h wait cap would have HALTed G1-6 (PRJ-0013, redesign built 84f6a44, tests passed). The queue was
+  stopped while no agent ran; PRJ-0013 stays in ENGINEERING and resumes with `autolab queue`. The scientist role
+  also uses Codex, so Gate 2 research is blocked too until the verifier/scientist backend is resolved.

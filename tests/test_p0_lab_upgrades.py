@@ -148,7 +148,7 @@ def test_resource_metrics_cannot_be_faked_and_output_is_capped(tmp_path):
     assert t.ok and t.metrics["autolab_cpu_s"] == t.resources["autolab_cpu_s"]
     capped = run_trial("python fake.py", wd, tmp_path / "o2", cond, 1, ["score"], 60,
                        output_cap_mb=1)
-    assert not capped.ok and "exceeds" in capped.error
+    assert not capped.ok and ("exceeds" in capped.error or "exceeded" in capped.error)
 
 
 def test_dependency_lock_mismatch_halts_before_data(tmp_path):

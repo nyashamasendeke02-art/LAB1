@@ -127,11 +127,16 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
     env = {**os.environ, "PYTHONHASHSEED": str(seed), "AUTOLAB_SEED": str(seed)}
     t0 = time.perf_counter()
     error = None
-    proc = run_tree(cmd, cwd=str(workdir), timeout=timeout_s, env=env)
+    proc = run_tree(cmd, cwd=str(workdir), timeout=timeout_s, env=env,
+                    output_dir=str(out_dir),
+                    output_cap_bytes=(int(output_cap_mb * 2**20)
+                                      if output_cap_mb is not None else None))
     rc, stdout, stderr = proc.returncode, proc.stdout, proc.stderr
     resources = {"autolab_wall_s": proc.wall_s, "autolab_cpu_s": proc.cpu_s,
                  "autolab_peak_mb": proc.peak_mb}
-    if proc.timed_out:
+    if proc.output_limit_exceeded:
+        error = f"trial output exceeded the {output_cap_mb} MB cap; process tree terminated"
+    elif proc.timed_out:
         error = f"timeout after {timeout_s}s"
     dur = time.perf_counter() - t0
     (out_dir / "stdout.txt").write_text(stdout, encoding="utf-8")
@@ -153,9 +158,9 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
             error = f"invalid metrics.json: {exc}"
     elif error is None:
         error = f"exit code {rc}"
-    if error is None and output_cap_mb is not None:
+    if output_cap_mb is not None:
         size = dir_size_mb(out_dir)
-        if size > output_cap_mb:
+        if size > output_cap_mb and error is None:
             error = f"trial output {size:.1f} MB exceeds the {output_cap_mb} MB cap"
     return Trial(condition["name"], condition["role"], seed, rc, round(dur, 4),
                  metrics, str(out_dir), error, resources)

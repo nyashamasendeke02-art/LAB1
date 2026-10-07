@@ -30,6 +30,8 @@ import sys
 import time
 from pathlib import Path
 
+from autolab.procs import run_tree
+
 ROOT = Path(__file__).resolve().parents[1]
 LAB = ROOT / "labs" / "robolab"
 LOG = ROOT / "labs" / "autopilot.log"
@@ -173,9 +175,10 @@ def run_claude(prompt: str) -> tuple[bool, str]:
     exe = "claude.cmd" if os.name == "nt" else "claude"
     cmd[0] = exe
     try:
-        proc = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
-                              errors="replace", timeout=CLAUDE_TIMEOUT_S)
-    except subprocess.TimeoutExpired:
+        proc = run_tree(cmd, cwd=str(ROOT), timeout=CLAUDE_TIMEOUT_S, env=os.environ.copy())
+    except OSError as exc:
+        return False, f"AUTOPILOT: NEEDS_HUMAN unable to start claude: {exc}"
+    if proc.timed_out:
         return False, "AUTOPILOT: NEEDS_HUMAN claude session timed out"
     raw = proc.stdout or ""
     try:

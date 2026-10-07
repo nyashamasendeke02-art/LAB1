@@ -33,6 +33,7 @@ class ProcResult:
     wall_s: float | None = None
     cpu_s: float | None = None
     peak_mb: float | None = None
+    output_limit_exceeded: bool = False
 
 
 class _Job:
@@ -130,7 +131,8 @@ def _kill_tree(proc: subprocess.Popen, job: _Job | None) -> None:
 
 
 def run_tree(cmd: list[str], *, cwd: str | None = None, input: str | None = None,
-             timeout: float | None = None, env: dict | None = None) -> ProcResult:
+             timeout: float | None = None, env: dict | None = None,
+             output_dir: str | None = None, output_cap_bytes: int | None = None) -> ProcResult:
     """Run ``cmd`` to completion; kill its whole process tree on timeout or interrupt."""
     win = sys.platform == "win32"
     t0 = time.perf_counter()
@@ -148,15 +150,19 @@ def run_tree(cmd: list[str], *, cwd: str | None = None, input: str | None = None
         except OSError:
             job.close()
             job = None
+    exceeded = False
     def finish(rc: int, out: str, err: str, timed_out: bool = False) -> ProcResult:
         res = ProcResult(rc, out or "", err or "", timed_out,
                          wall_s=round(time.perf_counter() - t0, 4))
+        res.output_limit_exceeded = exceeded
         if job is not None:
             res.cpu_s, res.peak_mb = job.usage()
         elif ru0 is not None:
             ru1 = resource.getrusage(resource.RUSAGE_CHILDREN)
             res.cpu_s = (ru1.ru_utime - ru0.ru_utime) + (ru1.ru_stime - ru0.ru_stime)
-            res.peak_mb = ru1.ru_maxrss / (2**20 if sys.platform == "darwin" else 2**10)
+            # POSIX exposes a cumulative child-process high-water mark, not a
+            # per-child value. Reporting it as this run's peak is misleading.
+            res.peak_mb = None
         if res.cpu_s is not None:
             res.cpu_s = round(res.cpu_s, 4)
         if res.peak_mb is not None:
@@ -165,7 +171,31 @@ def run_tree(cmd: list[str], *, cwd: str | None = None, input: str | None = None
 
     try:
         try:
-            out, err = proc.communicate(input=input, timeout=timeout)
+            deadline = None if timeout is None else t0 + timeout
+            pending_input = input
+            while True:
+                wait = 0.1 if output_cap_bytes is not None else None
+                if deadline is not None:
+                    remaining = deadline - time.perf_counter()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(cmd, timeout)
+                    wait = remaining if wait is None else min(wait, remaining)
+                try:
+                    out, err = proc.communicate(input=pending_input, timeout=wait)
+                    break
+                except subprocess.TimeoutExpired as exc:
+                    pending_input = None
+                    out, err = exc.output or "", exc.stderr or ""
+                    if output_cap_bytes is not None and output_dir is not None:
+                        from pathlib import Path
+                        disk_bytes = sum(p.stat().st_size for p in Path(output_dir).rglob("*")
+                                         if p.is_file())
+                        captured_bytes = len(out.encode("utf-8")) + len(err.encode("utf-8"))
+                        if disk_bytes + captured_bytes > output_cap_bytes:
+                            exceeded = True
+                            _kill_tree(proc, job)
+                            out, err = proc.communicate()
+                            return finish(-1, out, err)
             return finish(proc.returncode, out, err)
         except subprocess.TimeoutExpired:
             _kill_tree(proc, job)

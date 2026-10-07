@@ -27,3 +27,13 @@ def test_normal_completion_returns_output():
     res = run_tree([sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"],
                    input="hello", timeout=60)
     assert res.returncode == 0 and res.stdout.strip() == "HELLO" and not res.timed_out
+
+
+def test_output_cap_terminates_a_still_running_tree(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    child = ("import pathlib, sys, time; p=pathlib.Path(sys.argv[1]) / 'large.bin'; "
+             "f=p.open('wb'); f.write(b'x' * 200000); f.flush(); time.sleep(5)")
+    res = run_tree([sys.executable, "-c", child, str(out)], timeout=10,
+                   output_dir=str(out), output_cap_bytes=100000)
+    assert res.output_limit_exceeded and res.returncode == -1

@@ -84,6 +84,10 @@ def _print_steps(steps) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # User objectives may contain characters outside the active Windows code
+    # page. Escape those characters instead of crashing the status command.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="backslashreplace")
     ap = argparse.ArgumentParser(prog="autolab", description="Autonomous Research Lab")
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("init").add_argument("lab")

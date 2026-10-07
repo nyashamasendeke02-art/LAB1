@@ -47,12 +47,18 @@ autolab new ./lab "Investigate whether X can produce Y"
 autolab run ./lab                # runs until COMPLETE, HALTED, or an approval gate
 autolab status ./lab
 autolab approvals ./lab
+autolab ui ./lab                 # local dashboard at http://127.0.0.1:8765
 autolab approve ./lab APR-0001 --note "pre-registration OK"
 autolab run ./lab
 autolab trace ./lab CON-0001     # conclusion → result → run → commit/protocol/env/prompts
 autolab verify ./lab             # ledger hash chain + artifact integrity
 autolab resume ./lab PRJ-0001 --note "fixed backend"   # after HALTED
 ```
+
+The local dashboard shows project state and pending approval gates, lets you
+create research or engineering projects, and records human approval decisions
+in the ledger. It binds only to a loopback address and does not start or control
+an active queue; use `autolab run` or `autolab queue` to advance work.
 
 Backends: `claude-cli` (Claude Code headless), `codex-cli` (Codex CLI; also
 used read-only as the ChatGPT scientist via your ChatGPT login), and

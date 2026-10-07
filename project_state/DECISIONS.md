@@ -211,3 +211,8 @@
   as failures. Test: test_network_errors_wait_briefly_and_are_not_failures.
 - D47 (2026-10-06, claude-code): all lab waits (usage limit, network, autopilot polling) sleep by the wall clock,
   so they end on time after the PC wakes (F8). The sleeping queue process was restarted (no agent was running).
+- D48 (2026-10-06, human: "Finish up the web interface"): `autolab ui LAB` local dashboard committed
+  (src/autolab/web.py, dashboard.html, docs/USER_INTERFACE.md; the draft was found uncommitted in the tree).
+  Finished with: Host-header check against DNS rebinding (421), refusal of ledger writes while an agent
+  call is in flight (would trip the tamper check and HALT), stale-dispatch handling (>2 h = abandoned;
+  robolab had one, TASK-0017), titled/collapsible task specs, and 8 tests (tests/test_web.py).

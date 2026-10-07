@@ -8,6 +8,7 @@
     autolab run LAB [PRJ] [--max-steps N]  advance autonomously until done/blocked/halted
     autolab step LAB [PRJ]                 advance one state-machine action
     autolab status LAB                     projects, states, pending approvals
+    autolab ui LAB                         local project and approval dashboard
     autolab approvals LAB                  list pending approval gates
     autolab approve LAB APR-0001 [--note] [--as NAME]  gate decision (human, or a
                                            delegate named in lab.toml; delegates need --note)
@@ -114,6 +115,10 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--max-steps", type=int, default=500)
     sub.add_parser("status").add_argument("lab")
     sub.add_parser("approvals").add_argument("lab")
+    p = sub.add_parser("ui", help="open a local web dashboard for a lab")
+    p.add_argument("lab")
+    p.add_argument("--host", default="127.0.0.1", help="loopback IP address (default: 127.0.0.1)")
+    p.add_argument("--port", type=int, default=8765)
     for name in ("approve", "reject"):
         p = sub.add_parser(name)
         p.add_argument("lab")
@@ -163,7 +168,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     lab = Lab(a.lab)
-    if a.cmd == "new":
+    if a.cmd == "ui":
+        from .web import DashboardServer
+        DashboardServer(lab, a.host, a.port).serve_forever()
+    elif a.cmd == "new":
         pid = Controller(lab, agents={}).new_project(a.objective, _refs(a.refs))
         print(pid)
     elif a.cmd == "task":

@@ -1,0 +1,24 @@
+# G1-6 split (F9), prepared 2026-10-06. Used only if PRJ-0013 (the combined G1-6) HALTs or is
+# superseded: then these two tasks replace G1-6 in docs/gates/gate1_queue.toml, in this order.
+
+[[task]]
+id = "G1-6a"
+refs = ["Gate 1", "REQ-MHS", "REQ-SAFE+", "ADR-003"]
+spec = """G1-6a Body-agnostic Safety Kernel (D41) and latency liveness (APR-0004), on Puck2D only. The kernel v1.2 assumes a point mass whose actions are Cartesian forces. Replace that assumption with a model read only from the MHS safety envelope, with no body-specific branches in src/safety: per world axis the kernel uses declared bounds (max speed, max acceleration magnitude, guaranteed braking deceleration) and the observed position/velocity to bound the next position (p + v*dt +/- 0.5*a_max*dt^2) and the stopping distance (v^2 / (2*a_brake)); actions are checked against the MHS actuator limits. The braking safe action is declared in the MHS as a kind: `oppose_velocity` (force-actuated bodies: opposing force at the limit, as v1.2) or `fixed` (a declared action vector). Puck2D's MHS declares a_max = a_brake = force limit / mass, so its behaviour is unchanged. Latency liveness: v1.2 treats the force in flight during the declared actuator latency as an unknown worst case, so a body with latency >= 0.5 s cannot move; model the in-flight action from the kernel's own recent actuated-command history (worst case only before the first command and after a restart). The MHS safety envelope also gains `external_disturbances` (a list of named disturbance kinds the body may experience, e.g. "impulse") which the kernel's guarantee explicitly does not cover; document this in docs/mhs.md. Bump KERNEL_VERSION and MHS_VERSION. Do not add Car2D in this task."""
+accept = [
+  "src/safety contains no body-specific code: a static test fails on any body name or body_class branch in src/safety.",
+  "All existing Safety Kernel tests (G0-3, G1-3, G1-5) still pass, with Puck2D behaviour unchanged.",
+  "A test kernel built from a hand-written MHS with a `fixed` safe action and declared bounds keeps a bounded-acceleration point inside the workspace (property test).",
+  "Puck2D with actuator_tau = 1.0 s can reach at least half of the workspace extent while never leaving it (property test, no external disturbances).",
+]
+
+[[task]]
+id = "G1-6b"
+refs = ["Gate 1", "REQ-MHS", "REQ-NAV", "REQ-SIM", "H5"]
+spec = """G1-6b Car2D: a second body (RC-car-like) behind the same MHS and the body-agnostic kernel from G1-6a. In `src/simulation/car2d.py`, implement a deterministic kinematic-bicycle car (wheelbase, max steering angle and rate, throttle/brake force, speed limit, rolling resistance) in the same 2D world and task format as Puck2D (goals, obstacles, disturbances: slippery patches, impulses, payload change), implementing the runner's Environment protocol and publishing an MHS. Rules (F9): (1) every actuator latency the MHS declares is actually simulated as that dead time; (2) the MHS bounds (speed, acceleration, braking deceleration, in world axes) must hold for the car's own controlled motion, including slippery patches and payload changes within declared ranges; (3) impulses are listed in the MHS `external_disturbances`, which the kernel's guarantee does not cover; (4) the braking safe action is `fixed` (throttle 0, full brake, steering unchanged). Every random draw comes from the passed numpy Generator. Do not modify src/safety; adding Car2D must need no brain-package changes."""
+accept = [
+  "Same seed + same actions give bit-identical trajectories.",
+  "Physics sanity: turning radius matches wheelbase and steering angle; no sideways motion without slip; a declared latency delays the effect of a command by that time.",
+  "The G1-2 harness runs Car2D unchanged.",
+  "The Safety Kernel built from Car2D's MHS keeps the car inside the workspace over seeded random commands without impulses (property test); the same kernel code passes the Puck2D property tests.",
+]

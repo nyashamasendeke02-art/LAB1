@@ -33,3 +33,9 @@
   overnight. Fixed (D47): waits are wall-clock based (30 s naps against a time.time() deadline) in autolab and
   the autopilot. Also found: commit 6e4c0c6 broke scripts/autopilot.py (a newline escape became a literal line
   break via a heredoc); fixed and now compiled before commit.
+- F9 (2026-10-06): robolab G1-6 (PRJ-0013) failed verification 3 times and went to REDESIGN (16:04), then the
+  redesign build hit the 30-min agent timeout. The verifier's findings were real spec gaps, not sloppy code:
+  (1) Car2D published an actuator dead time in its MHS but did not simulate it; (2) declared impulse
+  disturbances can exceed the MHS speed limits the kernel relies on. Lesson: the G1-6 spec did not say how
+  external disturbances relate to the MHS bounds, and the task (car sim + kernel rewrite + latency liveness)
+  is too large for one 30-minute engineer call.

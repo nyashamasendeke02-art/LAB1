@@ -42,9 +42,13 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress (2026-10-06 03:55)
-- [ ] robolab Gate 1 queue (restarted 09:58 after the PC-sleep stall, F8/D47): G1-2..G1-5 DONE. G1-6 Car2D +
-      body-agnostic kernel RUNNING as PRJ-0013 (engineer working); then G1-7, G1-8. G1-6 stops at a safety review.
-      Waits now survive PC sleep (D47); network blips no longer count as failures (D46).
+- [ ] robolab Gate 1 queue (restarted 09:58): G1-2..G1-5 DONE. G1-6 (PRJ-0013) in REDESIGN after 3 failed
+      verifications (F9: spec gaps on disturbances vs MHS bounds; task too large); waiting out Claude limits.
+      If it HALTs: raise robolab engineer timeout to 3600 s (only while no queue runs: lab.toml is
+      integrity-checked), split G1-6 into G1-6a (body-agnostic kernel on Puck2D, latency liveness) and G1-6b
+      (Car2D: declared latency is simulated; MHS bounds hold for the plant excluding declared external
+      disturbances, which the MHS lists and the kernel guarantee excludes; safety property tests run without
+      impulses), and resubmit.
 - [ ] AUTOPILOT not running. Unattended reviews need headless sessions without approval prompts; Claude Code
       will not configure that itself (classifier: Create Unsafe Agents). The human may make the one-line change
       in scripts/autopilot.py (see the 2026-10-06 conversation) and start it; until then reviews are interactive.

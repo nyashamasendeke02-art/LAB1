@@ -3,8 +3,8 @@ import sys
 
 import pytest
 
-from autolab.agents import (Agent, ClaudeCLIBackend, CodexCLIBackend, OpenAIBackend,
-                            BackendError, ScriptedBackend, make_backend)
+from autolab.agents import (Agent, ClaudeCLIBackend, CodexCLIBackend, GeminiCLIBackend,
+                            FallbackBackend, OpenAIBackend, BackendError, ScriptedBackend, make_backend)
 from autolab.messages import (ProtocolError, TaskPacket, extract_json, validate_completion,
                               validate_protocol)
 from autolab.taxonomy import Role, check_label_change, validate_claim
@@ -146,8 +146,65 @@ def test_openai_backend_requires_key(monkeypatch):
 def test_make_backend():
     assert isinstance(make_backend({"backend": "claude-cli"}), ClaudeCLIBackend)
     assert isinstance(make_backend({"backend": "codex-cli"}), CodexCLIBackend)
+    assert isinstance(make_backend({"backend": "gemini-cli"}), GeminiCLIBackend)
+    assert isinstance(make_backend({"backend": "gemini"}), GeminiCLIBackend)
     with pytest.raises(ValueError):
         make_backend({"backend": "gpt-telepathy"})
+
+
+def test_gemini_backend_commands_and_output():
+    t_ro = TaskPacket("T", Role.SCIENTIST, "design", "o", writable=False)
+    t_rw = TaskPacket("T", Role.VERIFIER, "verify", "o", writable=True)
+    gemini = GeminiCLIBackend(model="gemini-3.8-flash-high")
+    ro = gemini.command(t_ro)
+    assert ro[:3] == ["agy", "--output-format", "json"]
+    assert "--mode" in ro and ro[ro.index("--mode") + 1] == "plan"
+    assert "--model" in ro and ro[ro.index("--model") + 1] == "gemini-3.8-flash-high"
+    assert "--dangerously-skip-permissions" not in ro
+
+    rw = gemini.command(t_rw)
+    assert "--mode" in rw and rw[rw.index("--mode") + 1] == "accept-edits"
+    assert "--dangerously-skip-permissions" in rw
+
+    # Output parsing
+    assert GeminiCLIBackend.parse_output(0, json.dumps({"status": "SUCCESS", "response": '{"ans": 1}'}), "") == '{"ans": 1}'
+    with pytest.raises(BackendError, match="quota exceeded"):
+        GeminiCLIBackend.parse_output(1, json.dumps({"status": "ERROR", "error": "quota exceeded"}), "")
+
+
+def test_fallback_backend():
+    # Primary succeeds
+    primary = ScriptedBackend({"design": lambda t: '{"res": "primary"}'})
+    backup = ScriptedBackend({"design": lambda t: '{"res": "backup"}'})
+    fb = FallbackBackend(primary, backup)
+    task = TaskPacket("T", Role.SCIENTIST, "design", "o")
+    assert fb.invoke(task, "p") == '{"res": "primary"}'
+
+    # Primary hits usage limit -> fallback to backup
+    def fail_with_limit(t):
+        raise BackendError("hit your usage limit: upgrade to plus to continue")
+    primary_failing = ScriptedBackend({"design": fail_with_limit})
+    fb2 = FallbackBackend(primary_failing, backup, cooldown_s=100)
+    assert fb2.invoke(task, "p") == '{"res": "backup"}'
+    assert fb2.describe()["primary_backend"] == "scripted"
+    assert fb2.describe()["backup_backend"] == "scripted"
+
+    # Subsequent call within cooldown bypasses failing primary
+    assert fb2.invoke(task, "p") == '{"res": "backup"}'
+
+
+def test_make_backend_with_backup():
+    spec = {
+        "backend": "codex-cli",
+        "model": "gpt-6-luna",
+        "backup_backend": "gemini-cli",
+        "backup_model": "gemini-3.8-flash-high",
+    }
+    b = make_backend(spec)
+    assert isinstance(b, FallbackBackend)
+    assert isinstance(b.primary, CodexCLIBackend)
+    assert isinstance(b.backup, GeminiCLIBackend)
+    assert b.backup.model == "gemini-3.8-flash-high"
 
 
 def test_validity_checks_must_bind_to_protocol_conditions_and_metrics():

@@ -42,10 +42,10 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress (2026-10-06 03:55)
-- [ ] robolab Gate 1 PAUSED 20:32 (F10): Codex (verifier + scientist) is out of usage until 2026-11-03 on the
-      user's ChatGPT plan. G1-6 (PRJ-0013) redesign built (84f6a44) and tests passed; it waits at adversarial
-      review. Resume with `autolab queue labs/robolab docs/gates/gate1_queue.toml` once a verifier backend is
-      available (human decision: ChatGPT Plus, a Claude-based verifier, or wait). Split plan for G1-6 ready:
+- [ ] robolab Gate 1 in progress (D50): Codex kept as primary; Gemini (gemini-3.8-flash-high via
+      gemini-cli / agy) configured as automatic backup on usage limit. G1-6 (PRJ-0013) redesign built
+      (84f6a44) and tests passed; waiting at adversarial review. Resuming with
+      `autolab queue labs/robolab docs/gates/gate1_queue.toml`. Split plan for G1-6 also ready:
       docs/gates/g1_6_split.toml.
 - [ ] AUTOPILOT not running. Unattended reviews need headless sessions without approval prompts; Claude Code
       will not configure that itself (classifier: Create Unsafe Agents). The human may make the one-line change

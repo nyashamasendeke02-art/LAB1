@@ -14,12 +14,14 @@ name = "autolab"
 # (e.g. "docs/MANDATE.md").
 charter = ""
 
-# Role -> backend. backends: "codex-cli", "claude-cli", "openai-api".
+# Role -> backend. backends: "codex-cli", "claude-cli", "gemini-cli", "openai-api".
+# Optional backup_backend and backup_model provide automatic fallback when primary limits hit.
 # The scientist (ChatGPT) defaults to the Codex CLI in read-only mode, which
 # authenticates with your ChatGPT login. Use backend = "openai-api" with
 # model = "..." and OPENAI_API_KEY in the environment to call the API instead.
 [agents.scientist]
 backend = "codex-cli"
+# backup_backend = "gemini-cli"
 # model = ""
 
 [agents.engineer]

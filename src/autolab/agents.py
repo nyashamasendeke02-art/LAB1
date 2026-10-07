@@ -13,6 +13,7 @@ Default role -> backend mapping (configurable in lab.toml):
 from __future__ import annotations
 
 import re
+import time
 
 import json
 import os
@@ -37,7 +38,7 @@ class BackendError(Exception):
 
 _USAGE_LIMIT = re.compile(
     r"hit your (?:\w+ )?limit|usage limit|rate[ _-]?limit|quota exceeded|too many requests"
-    r"|\b429\b", re.IGNORECASE)
+    r"|upgrade to plus|try again at|\b429\b", re.IGNORECASE)
 
 
 _TRANSIENT_NETWORK = re.compile(
@@ -263,15 +264,133 @@ class OpenAIBackend(AgentBackend):
         return "\n".join(texts)
 
 
-def make_backend(spec: dict) -> AgentBackend:
+def _make_single_backend(spec: dict) -> AgentBackend:
     kind = spec.get("backend")
     if kind == "claude-cli":
         return ClaudeCLIBackend(model=spec.get("model"), timeout=spec.get("timeout", 1800))
     if kind == "codex-cli":
         return CodexCLIBackend(model=spec.get("model"), timeout=spec.get("timeout", 1800))
+    if kind in ("gemini-cli", "gemini", "agy-cli"):
+        return GeminiCLIBackend(model=spec.get("model"), timeout=spec.get("timeout", 1800),
+                                effort=spec.get("effort"))
     if kind == "openai-api":
         return OpenAIBackend(model=spec["model"], api_key_env=spec.get("api_key_env", "OPENAI_API_KEY"))
     raise ValueError(f"unknown backend {kind!r}")
+
+
+class GeminiCLIBackend(AgentBackend):
+    """Google Gemini / Antigravity CLI (``agy``) in headless mode.
+
+    Hermetic: slash commands disabled; mode is 'accept-edits' for writable tasks
+    and 'plan' (read-only) for read-only tasks.
+    """
+
+    HERMETIC = ["--disable-slash-commands"]
+
+    name = "gemini-cli"
+
+    def __init__(self, model: str | None = None, timeout: float = 1800,
+                 effort: str | None = None):
+        self.model = model
+        self.timeout = timeout
+        self.effort = effort
+
+    def command(self, task: TaskPacket) -> list[str]:
+        cmd = ["agy", "--output-format", "json", *self.HERMETIC]
+        if task.writable:
+            cmd += ["--mode", "accept-edits", "--dangerously-skip-permissions"]
+        else:
+            cmd += ["--mode", "plan"]
+        if self.model:
+            cmd += ["--model", self.model]
+        if self.effort:
+            cmd += ["--effort", self.effort]
+        return cmd
+
+    def invoke(self, task: TaskPacket, prompt: str) -> str:
+        with tempfile.TemporaryDirectory() as td:
+            workdir = task.workdir or td
+            proc = _run(self.command(task), cwd=workdir, stdin=prompt, timeout=self.timeout)
+            return self.parse_output(proc.returncode, proc.stdout, proc.stderr)
+
+    @staticmethod
+    def parse_output(returncode: int, stdout: str, stderr: str) -> str:
+        try:
+            data = json.loads(stdout)
+        except json.JSONDecodeError:
+            data = None
+        if isinstance(data, dict):
+            if returncode != 0 or data.get("status") in ("ERROR", "FAILED"):
+                detail = data.get("error") or data.get("response") or stderr
+                raise BackendError(f"gemini exited {returncode}: {str(detail)[:2000]}".strip())
+            return data.get("response", "")
+        if returncode != 0:
+            raise BackendError(f"gemini exited {returncode}: stderr={stderr[-1500:]!r} "
+                               f"stdout={stdout[-1500:]!r}")
+        return stdout
+
+
+class FallbackBackend(AgentBackend):
+    """Wraps a primary backend and automatically falls back to a backup backend on usage limits.
+
+    If the primary hits a usage limit, quota exhaustion or rate limit, it switches
+    to the backup backend and sets a cooldown timer on the primary so subsequent calls
+    do not waste time waiting for a known-exhausted quota. Once the cooldown expires,
+    it automatically attempts the primary backend again.
+    """
+
+    def __init__(self, primary: AgentBackend, backup: AgentBackend, cooldown_s: float = 900.0):
+        self.primary = primary
+        self.backup = backup
+        self.cooldown_s = cooldown_s
+        self._primary_limited_until: float = 0.0
+        self.active: AgentBackend = primary
+        self.name = primary.name
+        self.model = primary.model
+
+    def describe(self) -> dict:
+        desc = self.active.describe()
+        desc["primary_backend"] = self.primary.name
+        desc["backup_backend"] = self.backup.name
+        return desc
+
+    def invoke(self, task: TaskPacket, prompt: str) -> str:
+        now = time.time()
+        if now < self._primary_limited_until:
+            self.active = self.backup
+            return self.backup.invoke(task, prompt)
+
+        try:
+            self.active = self.primary
+            return self.primary.invoke(task, prompt)
+        except BackendError as exc:
+            if is_usage_limit(exc) or any(phrase in str(exc).lower() for phrase in (
+                "usage limit", "rate limit", "upgrade to plus", "quota exceeded", "too many requests", "429"
+            )):
+                self._primary_limited_until = time.time() + self.cooldown_s
+                sys.stderr.write(
+                    f"\n[autolab] Primary backend {self.primary.name} usage limit hit: {exc}\n"
+                    f"[autolab] Automatically falling back to backup backend {self.backup.name}...\n"
+                )
+                self.active = self.backup
+                return self.backup.invoke(task, prompt)
+            raise
+
+
+def make_backend(spec: dict) -> AgentBackend:
+    primary = _make_single_backend(spec)
+    backup_kind = spec.get("backup_backend") or spec.get("backup")
+    if backup_kind:
+        backup_spec = {
+            "backend": backup_kind,
+            "model": spec.get("backup_model"),
+            "timeout": spec.get("backup_timeout", spec.get("timeout", 1800)),
+            "effort": spec.get("backup_effort"),
+        }
+        backup = _make_single_backend(backup_spec)
+        cooldown_s = float(spec.get("backup_cooldown_s", 900.0))
+        return FallbackBackend(primary, backup, cooldown_s=cooldown_s)
+    return primary
 
 
 # --------------------------------------------------------------------- agent

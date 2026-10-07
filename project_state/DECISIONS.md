@@ -224,3 +224,4 @@
   SPA (hash routes), light/dark design system, command palette and keyboard shortcuts, diff viewer, pipeline
   stepper, accessible markup. Still stdlib-only and loopback-only. 13 tests (tests/test_web.py); every view
   checked in headless Edge via the DevTools protocol with no page errors.
+- D50 (2026-10-06, human: "keep codex and let gemini bcome backup"): Gemini CLI backend (`gemini-cli` via `agy`) and `FallbackBackend` added to autolab (`src/autolab/agents.py`). The controller attempts the primary backend (Codex) first; upon detecting a quota or usage limit (`is_usage_limit` / "upgrade to plus" / 429), it sets a cooldown window and automatically falls back to Gemini (`gemini-3.8-flash-high`) without halting or charging a stage failure. Configured in `labs/robolab/lab.toml` for both verifier and scientist. Tests added to `tests/test_messages_and_agents.py`.

@@ -1,51 +1,58 @@
-# LAB1 dashboard
+# Autolab control room (local web dashboard)
 
-Start the local dashboard for a lab with:
+Start it for a lab and open the printed address:
 
 ```powershell
-autolab ui .\lab
+.venv\Scripts\autolab.exe ui labs\robolab        # http://127.0.0.1:8765/
 ```
 
-Then open `http://127.0.0.1:8765/`. Change the port with `--port`; `--host` may
-select another loopback IP address, but the server rejects non-loopback
-addresses. Stop it with Ctrl+C.
+`--port` changes the port; `--host` may pick another loopback address (non-loopback is
+refused). Stop it with Ctrl+C. The queue log shown on the Overview is read from
+`<lab>-run.log` next to the lab folder when it exists.
 
-The dashboard reads project and approval state from the lab's existing SQLite
-ledger. It can create research and engineering projects, show recent
-project-ledger events, and approve or reject pending gates as the human user.
-Those decisions use the same `Gates` API as the CLI and are recorded in the
-append-only ledger.
+## Views
 
-The operations panels show configured scientist, engineer, verifier and
-optional reviewer roles; backend and model; currently dispatched work; and
-the latest task outcome. Recent task calls expose the stored task packet,
-validated response, protocol rejections and errors. These are ledger/handoff
-indicators, not live provider health probes. Future research questions appear
-with their stored priority; Autolab's current rule selects the lowest numeric
-priority first. The dashboard also lists study protocols with their status,
-freeze state/hash, conditions, seeds, metrics and decision rule.
+| View | What it shows |
+|---|---|
+| **Overview** | Alerts (blocked agents with a readable reason, unresolved halts, waiting approvals); counters; **gate progress board** (each gate's tasks, newest attempt per task); the active task with a **live pipeline stepper** (spec → implementing → testing → adversarial review → merge → merged) and its review/patch/redesign/test counts; the task-queue log; agents; recent ledger activity |
+| **Projects** | Searchable, filterable table (state, kind, free text). A project page has tabs: overview (spec, acceptance criteria, facts, deliveries, gate decisions), pipeline timeline, verifier reviews with findings by severity, failures, agent calls (each opens the task packet and validated response) and its ledger events |
+| **Approvals** | Waiting review gates; each opens a per-file colored diff, context and the decision form (a note is required; you confirm before it is recorded) |
+| **Agents** | Each role's backend and model, status, call counts, a strip of recent call outcomes, and the last error in plain words (raw error expandable) |
+| **Activity** | The tamper-evident ledger, newest first, filterable by event type |
 
-Autolab does not currently assign priority to agent calls or engineering
-projects. The dashboard labels research-question priority separately rather
-than inventing those missing fields.
+Keyboard: **Ctrl+K** search and commands (jump to any project, approval or view), **/** search
+projects, **g o / g p / g a / g g / g e** go to overview, projects, approvals, agents, activity,
+**n** new project, **Esc** closes panels. Light and dark themes follow the system setting; the
+sidebar button switches and remembers the choice.
 
-The first version is a monitor and gate-review surface. It does not run or stop
-projects or queues; use `autolab run` or `autolab queue` for execution. This
-avoids introducing a second controller loop that could race a CLI queue.
+## How it stays current
 
-The server binds only to localhost, uses a per-process request token for state
-changes, checks same-origin browser requests, and does not enable CORS. It adds
-no runtime dependency and is launched with `autolab ui <lab>`.
+The page holds one Server-Sent Events connection (`/api/stream`). The server announces when the
+ledger head or the queue log changes and the page reloads its data; it does not re-render while
+you are typing a note or have a dialog open. The sidebar shows **Live** when connected and the
+result of a ledger hash-chain verification.
 
-Safety rules (D48):
+## Architecture (D49)
 
-- **DNS rebinding:** every request must be addressed to `127.0.0.1`, `localhost` or `[::1]`
-  (the `Host` header); a page on another hostname that resolves to loopback gets `421`.
-- **No writes during agent work:** approving a gate or creating a project is refused while
-  an agent call is in flight. The controller treats any ledger change during an agent call as
-  possible tampering and would HALT the project. A dispatch with no result after 2 hours is
-  treated as abandoned by a stopped controller, not as running.
-- **Decisions made here are recorded as the human's** (`decided_by = "human"`), so only the
-  human should use the approval buttons; delegated reviews by Claude Code use the CLI with
-  `--as claude-code` and evidence in the note.
-- Long task specs show their first sentence as the title; click the text to expand it.
+- **Backend** (`src/autolab/web.py`, standard library only): `ThreadingHTTPServer` with a
+  per-thread `Lab` (SQLite connections are per thread); JSON API: `/api/overview`,
+  `/api/projects[/<id>]`, `/api/approvals[/<id>]`, `/api/agents`, `/api/activity`,
+  `/api/tasks/<id>`, `/api/stream`; `/api/state` kept for v1 clients.
+- **Frontend** (`src/autolab/web/index.html`, `app.css`, `app.js`): dependency-free ES module,
+  hash routing, design tokens for both themes, ARIA roles and visible focus, reduced-motion
+  support, responsive layout. All content is built with DOM APIs and `textContent`, never
+  `innerHTML`, so ledger text cannot inject markup.
+
+## Safety rules
+
+- **Loopback only**, and every request must be addressed to `127.0.0.1`, `localhost` or `[::1]`
+  (`Host` check against DNS rebinding; others get `421`).
+- **Strict Content-Security-Policy**: scripts and styles only from the dashboard itself, no inline
+  code; plus `nosniff`, `no-referrer`, same-origin opener/resource policies.
+- **Writes** (create a project, record a gate decision) need the per-process token and a
+  same-origin request, and are refused while an agent call is in flight: the controller treats
+  any ledger change during an agent call as possible tampering and would HALT the project. A
+  dispatch with no result after 2 hours counts as abandoned, not running.
+- **Decisions made here are the human's** (`decided_by = "human"`) and need a note. Delegated
+  reviews by Claude Code use the CLI with `--as claude-code`.
+- The dashboard never starts or stops agents or queues; use `autolab run` / `autolab queue`.

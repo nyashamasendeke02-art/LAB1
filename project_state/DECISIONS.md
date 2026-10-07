@@ -216,3 +216,11 @@
   Finished with: Host-header check against DNS rebinding (421), refusal of ledger writes while an agent
   call is in flight (would trip the tamper check and HALT), stale-dispatch handling (>2 h = abandoned;
   robolab had one, TASK-0017), titled/collapsible task specs, and 8 tests (tests/test_web.py).
+- D49 (2026-10-06, human: "Update the user interface to state of the art in UI, UX, backend"): dashboard v2.
+  Backend: ThreadingHTTPServer with per-thread Lab, richer JSON API (overview with gate board, alerts, queue
+  log, ledger verification; project detail with pipeline/reviews/failures/calls/events; approval with diff;
+  agents with readable error classification; activity), Server-Sent Events for live updates, strict CSP (no
+  inline code) and security headers, required note for human decisions. Frontend: dependency-free ES module
+  SPA (hash routes), light/dark design system, command palette and keyboard shortcuts, diff viewer, pipeline
+  stepper, accessible markup. Still stdlib-only and loopback-only. 13 tests (tests/test_web.py); every view
+  checked in headless Edge via the DevTools protocol with no page errors.

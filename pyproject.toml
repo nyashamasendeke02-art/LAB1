@@ -20,7 +20,7 @@ autolab = "autolab.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-autolab = ["dashboard.html"]
+autolab = ["web/*.html", "web/*.js", "web/*.css"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

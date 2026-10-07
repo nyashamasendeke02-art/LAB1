@@ -1,0 +1,576 @@
+// Autolab control room (D49). Vanilla ES module, no dependencies, no innerHTML with data:
+// every node is built with h() and text goes through textContent, so ledger content can
+// never inject markup. Live updates come from the server's SSE stream (/api/stream).
+
+const TOKEN = document.querySelector('meta[name="autolab-token"]').content;
+const $ = (id) => document.getElementById(id);
+
+// ------------------------------------------------------------------ DOM helper
+function h(tag, attrs = {}, ...children) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "text") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "dataset") Object.assign(el.dataset, v);
+    else el.setAttribute(k, v === true ? "" : String(v));
+  }
+  for (const c of children.flat(Infinity)) {
+    if (c === null || c === undefined || c === false) continue;
+    el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  }
+  return el;
+}
+
+// ------------------------------------------------------------------ formatting
+const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+function ago(iso) {
+  if (!iso) return "";
+  const s = (new Date(iso).getTime() - Date.now()) / 1000;
+  const units = [["year", 31536000], ["month", 2592000], ["day", 86400], ["hour", 3600], ["minute", 60]];
+  for (const [u, n] of units) if (Math.abs(s) >= n) return rtf.format(Math.round(s / n), u);
+  return "just now";
+}
+const absTime = (iso) => (iso ? new Date(iso).toLocaleString() : "");
+function time(iso) { return h("time", { datetime: iso, title: absTime(iso), class: "when", text: ago(iso) }); }
+const human = (s) => String(s ?? "").replaceAll("_", " ").toLowerCase();
+const STATE_CLASS = {
+  COMPLETE: "b-ok", MERGED: "b-ok", approved: "b-ok", completed: "b-ok", complete: "b-ok", needs_review: "b-warn", pass: "b-ok", PASSED: "b-ok",
+  HALTED: "b-bad", rejected: "b-bad", error: "b-bad", fail: "b-bad", ESCALATED: "b-bad",
+  ENGINEERING: "b-info", IMPLEMENTING: "b-info", TESTING: "b-info", ADVERSARIAL_REVIEW: "b-violet",
+  REDESIGN: "b-warn", pending: "b-warn", working: "b-info", blocked: "b-warn", usage_limit: "b-warn",
+  network: "b-warn", timeout: "b-bad", idle: "", failed: "b-bad",
+};
+function badge(value, extra = "") {
+  const v = String(value ?? "");
+  return h("span", { class: `badge ${STATE_CLASS[v] ?? ""} ${extra}`, text: human(v) });
+}
+
+// ------------------------------------------------------------------ API
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    method: opts.method || "GET",
+    headers: { "Content-Type": "application/json", "X-Autolab-Token": TOKEN },
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+    cache: "no-store",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+// ------------------------------------------------------------------ toasts
+function toast(msg, kind = "") {
+  const t = h("div", { class: `toast ${kind}`, role: kind === "bad" ? "alert" : "status", text: msg });
+  $("toasts").append(t);
+  setTimeout(() => t.remove(), kind === "bad" ? 7000 : 3800);
+}
+
+// ------------------------------------------------------------------ theme
+function applyTheme(t) {
+  const theme = t || localStorage.getItem("autolab-theme") ||
+    (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  document.documentElement.dataset.theme = theme;
+  $("theme-btn").textContent = theme === "dark" ? "☀ Light theme" : "☾ Dark theme";
+}
+$("theme-btn")?.addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  localStorage.setItem("autolab-theme", next);
+  applyTheme(next);
+});
+
+// ------------------------------------------------------------------ state + router
+const store = { overview: null, projects: null, agents: null, approvals: null, activity: null };
+let route = { name: "overview", id: null, tab: null };
+let renderSeq = 0;
+
+function parseRoute() {
+  const parts = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean).map(decodeURIComponent);
+  const name = parts[0] || "overview";
+  return { name, id: parts[1] || null, tab: parts[2] || null };
+}
+function go(path) { location.hash = path; }
+
+async function loadCore() {
+  store.overview = await api("/api/overview");
+  const o = store.overview;
+  $("lab-name").textContent = o.lab;
+  document.title = `${o.counts.approvals ? `(${o.counts.approvals}) ` : ""}Autolab · ${o.lab}`;
+  $("nav-projects").textContent = o.counts.projects || "";
+  $("nav-approvals").textContent = o.counts.approvals || "";
+  const blocked = o.agents.filter((a) => a.status === "blocked").length;
+  $("nav-agents").textContent = blocked ? `${blocked} blocked` : "";
+  const l = o.ledger;
+  $("ledger-dot").className = `dot ${l.ok ? "ok" : "bad"}`;
+  $("ledger-text").textContent = l.ok ? `Ledger verified · ${l.events} events` : "Ledger verification FAILED";
+  $("ledger-text").title = l.ok ? `head ${l.head}` : l.error;
+}
+
+async function render() {
+  const seq = ++renderSeq;
+  route = parseRoute();
+  document.querySelectorAll("#nav a").forEach((a) =>
+    a.classList.toggle("active", a.dataset.route === route.name) || a.removeAttribute("aria-current"));
+  document.querySelector(`#nav a[data-route="${route.name}"]`)?.setAttribute("aria-current", "page");
+  const view = $("view");
+  if (!view.childElementCount) view.append(skeleton());
+  try {
+    await loadCore();
+    const node = await (VIEWS[route.name] || VIEWS.overview)(route);
+    if (seq !== renderSeq) return; // a newer render started
+    const scroll = window.scrollY;
+    view.replaceChildren(node);
+    window.scrollTo(0, scroll);
+  } catch (err) {
+    if (seq !== renderSeq) return;
+    view.replaceChildren(h("div", { class: "empty", text: `Could not load: ${err.message}` }));
+  }
+}
+function skeleton() {
+  return h("div", {}, h("div", { class: "skel" }), h("div", { class: "skel" }), h("div", { class: "skel" }));
+}
+
+// ------------------------------------------------------------------ shared pieces
+function pageHead(title, sub, ...actions) {
+  return h("div", { class: "page-head" },
+    h("div", {}, h("h1", { text: title }), sub ? h("p", { text: sub }) : null),
+    actions.length ? h("div", { class: "actions" }, actions) : null);
+}
+function card(title, sub, ...body) {
+  return h("section", { class: "card" },
+    title ? h("div", { class: "card-head" }, h("h2", { text: title }), sub ? (sub instanceof Node ? sub : h("span", { class: "sub", text: sub })) : null) : null,
+    body);
+}
+function kpi(label, value, cls = "") {
+  return h("div", { class: `card kpi ${cls}` }, h("span", { class: "label", text: label }), h("span", { class: "value", text: value }));
+}
+function stepper(pipeline, current, done = false) {
+  const idx = pipeline.indexOf(current);
+  return h("div", { class: "stepper", role: "list", "aria-label": "Engineering pipeline" },
+    pipeline.map((s, i) => h("div", {
+      class: `step ${done || i < idx ? "done" : i === idx ? "current" : ""}`, role: "listitem",
+      "aria-current": i === idx && !done ? "step" : null,
+    }, h("div", { class: "bar" }), h("div", { text: human(s) }))));
+}
+function alertBox(a) {
+  const icon = { error: "!", warn: "!", info: "i" }[a.level] || "i";
+  return h("div", { class: `alert ${a.level}`, role: a.level === "error" ? "alert" : null },
+    h("span", { class: "icon", text: icon }),
+    h("div", {}, h("div", { class: "title", text: a.title }), a.detail ? h("div", { class: "detail", text: a.detail, title: a.detail }) : null),
+    a.project ? h("a", { href: `#/projects/${a.project}`, text: "Open" }) : h("span"));
+}
+function logView(lines) {
+  return h("pre", { class: "code log", "aria-label": "Queue log" }, lines.map((ln) => h("span", {
+    class: /waiting/.test(ln) ? "l-wait" : /ERROR|HALTED|timed out/.test(ln) ? "l-err"
+      : /COMPLETE|passed|approved/.test(ln) ? "l-ok" : /^(---|===|QUEUE)/.test(ln) ? "l-head" : "",
+    text: ln + "\n",
+  })));
+}
+
+// ------------------------------------------------------------------ views
+const VIEWS = {};
+
+VIEWS.overview = async () => {
+  const o = store.overview;
+  const c = o.counts;
+  const out = h("div", {});
+  out.append(pageHead("Overview", "The lab at a glance: gates, live work, agents and anything that needs you.",
+    h("button", { class: "primary", onclick: newProjectDialog, text: "New project" })));
+  if (o.alerts.length) out.append(h("div", { class: "alerts" }, o.alerts.map(alertBox)));
+  out.append(h("div", { class: "grid kpis" },
+    kpi("Active projects", c.active, c.active ? "attn" : ""), kpi("Awaiting your decision", c.approvals, c.approvals ? "attn" : ""),
+    kpi("Agents working", c.agents_working), kpi("Delivered", c.deliveries), kpi("Halted", c.halted, c.halted ? "bad" : "")));
+  const left = h("div", { class: "stack" });
+  const right = h("div", { class: "stack" });
+
+  // gate board
+  const gates = h("div", { class: "gates" }, o.gates.length ? o.gates.map((g) => {
+    const done = g.tasks.filter((t) => t.state === "COMPLETE").length;
+    const bar = h("span"); bar.style.width = `${Math.round((done / Math.max(1, g.tasks.length)) * 100)}%`;
+    return h("div", { class: "gate-row" },
+      h("div", { class: "gate-label" }, `Gate ${g.gate}`, h("span", { class: "muted", text: `${done}/${g.tasks.length} done` }),
+        h("div", { class: "gate-progress", role: "progressbar", "aria-valuenow": done, "aria-valuemax": g.tasks.length }, bar)),
+      h("div", { class: "gate-tasks" }, g.tasks.map((t) => h("button", {
+        class: `gate-task ${t.state === "COMPLETE" ? "done" : t.state === "HALTED" ? "halt" : "live"}`,
+        onclick: () => go(`/projects/${t.project}`), title: t.title,
+      }, h("span", { class: "k", text: t.key }), h("span", { class: "s", text: t.state === "COMPLETE" ? "complete" : human(t.eng_state || t.state) })))));
+  }) : h("div", { class: "empty", text: "No gate tasks yet." }));
+  left.append(card("Gate progress", "engineering tasks tagged with a gate", gates));
+
+  // active work
+  for (const p of o.active) {
+    const e = p.eng;
+    left.append(card(`${p.key || p.id} · in progress`, h("a", { href: `#/projects/${p.id}`, text: "Details →" }),
+      h("div", { class: "prose", text: p.title }),
+      e ? [stepper(o.pipeline, e.state === "REDESIGN" ? "IMPLEMENTING" : e.state),
+        h("div", { class: "metrics" },
+          [["Review rounds", e.review_round], ["Patches", e.patch_attempts], ["Redesigns", e.redesigns], ["Test runs", e.test_runs]]
+            .map(([l, v]) => h("div", { class: "metric" }, h("b", { text: v }), h("span", { text: l }))))] : badge(p.state)));
+  }
+  if (!o.active.length) left.append(card("Active work", null, h("div", { class: "empty", text: "Nothing in progress." })));
+
+  // queue
+  const q = o.queue;
+  if (q.log) {
+    left.append(card("Task queue", q.running ? badge("working") : badge(q.running === false ? "idle" : "unknown"),
+      q.last_result ? h("p", { class: "muted small", text: q.last_result }) : null, logView(q.lines.slice(-18))));
+  }
+
+  // approvals + agents + activity
+  right.append(card("Awaiting your decision", o.approvals.length ? `${o.approvals.length}` : null,
+    o.approvals.length ? h("div", { class: "list" }, o.approvals.map((a) => h("div", { class: "item" },
+      badge(a.gate, "plain"), h("div", {}, h("a", { href: `#/approvals/${a.id}`, text: a.id }), " ", h("span", { class: "muted", text: a.summary })), time(a.at))))
+      : h("div", { class: "empty", text: "Nothing waiting. Gates that need a review appear here." })));
+  right.append(card("Agents", h("a", { href: "#/agents", text: "All →" }), h("div", { class: "list" }, o.agents.map((a) => h("div", { class: "item" },
+    h("div", { class: `avatar av-${a.role}`, text: a.role[0].toUpperCase(), "aria-hidden": "true" }),
+    h("div", {}, h("b", { text: a.role }), h("div", { class: "agent-meta", text: `${a.backend}${a.model ? ` · ${a.model}` : ""}` })),
+    badge(a.status === "blocked" ? a.error_kind : a.status))))));
+  right.append(card("Recent activity", h("a", { href: "#/activity", text: "All →" }), feed(o.activity)));
+  out.append(h("div", { class: "grid two" }, left, right));
+  return out;
+};
+
+function feed(events) {
+  return h("div", { class: "list feed" }, events.map((e) => h("div", { class: "item" },
+    h("span", { class: "type-pill", text: e.type }),
+    h("div", { class: "what" }, subjectLink(e.subject), " ", h("span", { class: "muted", text: `${e.brief ? `· ${e.brief} ` : ""}by ${e.actor}` })),
+    time(e.ts))));
+}
+function subjectLink(id) {
+  if (/^PRJ-/.test(id)) return h("a", { href: `#/projects/${id}`, text: id });
+  if (/^APR-/.test(id)) return h("a", { href: `#/approvals/${id}`, text: id });
+  if (/^TASK-/.test(id)) return h("a", { href: "#", onclick: (ev) => { ev.preventDefault(); openTask(id); }, text: id });
+  return h("span", { class: "mono", text: id });
+}
+
+// ---------- projects
+const filters = { q: "", state: "all", kind: "all" };
+VIEWS.projects = async (r) => {
+  if (r.id) return projectDetail(r.id, r.tab);
+  const projects = await api("/api/projects");
+  const out = h("div", {}, pageHead("Projects", "Every research and engineering project in this lab.",
+    h("button", { class: "primary", onclick: newProjectDialog, text: "New project" })));
+  const body = h("tbody");
+  const search = h("input", { type: "search", placeholder: "Search id, task or text…  ( / )", value: filters.q, "aria-label": "Search projects",
+    oninput: (ev) => { filters.q = ev.target.value; draw(); } });
+  search.id = "project-search";
+  const chip = (group, value, label) => h("button", { class: "chip", "aria-pressed": String(filters[group] === value),
+    onclick: (ev) => { filters[group] = value; ev.target.parentElement.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c === ev.target))); draw(); }, text: label });
+  out.append(h("div", { class: "toolbar" }, search,
+    h("div", { class: "chips", role: "group", "aria-label": "State" }, chip("state", "all", "All"), chip("state", "active", "Active"), chip("state", "COMPLETE", "Complete"), chip("state", "HALTED", "Halted")),
+    h("div", { class: "chips", role: "group", "aria-label": "Kind" }, chip("kind", "all", "Any kind"), chip("kind", "engineering", "Engineering"), chip("kind", "research", "Research"))));
+  const table = h("table", { class: "table" }, h("thead", {}, h("tr", {}, ["Project", "Task", "Title", "State", "Stage", "Updated"].map((t) => h("th", { text: t })))), body);
+  const count = h("p", { class: "muted small" });
+  out.append(card(null, null, table, count));
+  function draw() {
+    const q = filters.q.trim().toLowerCase();
+    const rows = projects.filter((p) => (filters.state === "all" || (filters.state === "active" ? !["COMPLETE", "HALTED"].includes(p.state) : p.state === filters.state))
+      && (filters.kind === "all" || p.kind === filters.kind)
+      && (!q || `${p.id} ${p.key || ""} ${p.objective}`.toLowerCase().includes(q)));
+    body.replaceChildren(...rows.map((p) => h("tr", { class: "click", tabindex: "0", onclick: () => go(`/projects/${p.id}`), onkeydown: (ev) => ev.key === "Enter" && go(`/projects/${p.id}`) },
+      h("td", {}, h("span", { class: "mono", text: p.id })), h("td", {}, h("span", { class: "mono", text: p.key || "—" })),
+      h("td", { class: "title-cell" }, p.title, h("span", { class: "muted", text: p.kind })),
+      h("td", {}, badge(p.state)), h("td", {}, p.eng ? badge(p.eng.state) : h("span", { class: "muted", text: "—" })), h("td", {}, time(p.updated_at)))));
+    if (!rows.length) body.replaceChildren(h("tr", {}, h("td", { colspan: "6" }, h("div", { class: "empty", text: "No projects match these filters." }))));
+    count.textContent = `${rows.length} of ${projects.length} projects`;
+  }
+  draw();
+  return out;
+};
+
+async function projectDetail(id, tab) {
+  const p = await api(`/api/projects/${encodeURIComponent(id)}`);
+  tab = tab || "overview";
+  const out = h("div", {});
+  out.append(h("div", { class: "crumbs" }, h("a", { href: "#/projects", text: "Projects" }), ` / ${p.id}`));
+  const shownTitle = p.key && p.title.startsWith(p.key) ? p.title : `${p.key ? `${p.key} · ` : ""}${p.title}`;
+  out.append(pageHead(shownTitle, null, badge(p.state), p.eng ? badge(p.eng.state) : null));
+  const tabs = [["overview", "Overview"], ["pipeline", "Pipeline", p.eng_history.length], ["reviews", "Reviews", p.reviews.length],
+    ["failures", "Failures", p.failures.length], ["calls", "Agent calls", p.tasks.length], ["events", "Ledger", p.events.length]];
+  out.append(h("div", { class: "tabs", role: "tablist" }, tabs.map(([k, label, n]) => h("button", {
+    role: "tab", "aria-selected": String(k === tab), onclick: () => go(`/projects/${p.id}/${k}`) }, label, n ? h("span", { class: "n", text: n }) : null))));
+  const panel = h("div", { role: "tabpanel" });
+  out.append(panel);
+  if (tab === "overview") {
+    panel.append(h("div", { class: "grid two" },
+      h("div", { class: "stack" },
+        p.eng ? card("Pipeline", p.eng.id, stepper(p.pipeline, p.eng.state === "REDESIGN" ? "IMPLEMENTING" : p.eng.state, p.state === "COMPLETE"),
+          h("div", { class: "metrics" }, [["Review rounds", p.eng.review_round], ["Patches", p.eng.patch_attempts], ["Redesigns", p.eng.redesigns], ["Test runs", p.eng.test_runs]]
+            .map(([l, v]) => h("div", { class: "metric" }, h("b", { text: v }), h("span", { text: l }))))) : null,
+        p.halt_reason ? h("div", { class: "alert error" }, h("span", { class: "icon", text: "!" }), h("div", {}, h("div", { class: "title", text: "Halted" }), h("div", { class: "prose small", text: p.halt_reason })), h("span")) : null,
+        card("Specification", null, h("div", { class: "prose", text: p.objective })),
+        p.acceptance_criteria.length ? card("Acceptance criteria", null, h("ol", {}, p.acceptance_criteria.map((a) => h("li", { class: "prose", text: a })))) : null),
+      h("div", { class: "stack" },
+        card("Facts", null, h("div", { class: "list" },
+          [["Kind", p.kind], ["Cycle", p.cycle], ["Created", absTime(p.created_at)], ["Updated", absTime(p.updated_at)], ["Branch", p.eng?.branch], ["Head", p.eng?.head?.slice(0, 12)]]
+            .filter(([, v]) => v !== undefined && v !== null && v !== "")
+            .map(([k, v]) => h("div", { class: "item" }, h("span", { class: "muted", text: k }), h("span", { class: "mono", text: v }), h("span"))))),
+        p.mandate_refs.length ? card("Mandate references", null, h("div", { class: "tags" }, p.mandate_refs.map((m) => h("span", { class: "tag", text: m })))) : null,
+        p.deliveries.length ? card("Deliveries", null, h("div", { class: "list" }, p.deliveries.map((d) => h("div", { class: "item" }, badge("MERGED"), h("span", { class: "mono", text: `${d.id} · ${String(d.commit).slice(0, 12)}` }), time(d.at))))) : null,
+        p.approvals.length ? card("Gate decisions", null, h("div", { class: "list" }, p.approvals.map((a) => h("div", { class: "item" }, badge(a.status), h("div", {}, h("a", { href: `#/approvals/${a.id}`, text: `${a.id} · ${a.gate}` }), h("div", { class: "muted small", text: a.decided_by ? `by ${a.decided_by}` : "" })), time(a.at))))) : null)));
+  } else if (tab === "pipeline") {
+    panel.append(card("Engineering transitions", null, p.eng_history.length ? h("ol", { class: "timeline" }, p.eng_history.slice().reverse().map((t) => h("li", {
+      class: t.to === "MERGED" ? "ok" : ["REDESIGN", "ESCALATED"].includes(t.to) ? "bad" : "" },
+      h("div", { class: "t", text: `${human(t.from)} → ${human(t.to)}` }), h("div", { class: "r", text: `${t.eng} · ${t.reason || ""}` })))) : h("div", { class: "empty", text: "No transitions yet." })));
+  } else if (tab === "reviews") {
+    panel.append(p.reviews.length ? h("div", { class: "stack" }, p.reviews.map((r) => card(`${r.id} · round ${r.round ?? "?"}`, h("span", { class: "row" }, badge(r.verdict), time(r.at)),
+      h("p", { class: "muted small", text: `${human(r.type)} · commit ${String(r.commit || "").slice(0, 12)} · tests ${r.tests_passed ? "passed" : "not passed"}` }),
+      (r.findings || []).length ? r.findings.map(findingView) : h("p", { class: "muted", text: "No findings." }))))
+      : h("div", { class: "empty", text: "No reviews yet." }));
+  } else if (tab === "failures") {
+    panel.append(card(null, null, p.failures.length ? h("div", { class: "list" }, p.failures.map((f) => h("div", { class: "item" },
+      badge(f.category), h("div", { class: "prose small", text: f.summary }), time(f.at)))) : h("div", { class: "empty", text: "No failures recorded." })));
+  } else if (tab === "calls") {
+    panel.append(card(null, null, p.tasks.length ? h("table", { class: "table" }, h("thead", {}, h("tr", {}, ["Call", "Role", "Stage", "Outcome", "When"].map((t) => h("th", { text: t })))),
+      h("tbody", {}, p.tasks.map((t) => h("tr", { class: "click", tabindex: "0", onclick: () => openTask(t.id), onkeydown: (ev) => ev.key === "Enter" && openTask(t.id) },
+        h("td", {}, h("span", { class: "mono", text: t.id })), h("td", { text: t.role }), h("td", { text: human(t.stage) }),
+        h("td", {}, badge(t.error_kind || t.status)), h("td", {}, time(t.at)))))) : h("div", { class: "empty", text: "No agent calls yet." })));
+  } else if (tab === "events") {
+    panel.append(card(null, null, feed(p.events.slice().reverse().map((e) => ({ ...e, brief: (e.data && (e.data.reason || (e.data.to && `${e.data.from} → ${e.data.to}`) || e.data.stage)) || "" })))));
+  }
+  return out;
+}
+
+function findingView(f) {
+  if (typeof f === "string") return h("div", { class: "finding" }, h("div", { class: "prose", text: f }));
+  const sev = String(f.severity || f.level || "note").toLowerCase();
+  return h("div", { class: `finding ${sev}` },
+    h("div", { class: "row start wrap" }, h("span", { class: `badge ${sev === "critical" || sev === "major" ? "b-bad" : sev === "minor" ? "b-warn" : "b-info"}`, text: sev })),
+    h("div", { class: "prose", text: f.description || f.summary || JSON.stringify(f) }),
+    f.location || f.file ? h("div", { class: "loc", text: f.location || f.file }) : null);
+}
+
+// ---------- approvals
+VIEWS.approvals = async (r) => {
+  if (r.id) return approvalDetail(r.id);
+  const list = await api("/api/approvals");
+  const out = h("div", {}, pageHead("Approvals", "Review gates waiting for a decision. Decisions made here are recorded in the ledger as yours."));
+  out.append(list.length ? h("div", { class: "grid cards" }, list.map((a) => h("section", { class: "card" },
+    h("div", { class: "card-head" }, h("h2", { text: a.id }), badge("pending")),
+    h("p", { text: a.summary }), h("div", { class: "tags" }, badge(a.gate, "plain"), a.project ? h("a", { href: `#/projects/${a.project}`, class: "tag", text: a.project }) : null),
+    h("p", { class: "muted small", text: `${(a.files || []).length} file(s) · requested ${ago(a.at)}` }),
+    h("button", { class: "primary", onclick: () => go(`/approvals/${a.id}`), text: "Review" }))))
+    : h("div", { class: "empty", text: "No approvals waiting. When the lab reaches a safety or contracts gate, it appears here." }));
+  return out;
+};
+
+function parseDiff(text) {
+  const files = [];
+  let cur = null;
+  for (const line of String(text || "").split("\n")) {
+    const m = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
+    if (m) { cur = { name: m[2], lines: [], add: 0, del: 0 }; files.push(cur); continue; }
+    if (!cur) { cur = { name: "(diff)", lines: [], add: 0, del: 0 }; files.push(cur); }
+    if (line.startsWith("+") && !line.startsWith("+++")) cur.add++;
+    else if (line.startsWith("-") && !line.startsWith("---")) cur.del++;
+    cur.lines.push(line);
+  }
+  return files;
+}
+function diffView(text) {
+  const files = parseDiff(text);
+  if (!files.length) return h("div", { class: "empty", text: "No diff stored for this approval." });
+  return h("div", {}, files.map((f, i) => h("details", { class: "diff-file", open: i < 3 },
+    h("summary", {}, h("span", { text: f.name }), h("span", { class: "stat" }, h("span", { class: "a", text: `+${f.add}` }), " ", h("span", { class: "d", text: `−${f.del}` }))),
+    h("pre", { class: "diff" }, f.lines.map((ln) => h("span", {
+      class: `ln ${ln.startsWith("@@") ? "hunk" : ln.startsWith("+") && !ln.startsWith("+++") ? "add" : ln.startsWith("-") && !ln.startsWith("---") ? "del" : /^(index|\+\+\+|---|new file|deleted file)/.test(ln) ? "meta" : ""}`,
+      text: ln || " " }))))));
+}
+
+async function approvalDetail(id) {
+  const a = await api(`/api/approvals/${encodeURIComponent(id)}`);
+  const out = h("div", {});
+  out.append(h("div", { class: "crumbs" }, h("a", { href: "#/approvals", text: "Approvals" }), ` / ${a.id}`));
+  out.append(pageHead(`${a.id} · ${a.gate}`, a.summary, badge(a.status)));
+  const left = h("div", { class: "stack" }, card("Changes under review", `${(a.files || []).length} file(s)`, diffView(a.diff)));
+  const right = h("div", { class: "stack" });
+  right.append(card("Context", null, h("div", { class: "list" },
+    [["Subject", a.subject], ["Project", a.project], ["Requested", absTime(a.at)]].filter(([, v]) => v).map(([k, v]) =>
+      h("div", { class: "item" }, h("span", { class: "muted", text: k }), k === "Project" ? h("a", { href: `#/projects/${v}`, text: v }) : h("span", { class: "mono", text: v }), h("span")))),
+    (a.files || []).length ? h("div", { class: "tags" }, a.files.map((f) => h("span", { class: "tag mono", text: f }))) : null));
+  if (a.status === "pending") {
+    const note = h("textarea", { id: "decision-note", placeholder: "What did you check? (required; stored in the ledger)", maxlength: "2000", required: true });
+    const decide = async (approved) => {
+      if (!note.value.trim()) { note.focus(); toast("Add a note saying what you checked.", "bad"); return; }
+      const ok = await confirmDialog(approved ? "Approve this gate?" : "Reject this gate?",
+        `${a.id} will be recorded as ${approved ? "approved" : "rejected"} by you (the human) in the tamper-evident ledger. This cannot be undone.`,
+        approved ? "Approve" : "Reject", approved ? "ok" : "bad");
+      if (!ok) return;
+      try { const res = await api(`/api/approvals/${encodeURIComponent(a.id)}`, { method: "POST", body: { approved, note: note.value } });
+        toast(`${res.id} ${res.status}`, "ok"); go("/approvals"); } catch (err) { toast(err.message, "bad"); }
+    };
+    right.append(card("Your decision", null, h("label", {}, "Review note", note),
+      h("p", { class: "muted small", text: "Recorded as decided_by = human. The lab resumes the next time its queue runs." }),
+      h("div", { class: "actions" }, h("button", { class: "ok", onclick: () => decide(true), text: "Approve" }), h("button", { class: "bad", onclick: () => decide(false), text: "Reject" }))));
+  } else {
+    right.append(card("Decision", null, h("p", {}, badge(a.status), ` by ${a.decided_by || "?"}`), a.note ? h("div", { class: "prose small", text: a.note }) : null));
+  }
+  out.append(h("div", { class: "grid two" }, left, right));
+  return out;
+}
+
+// ---------- agents
+VIEWS.agents = async () => {
+  const agents = await api("/api/agents");
+  const out = h("div", {}, pageHead("Agents", "Who does the work, on which backend, and how their recent calls went."));
+  out.append(h("div", { class: "grid cards" }, agents.map((a) => h("section", { class: "card" },
+    h("div", { class: "agent-top" }, h("div", { class: `avatar av-${a.role}`, text: a.role[0].toUpperCase(), "aria-hidden": "true" }),
+      h("div", {}, h("h2", { class: "", text: a.role[0].toUpperCase() + a.role.slice(1) }), h("div", { class: "agent-meta", text: `${a.backend}${a.model ? ` · ${a.model}` : " · default model"}` })),
+      h("div", { class: "actions" }, badge(a.status === "blocked" ? a.error_kind : a.status))),
+    h("div", { class: "metrics" }, [["Calls", a.calls], ["Completed", a.completed], ["Errors", a.errors]].map(([l, v]) => h("div", { class: "metric" }, h("b", { text: v }), h("span", { text: l })))),
+    h("div", { class: "spark", "aria-label": "Recent calls, oldest to newest" }, a.recent.slice().reverse().map((t) => h("span", { class: `s-${t.status} k-${t.error_kind || ""}`, title: `${t.id} · ${t.stage} · ${t.error_kind || t.status} · ${absTime(t.at)}` }))),
+    a.active ? h("p", { class: "small" }, "Working on ", subjectLink(a.active.task), ` (${human(a.active.stage)}) since ${ago(a.active.since)}`) : null,
+    a.error_message ? h("div", { class: `alert ${a.error_kind === "usage_limit" || a.error_kind === "network" ? "warn" : "error"}` },
+      h("span", { class: "icon", text: "!" }), h("div", {}, h("div", { class: "title", text: `Last call failed · ${human(a.error_kind)}` }), h("div", { class: "prose small", text: a.error_message })), h("span")) : null,
+    a.error ? h("details", {}, h("summary", { class: "small muted", text: "Raw error" }), h("pre", { class: "code", text: a.error })) : null,
+    a.last_task ? h("p", { class: "muted small" }, "Last call ", subjectLink(a.last_task.id), ` · ${human(a.last_task.stage)} · ${ago(a.last_task.at)}`) : null))));
+  return out;
+};
+
+// ---------- activity
+VIEWS.activity = async () => {
+  const events = await api("/api/activity?limit=300");
+  const types = [...new Set(events.map((e) => e.type))].sort();
+  const out = h("div", {}, pageHead("Activity", "The lab's tamper-evident ledger, newest first."));
+  let chosen = "all";
+  const list = h("div");
+  const draw = () => list.replaceChildren(feed(events.filter((e) => chosen === "all" || e.type === chosen)));
+  const select = h("select", { "aria-label": "Event type", onchange: (ev) => { chosen = ev.target.value; draw(); } },
+    h("option", { value: "all", text: "All event types" }), types.map((t) => h("option", { value: t, text: t })));
+  select.style.maxWidth = "260px";
+  out.append(h("div", { class: "toolbar" }, select), card(null, null, list));
+  draw();
+  return out;
+};
+
+// ------------------------------------------------------------------ drawers & dialogs
+async function openTask(id) {
+  const drawer = $("drawer");
+  drawer.hidden = false;
+  drawer.replaceChildren(skeleton());
+  try {
+    const t = await api(`/api/tasks/${encodeURIComponent(id)}`);
+    const r = t.result || {};
+    drawer.replaceChildren(
+      h("div", { class: "row" }, h("h2", { text: `${t.id} · ${t.packet.role} · ${human(t.packet.stage)}` }), h("button", { class: "ghost", onclick: closeDrawer, "aria-label": "Close", text: "✕" })),
+      h("div", { class: "row start wrap" }, badge(r.error_kind || r.status), r.backend ? h("span", { class: "agent-meta", text: `${r.backend.backend || ""} ${r.backend.model || ""}` }) : null, r.attempts ? h("span", { class: "muted small", text: `${r.attempts} attempt(s)` }) : null),
+      r.summary ? card("Summary", null, h("div", { class: "prose", text: r.summary })) : null,
+      r.error ? card("Error", null, h("pre", { class: "code", text: r.error })) : null,
+      (r.rejections || []).length ? card("Protocol rejections", null, h("pre", { class: "code", text: r.rejections.join("\n\n") })) : null,
+      card("Task packet", null, h("pre", { class: "code", text: JSON.stringify(t.packet, null, 2) })),
+      t.completion ? card("Validated completion", null, h("pre", { class: "code", text: JSON.stringify(t.completion, null, 2) })) : null);
+    drawer.querySelector("button")?.focus();
+  } catch (err) { drawer.replaceChildren(h("p", { text: err.message }), h("button", { onclick: closeDrawer, text: "Close" })); }
+}
+function closeDrawer() { $("drawer").hidden = true; }
+
+function confirmDialog(title, body, okLabel, okClass) {
+  return new Promise((resolve) => {
+    const m = $("modal");
+    const done = (v) => { m.close(); resolve(v); };
+    m.replaceChildren(h("div", { class: "modal-body" }, h("h2", { text: title }), h("p", { class: "muted", text: body })),
+      h("div", { class: "modal-actions" }, h("button", { onclick: () => done(false), text: "Cancel" }), h("button", { class: okClass, onclick: () => done(true), text: okLabel })));
+    m.onclose = () => resolve(false);
+    m.showModal();
+  });
+}
+
+function newProjectDialog() {
+  const m = $("modal");
+  const kind = h("select", { id: "np-kind" }, h("option", { value: "research", text: "Research: investigate a question" }), h("option", { value: "engineering", text: "Engineering: build to a spec" }));
+  const objective = h("textarea", { id: "np-objective", maxlength: "4000", placeholder: "e.g. Investigate whether X can produce Y", required: true });
+  const accept = h("textarea", { id: "np-accept", placeholder: "One criterion per line" });
+  const acceptWrap = h("label", {}, "Acceptance criteria", h("span", { class: "hint", text: "Engineering projects need at least one." }), accept);
+  acceptWrap.hidden = true;
+  const refs = h("input", { id: "np-refs", placeholder: "Gate 2, REQ-WM" });
+  kind.addEventListener("change", () => { acceptWrap.hidden = kind.value !== "engineering"; });
+  const submit = async () => {
+    const body = { kind: kind.value, objective: objective.value, refs: refs.value.split(",").map((x) => x.trim()).filter(Boolean) };
+    if (kind.value === "engineering") body.acceptance = accept.value.split("\n").map((x) => x.trim()).filter(Boolean);
+    try { const res = await api("/api/projects", { method: "POST", body }); m.close(); toast(`${res.id} created`, "ok"); go(`/projects/${res.id}`); }
+    catch (err) { toast(err.message, "bad"); }
+  };
+  m.replaceChildren(h("div", { class: "modal-body" }, h("h2", { text: "New project" }),
+    h("p", { class: "muted small", text: "Creates the project in the ledger. Run it with `autolab run` or a queue; the dashboard does not start agents." }),
+    h("label", {}, "Type", kind), h("label", {}, "Objective", objective), acceptWrap, h("label", {}, "Mandate references", h("span", { class: "hint", text: "Optional, comma-separated" }), refs)),
+    h("div", { class: "modal-actions" }, h("button", { onclick: () => m.close(), text: "Cancel" }), h("button", { class: "primary", onclick: submit, text: "Create project" })));
+  m.showModal();
+  objective.focus();
+}
+
+// ------------------------------------------------------------------ command palette
+let paletteItems = [], paletteIndex = 0;
+async function openPalette() {
+  const dlg = $("palette"), input = $("palette-input");
+  const projects = store.projects || (store.projects = await api("/api/projects").catch(() => []));
+  const base = [
+    { label: "Overview", kind: "view", run: () => go("/overview") }, { label: "Projects", kind: "view", run: () => go("/projects") },
+    { label: "Approvals", kind: "view", run: () => go("/approvals") }, { label: "Agents", kind: "view", run: () => go("/agents") },
+    { label: "Activity", kind: "view", run: () => go("/activity") }, { label: "New project…", kind: "command", run: newProjectDialog },
+    { label: "Toggle theme", kind: "command", run: () => $("theme-btn").click() },
+    ...(store.overview?.approvals || []).map((a) => ({ label: `${a.id} · ${a.summary}`, kind: "approval", run: () => go(`/approvals/${a.id}`) })),
+    ...projects.map((p) => ({ label: `${p.id}${p.key ? ` · ${p.key}` : ""} · ${p.title}`, kind: human(p.state), run: () => go(`/projects/${p.id}`) })),
+  ];
+  const draw = () => {
+    const q = input.value.trim().toLowerCase();
+    paletteItems = base.filter((i) => !q || i.label.toLowerCase().includes(q)).slice(0, 40);
+    paletteIndex = Math.min(paletteIndex, Math.max(0, paletteItems.length - 1));
+    $("palette-list").replaceChildren(...paletteItems.map((it, i) => h("li", { role: "option", "aria-selected": String(i === paletteIndex),
+      onclick: () => { dlg.close(); it.run(); } }, h("span", { text: it.label }), h("span", { class: "kind", text: it.kind }))));
+  };
+  input.value = ""; paletteIndex = 0; draw();
+  input.oninput = () => { paletteIndex = 0; draw(); };
+  input.onkeydown = (ev) => {
+    if (ev.key === "ArrowDown") { paletteIndex = Math.min(paletteIndex + 1, paletteItems.length - 1); draw(); ev.preventDefault(); }
+    else if (ev.key === "ArrowUp") { paletteIndex = Math.max(paletteIndex - 1, 0); draw(); ev.preventDefault(); }
+    else if (ev.key === "Enter" && paletteItems[paletteIndex]) { dlg.close(); paletteItems[paletteIndex].run(); }
+  };
+  dlg.showModal(); input.focus();
+}
+$("palette-btn").addEventListener("click", openPalette);
+
+// ------------------------------------------------------------------ keyboard
+let gPending = false;
+document.addEventListener("keydown", (ev) => {
+  const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement?.tagName);
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") { ev.preventDefault(); openPalette(); return; }
+  if (ev.key === "Escape" && !$("drawer").hidden) { closeDrawer(); return; }
+  if (typing) return;
+  if (ev.key === "/") { const s = $("project-search"); if (s) { ev.preventDefault(); s.focus(); } else { ev.preventDefault(); go("/projects"); } return; }
+  if (gPending) {
+    gPending = false;
+    const map = { o: "/overview", p: "/projects", a: "/approvals", g: "/agents", e: "/activity" };
+    if (map[ev.key]) { go(map[ev.key]); ev.preventDefault(); }
+    return;
+  }
+  if (ev.key === "g") { gPending = true; setTimeout(() => (gPending = false), 900); }
+  if (ev.key === "n") newProjectDialog();
+});
+
+// ------------------------------------------------------------------ live updates (SSE)
+let refreshTimer = null;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(() => {
+    // Do not re-render under someone typing a note or filling a form.
+    const active = document.activeElement;
+    if ($("modal").open || $("palette").open || (active && ["TEXTAREA"].includes(active.tagName))) { scheduleRefresh(); return; }
+    store.projects = null;
+    render();
+  }, 500);
+}
+function connect() {
+  const es = new EventSource("/api/stream");
+  const set = (cls, text) => { $("live-dot").className = `dot ${cls}`; $("live-text").textContent = text; };
+  es.addEventListener("open", () => set("ok pulse", "Live"));
+  es.addEventListener("change", scheduleRefresh);
+  es.addEventListener("error", () => set("warn", "Reconnecting…"));
+}
+
+// ------------------------------------------------------------------ boot
+applyTheme();
+window.addEventListener("hashchange", () => { closeDrawer(); render(); $("main").focus({ preventScroll: true }); });
+render();
+connect();
+setInterval(() => document.querySelectorAll("time.when").forEach((t) => (t.textContent = ago(t.getAttribute("datetime")))), 30000);

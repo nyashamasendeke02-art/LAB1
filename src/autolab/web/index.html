@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="autolab-token" content="__AUTOLAB_TOKEN__">
+  <meta name="color-scheme" content="dark light">
+  <title>Autolab control room</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Primary">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">A</div>
+        <div><div class="brand-name">Autolab</div><div class="brand-lab" id="lab-name">loading…</div></div>
+      </div>
+      <nav class="nav" id="nav">
+        <a href="#/overview" data-route="overview"><span class="ico" aria-hidden="true">◎</span>Overview</a>
+        <a href="#/projects" data-route="projects"><span class="ico" aria-hidden="true">▤</span>Projects<span class="count" id="nav-projects"></span></a>
+        <a href="#/approvals" data-route="approvals"><span class="ico" aria-hidden="true">✓</span>Approvals<span class="count attn" id="nav-approvals"></span></a>
+        <a href="#/agents" data-route="agents"><span class="ico" aria-hidden="true">◈</span>Agents<span class="count warn" id="nav-agents"></span></a>
+        <a href="#/activity" data-route="activity"><span class="ico" aria-hidden="true">≋</span>Activity</a>
+      </nav>
+      <div class="sidebar-foot">
+        <div class="status-line"><span class="dot" id="live-dot"></span><span id="live-text">Connecting…</span></div>
+        <div class="status-line"><span class="dot" id="ledger-dot"></span><span id="ledger-text">Ledger</span></div>
+        <button class="ghost small" id="palette-btn" type="button" aria-keyshortcuts="Control+K">Search &amp; commands <kbd>Ctrl K</kbd></button>
+        <button class="ghost small" id="theme-btn" type="button">Theme</button>
+      </div>
+    </aside>
+    <main id="main" tabindex="-1">
+      <div id="view" aria-live="polite"></div>
+    </main>
+  </div>
+
+  <dialog id="palette" aria-label="Search and commands">
+    <input id="palette-input" type="search" placeholder="Jump to a project, approval, view or command…" autocomplete="off" aria-controls="palette-list">
+    <ul id="palette-list" role="listbox"></ul>
+    <div class="palette-hint"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close</div>
+  </dialog>
+
+  <dialog id="modal" aria-modal="true"></dialog>
+  <div id="drawer" class="drawer" role="complementary" aria-label="Details" hidden></div>
+  <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+</body>
+</html>

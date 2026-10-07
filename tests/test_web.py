@@ -129,3 +129,78 @@ def test_task_detail_rejects_path_tricks(ui):
     lab, server = ui
     assert call(server, "GET", "/api/tasks/..%2F..%2Flab.toml")[0] == 404
     assert call(server, "GET", "/api/tasks/TASK-0001")[0] == 404
+
+
+def test_assets_are_served_with_a_strict_csp(ui):
+    lab, server = ui
+    port = server.httpd.server_address[1]
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    for path, ctype in (("/", "text/html"), ("/assets/app.js", "text/javascript"),
+                        ("/assets/app.css", "text/css")):
+        conn.request("GET", path, headers={"Host": f"127.0.0.1:{port}"})
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 200 and resp.getheader("Content-Type").startswith(ctype)
+        csp = resp.getheader("Content-Security-Policy")
+        assert "script-src 'self'" in csp and "unsafe-inline" not in csp
+    conn.close()
+
+
+def test_overview_projects_and_detail(ui):
+    lab, server = ui
+    body = {"kind": "engineering", "objective": "G2-1 World Model. Build it.",
+            "acceptance": ["tests pass"], "refs": ["Gate 2"]}
+    pid = json.loads(call(server, "POST", "/api/projects", body, token=server.token)[1])["id"]
+    o = json.loads(call(server, "GET", "/api/overview")[1])
+    assert o["counts"]["projects"] == 1 and o["ledger"]["ok"] is True
+    assert o["gates"] == [{"gate": 2, "tasks": [{"key": "G2-1", "project": pid, "state": "ENGINEERING",
+                                                   "eng_state": "SPEC", "title": "G2-1 World Model."}]}]
+    detail = json.loads(call(server, "GET", f"/api/projects/{pid}")[1])
+    assert detail["key"] == "G2-1" and detail["acceptance_criteria"] == ["tests pass"]
+    assert call(server, "GET", "/api/projects/PRJ-9999")[0] == 404
+    assert json.loads(call(server, "GET", "/api/activity?limit=5")[1])
+
+
+def test_decision_needs_a_note(ui):
+    lab, server = ui
+    apr = Gates(lab.store).request("review:safety", "ENG-0001@abc", "safety review")
+    status, data = call(server, "POST", f"/api/approvals/{apr.id}",
+                        {"approved": True, "note": "  "}, token=server.token)
+    assert status == 400 and b"note" in data
+    assert lab.store.get(apr.id).data["status"] == "pending"
+    detail = json.loads(call(server, "GET", f"/api/approvals/{apr.id}")[1])
+    assert detail["status"] == "pending" and detail["diff"] == ""
+
+
+def test_live_stream_announces_ledger_changes(ui):
+    lab, server = ui
+    port = server.httpd.server_address[1]
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+    conn.request("GET", "/api/stream", headers={"Host": f"127.0.0.1:{port}"})
+    resp = conn.getresponse()
+    assert resp.getheader("Content-Type").startswith("text/event-stream")
+    def next_change() -> bytes:
+        for _ in range(40):  # retry line, events, heartbeats
+            line = resp.fp.readline()
+            if line.startswith(b"event: change"):
+                return resp.fp.readline()  # its data line
+        raise AssertionError("no change event")
+
+    first = next_change()  # initial state
+    Gates(lab.store).request("review:safety", "ENG-0002@abc", "another review")
+    second = next_change()  # pushed because the ledger head moved
+    assert first != second and b'"ledger"' in second
+    conn.close()
+
+
+def test_readable_error_and_favicon(ui):
+    from autolab.web import classify_error, readable_error
+    raw = ("BackendError: codex exited 1: stderr='...schema...\n```\n\nERROR: You've hit your usage "
+           "limit. Upgrade to Plus to continue using Codex, or try again at Nov 3rd, 2026 9:58 AM.\n'")
+    assert readable_error(raw).startswith("You've hit your usage limit.")
+    assert classify_error(raw) == "usage_limit"
+    assert classify_error("claude timed out after 1800s") == "timeout"
+    assert classify_error("API Error: Connection dropped (ECONNRESET)") == "network"
+    lab, server = ui
+    status, body = call(server, "GET", "/favicon.ico")
+    assert status == 200 and body.startswith(b"<svg")

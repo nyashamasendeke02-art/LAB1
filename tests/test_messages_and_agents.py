@@ -165,6 +165,8 @@ def test_gemini_backend_commands_and_output():
     rw = gemini.command(t_rw)
     assert "--mode" in rw and rw[rw.index("--mode") + 1] == "accept-edits"
     assert "--dangerously-skip-permissions" in rw
+    assert "--sandbox" in rw  # auto-approved tools run inside agy's terminal sandbox
+    assert "--sandbox" not in ro
 
     # Output parsing
     assert GeminiCLIBackend.parse_output(0, json.dumps({"status": "SUCCESS", "response": '{"ans": 1}'}), "") == '{"ans": 1}'

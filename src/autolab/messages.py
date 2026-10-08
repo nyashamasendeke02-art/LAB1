@@ -139,6 +139,39 @@ def _obj(required: list[str], props: dict) -> dict:
     return {"type": "object", "required": required, "properties": props}
 
 
+_KEY = {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,24}$"}
+QUALITY_REVIEW_SCHEMA = _obj(
+    ["verdict", "findings", "summary"],
+    {"verdict": {"enum": ["pass", "fail"]}, "summary": _nstr,
+     "findings": {"type": "array", "items": _issue}, "measurements": _strs})
+# A Research Director's unit of work: becomes a research project, or an engineering item that
+# the Engineering Director breaks into specialty tasks.
+WORK_ITEM_SCHEMA = {
+    "type": "object", "additionalProperties": False,
+    "required": ["key", "kind", "objective", "rationale"],
+    "properties": {
+        "key": _KEY, "kind": {"enum": ["research", "engineering"]},
+        "objective": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "acceptance_criteria": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "depends_on": {"type": "array", "items": _KEY},
+        "priority": {"type": "integer", "minimum": 1, "maximum": 99},
+        "rationale": {"type": "string", "minLength": 1},
+        "mandate_refs": {"type": "array", "items": {"type": "string"}},
+    },
+}
+ENG_TASK_SCHEMA = {
+    "type": "object", "additionalProperties": False,
+    "required": ["key", "specialty", "spec", "acceptance_criteria"],
+    "properties": {
+        "key": _KEY, "specialty": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,23}$"},
+        "spec": {"type": "string", "minLength": 1, "maxLength": 4000},
+        "acceptance_criteria": {"type": "array", "minItems": 1,
+                                "items": {"type": "string", "minLength": 1}},
+        "depends_on": {"type": "array", "items": _KEY},
+    },
+}
+
+
 STAGE_SCHEMAS: dict[str, dict] = {
     "define_problem": _obj(
         ["problem_statement", "scope"],
@@ -232,6 +265,60 @@ STAGE_SCHEMAS: dict[str, dict] = {
          "alternative_explanations": _strs, "requested_controls": _strs},
     ),
     "communicate": _obj(["summary"], {"summary": _nstr, "audience_notes": _str}),
+    # Hierarchical coordination (D54): programme-level stages.
+    "programme_plan": _obj(
+        ["plan_summary", "items"],
+        {"plan_summary": _nstr, "success_criteria": _strs,
+         "items": {"type": "array", "minItems": 1, "items": WORK_ITEM_SCHEMA}},
+    ),
+    "engineering_breakdown": _obj(
+        ["architecture_notes", "tasks"],
+        {"architecture_notes": _nstr,
+         "tasks": {"type": "array", "minItems": 1, "items": ENG_TASK_SCHEMA}},
+    ),
+    "programme_review": _obj(
+        ["decision", "assessment"],
+        {"decision": {"enum": ["continue", "replan", "complete", "escalate"]},
+         "assessment": _nstr, "blockers": _strs, "next_focus": _str,
+         "new_items": {"type": "array", "items": WORK_ITEM_SCHEMA},
+         "retry": _strs,
+         "dropped": {"type": "object", "additionalProperties": _nstr}},
+    ),
+    # Engineering workflow (D56).
+    "architecture": _obj(
+        ["architecture_summary", "components", "test_strategy", "implementation_plan"],
+        {"architecture_summary": _nstr,
+         "components": {"type": "array", "minItems": 1, "items": _obj(
+             ["name", "responsibility"],
+             {"name": _nstr, "responsibility": _nstr, "files": _strs, "interfaces": _strs})},
+         "data_flows": _strs,
+         "decisions": {"type": "array", "items": _obj(["decision", "rationale"],
+                                                      {"decision": _nstr, "rationale": _nstr})},
+         "risks": _strs, "test_strategy": _nstr,
+         "implementation_plan": {"type": "array", "minItems": 1, "items": _obj(
+             ["step"], {"step": _nstr, "files": _strs, "tests": _strs})},
+         "requirements_trace": {"type": "object", "additionalProperties": _strs}},
+    ),
+    "architecture_critique": _obj(
+        ["verdict", "issues"],
+        {"verdict": {"enum": ["approve", "revise"]},
+         "issues": {"type": "array", "items": _issue}, "required_changes": _strs},
+    ),
+    "security_review": QUALITY_REVIEW_SCHEMA,
+    "performance_review": QUALITY_REVIEW_SCHEMA,
+    # Research <-> engineering feedback (D55).
+    "observation_triage": _obj(
+        ["triage"],
+        {"triage": {"type": "array", "minItems": 1, "items": {
+            "type": "object", "additionalProperties": False,
+            "required": ["observation", "verdict", "rationale"],
+            "properties": {
+                "observation": _nstr,
+                "verdict": {"enum": ["research_question", "engineering_fix", "noise"]},
+                "rationale": _nstr, "question": _str,
+                "priority": {"type": "integer", "minimum": 1, "maximum": 99}}}},
+         "patterns": _strs},
+    ),
     "next_question": _obj(
         ["questions", "continue"],
         {"questions": {"type": "array",

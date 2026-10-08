@@ -70,7 +70,30 @@ STAGES: tuple[Stage, ...] = (
           "Adversarial challenge of results"),
     Stage("communicate", Role.SCIENTIST, "knowledge", False, False, "Report"),
     Stage("next_question", Role.SCIENTIST, "research", False, False, "Next research question"),
+    # Hierarchical coordination (D54): programme level.
+    Stage("programme_plan", Role.SCIENTIST, "coordination", False, False,
+          "Programme decomposition (Research Director)"),
+    Stage("engineering_breakdown", Role.ENGINEER, "coordination", False, True,
+          "Engineering breakdown into specialty tasks (Engineering Director)"),
+    Stage("programme_review", Role.SCIENTIST, "coordination", False, False,
+          "Programme review: progress, blockers, replanning (Research Director)"),
+    # Engineering workflow (D56).
+    Stage("architecture", Role.ENGINEER, "engineering", False, True,
+          "Machine-readable architecture and implementation plan"),
+    Stage("architecture_critique", Role.VERIFIER, "engineering", False, True,
+          "Architecture critique"),
+    Stage("security_review", Role.VERIFIER, "engineering", False, True,
+          "Security review before integration"),
+    Stage("performance_review", Role.VERIFIER, "engineering", False, True,
+          "Performance review before integration"),
+    # Research <-> engineering feedback (D55).
+    Stage("observation_triage", Role.SCIENTIST, "knowledge", False, False,
+          "Triage engineering failures into research questions"),
 )
+# Engineering stages that a specialty can route to a specialist agent ("build@ml").
+SPECIALTY_STAGES = ("implement", "redesign", "build", "rebuild")
+DEFAULT_SPECIALTIES = ("backend", "frontend", "ml", "algorithm", "data", "simulation", "safety",
+                       "infrastructure")
 STAGE_BY_NAME = {s.name: s for s in STAGES}
 
 # Backend capabilities (what a backend can do inside a task). Factories live in agents.py.
@@ -92,10 +115,16 @@ AGENT_KEYS = {"title", "charter", "backend", "model", "timeout", "effort", "api_
 # stages the controller runs. Applied with `autolab agents preset LAB organisation`.
 ORGANISATION = {
     "research_director": ("Research Director", Role.SCIENTIST,
-                          "You coordinate the research programme: turn the objective into a "
-                          "well-scoped problem, monitor progress across cycles and choose the "
-                          "next direction from evidence, not enthusiasm.",
-                          ["define_problem", "next_question"]),
+                          "You coordinate the research programme: decompose objectives into "
+                          "research and engineering work, monitor progress and blockers across "
+                          "projects, and choose the next direction from evidence, not "
+                          "enthusiasm.",
+                          ["programme_plan", "programme_review", "define_problem",
+                           "next_question"]),
+    "engineering_director": ("Engineering Director", Role.ENGINEER,
+                             "You coordinate engineering: split capabilities into small, "
+                             "testable specialty tasks that fit the existing architecture, with "
+                             "clear interfaces and merge order.", ["engineering_breakdown"]),
     "literature": ("Literature Agent", Role.SCIENTIST,
                    "You survey existing knowledge: methods, claims, limitations and the state of "
                    "the art, with relationships between works. Never invent sources.",
@@ -103,7 +132,8 @@ ORGANISATION = {
     "research_gap": ("Research Gap Agent", Role.SCIENTIST,
                      "You compare existing approaches, find contradictions, limitations and "
                      "unexplored areas, and turn the most valuable gap into one answerable "
-                     "question.", ["research_question"]),
+                     "question; engineering failures are evidence of such gaps.",
+                     ["research_question", "observation_triage"]),
     "hypothesis": ("Hypothesis Agent", Role.SCIENTIST,
                    "You formulate falsifiable hypotheses with explicit assumptions and "
                    "measurable predictions, ranked by value and testability.", ["hypothesis"]),
@@ -126,10 +156,19 @@ ORGANISATION = {
     "systems_architect": ("Systems Architect", Role.ENGINEER,
                           "You assess feasibility and design the software: components, "
                           "interfaces, data flows and risks, before any code is written.",
-                          ["solution_design"]),
+                          ["solution_design", "architecture"]),
+    "security_agent": ("Security Agent", Role.VERIFIER,
+                       "You review changes for secrets, injection, unsafe file or network "
+                       "access, weakened safety or permission checks and dependency risks.",
+                       ["security_review"]),
+    "performance_agent": ("Performance Agent", Role.VERIFIER,
+                          "You review changes for complexity, memory, latency, blocking calls "
+                          "in control loops and compute/energy waste, measuring where you can.",
+                          ["performance_review"]),
     "engineer": ("Implementation Engineer", Role.ENGINEER, "",
                  ["implement", "redesign", "build", "rebuild"]),
-    "verifier": ("Verification Engineer", Role.VERIFIER, "", ["verify", "challenge"]),
+    "verifier": ("Verification Engineer", Role.VERIFIER, "",
+                 ["verify", "challenge", "architecture_critique"]),
 }
 
 
@@ -149,6 +188,11 @@ def _toml_value(v) -> str:
     raise RegistryError(f"cannot store {type(v).__name__} in {AGENTS_FILE}")
 
 
+def _toml_key(k: str) -> str:
+    """Bare key when TOML allows it, else a quoted key (e.g. "build@ml")."""
+    return k if re.fullmatch(r"[A-Za-z0-9_-]+", k) else json.dumps(k)
+
+
 def dump_toml(agents: dict, allocation: dict) -> str:
     out = ["# Agents and stage allocation for this lab (autolab agents / web UI).",
            "# Permissions are fixed by each stage's role; this file only chooses who works.", ""]
@@ -158,7 +202,7 @@ def dump_toml(agents: dict, allocation: dict) -> str:
                 if v not in (None, "")]
         out.append("")
     out.append("[allocation]")
-    out += [f"{k} = {_toml_value(v)}" for k, v in sorted(allocation.items())]
+    out += [f"{_toml_key(k)} = {_toml_value(v)}" for k, v in sorted(allocation.items())]
     return "\n".join(out) + "\n"
 
 
@@ -202,11 +246,13 @@ class Registry:
         return True
 
     # ------------------------------------------------------------------ queries
-    def resolve(self, stage: str, role: Role) -> str:
-        """Name of the agent that performs ``stage`` (falls back to the role's agent)."""
-        name = self.allocation.get(stage)
-        if name and name in self.agents:
-            return name
+    def resolve(self, stage: str, role: Role, specialty: str | None = None) -> str:
+        """Name of the agent that performs ``stage``: the ``stage@specialty`` allocation, else
+        the stage's, else the role's agent."""
+        for key in ([f"{stage}@{specialty}"] if specialty else []) + [stage]:
+            name = self.allocation.get(key)
+            if name and name in self.agents:
+                return name
         return role.value
 
     def spec(self, name: str) -> dict:
@@ -216,8 +262,8 @@ class Registry:
         """Configuration errors (empty when every allocation is usable)."""
         errs = []
         for stage, name in self.allocation.items():
-            st = STAGE_BY_NAME.get(stage)
-            if st is None:
+            st = STAGE_BY_NAME.get(stage.split("@", 1)[0])
+            if st is None or ("@" in stage and st.name not in SPECIALTY_STAGES):
                 errs.append(f"allocation: unknown stage {stage!r}")
                 continue
             if name not in self.agents:
@@ -279,18 +325,26 @@ class Registry:
         """``{stage: agent name | ""}``; an empty name returns the stage to its role agent."""
         agents, alloc = self.overlay()
         for stage, name in changes.items():
-            if stage not in STAGE_BY_NAME:
-                raise RegistryError(f"unknown stage {stage!r}")
+            base, _, specialty = stage.partition("@")
+            if base not in STAGE_BY_NAME or (specialty and (
+                    base not in SPECIALTY_STAGES or not NAME.match(specialty))):
+                raise RegistryError(f"unknown stage {stage!r} (specialty routing: "
+                                    f"<{'|'.join(SPECIALTY_STAGES)}>@<specialty>)")
             if not isinstance(name, str):
                 raise RegistryError(f"allocation for {stage} must be an agent name")
             alloc[stage] = name  # "" overrides a lab.toml allocation back to the role agent
         self._write(agents, alloc)
 
-    def apply_preset(self, preset: str = "organisation") -> list[str]:
+    def _apply_file_preset(self, name: str) -> list[str]:
+        return _apply_file_preset(self, name)
+
+    def apply_preset(self, preset: str = "organisation",
+                     specialties: tuple[str, ...] = DEFAULT_SPECIALTIES) -> list[str]:
         """Create the master-prompt organisation, every agent inheriting the backend and model
-        of its role's current agent (change them afterwards per agent)."""
+        of its role's current agent (change them afterwards per agent), plus one specialist
+        engineer per specialty routed by ``<stage>@<specialty>``."""
         if preset != "organisation":
-            raise RegistryError(f"unknown preset {preset!r} (available: organisation)")
+            return self._apply_file_preset(preset)
         agents, alloc = self.overlay()
         created = []
         for name, (title, role, charter, stages) in ORGANISATION.items():
@@ -305,8 +359,50 @@ class Registry:
             for st in stages:
                 alloc[st] = name
             created.append(name)
+        eng_base = {k: v for k, v in self.spec(Role.ENGINEER.value).items() if k != "stages"}
+        for sp in specialties:
+            name = f"{sp}_engineer"
+            agents[name] = {**eng_base, "title": f"{sp.replace('_', ' ').title()} Engineer",
+                            "charter": f"You are the lab's {sp.replace('_', ' ')} specialist: "
+                                       f"build to the spec with tests, following the "
+                                       f"repository's existing conventions."}
+            for st in SPECIALTY_STAGES:
+                alloc[f"{st}@{sp}"] = name
+            created.append(name)
         self._write(agents, alloc)
         return created
+
+
+PRESET_DIR = Path(__file__).with_name("presets")
+
+
+def available_presets() -> list[str]:
+    return ["organisation"] + sorted(p.stem for p in PRESET_DIR.glob("*.toml"))
+
+
+def _load_file_preset(name: str) -> dict:
+    path = PRESET_DIR / f"{name}.toml"
+    if not NAME.match(name) or not path.is_file():
+        raise RegistryError(f"unknown preset {name!r} (available: {', '.join(available_presets())})")
+    return tomllib.loads(path.read_text(encoding="utf-8"))
+
+
+def _preset_agents(data: dict) -> dict:
+    return {n: dict(s) for n, s in (data.get("agents") or {}).items()}
+
+
+def _apply_file_preset(reg: "Registry", name: str) -> list[str]:
+    """A data-file preset (src/autolab/presets/<name>.toml): its agents and allocation are
+    merged into agents.toml (models live in the data file, not in code)."""
+    data = _load_file_preset(name)
+    agents, alloc = reg.overlay()
+    new_agents = _preset_agents(data)
+    for agent_name, spec in new_agents.items():
+        validate_agent(agent_name, spec)
+    agents.update(new_agents)
+    alloc.update(dict(data.get("allocation") or {}))
+    reg._write(agents, alloc)
+    return sorted(new_agents)
 
 
 def validate_agent(name: str, spec: dict) -> None:

@@ -309,7 +309,9 @@ class GeminiCLIBackend(AgentBackend):
     def command(self, task: TaskPacket) -> list[str]:
         cmd = ["agy", "--output-format", "json", *self.HERMETIC]
         if task.writable:
-            cmd += ["--mode", "accept-edits", "--dangerously-skip-permissions"]
+            # agy has no per-tool allowlist: headless edits need auto-approval, so the
+            # terminal sandbox must contain what the auto-approved tools can do.
+            cmd += ["--mode", "accept-edits", "--dangerously-skip-permissions", "--sandbox"]
         else:
             cmd += ["--mode", "plan"]
         if self.model:

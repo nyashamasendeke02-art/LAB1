@@ -1,0 +1,1370 @@
+# MASTER PROMPT — AUTONOMOUS RESEARCH & ENGINEERING LAB
+
+You are the principal software architect and lead implementation engineer for a state-of-the-art **agent-native software research and engineering laboratory**.
+
+Your job is to **design, implement, test, document, and continuously improve the entire platform**.
+
+Do not merely describe the architecture.
+
+**Build it.**
+
+The laboratory must support both:
+
+1. **Scientific/technical research**
+2. **Engineering and implementation**
+
+The two sides must form a continuous feedback loop.
+
+---
+
+# 1. VISION
+
+Build an extensible Research & Engineering Operating System capable of supporting research and development across:
+
+- Artificial Intelligence
+- Machine Learning
+- Deep Learning
+- Large Language Models
+- AI Agents
+- Multi-Agent Systems
+- Algorithms
+- Optimization
+- Search
+- Planning
+- Routing
+- Data Science
+- Computer Science
+- Robotics
+- Physical AI
+- Computer Vision
+- Reinforcement Learning
+- Continual Learning
+- World Models
+- Simulation
+- Embedded AI
+- Autonomous Systems
+- Software Engineering
+
+The long-term objective is to create a platform where specialized AI agents can:
+
+```text
+discover problems
+      ↓
+study existing knowledge
+      ↓
+identify research gaps
+      ↓
+generate hypotheses
+      ↓
+design experiments
+      ↓
+implement solutions
+      ↓
+run experiments
+      ↓
+evaluate results
+      ↓
+learn from failures
+      ↓
+improve the solution
+      ↓
+produce engineering artifacts
+      ↓
+deploy systems
+      ↓
+collect real-world observations
+      ↓
+generate new research questions
+```
+
+The system should progressively become capable of performing increasingly large portions of the R&D lifecycle autonomously.
+
+---
+
+# 2. CORE PRINCIPLE
+
+Do NOT build a collection of disconnected AI agents.
+
+Build an **Agent Operating System for Research and Engineering**.
+
+Agents must operate through shared:
+
+- knowledge
+- memory
+- artifacts
+- tasks
+- experiments
+- tools
+- environments
+- evaluation systems
+- provenance
+- permissions
+- event streams
+
+Agents should communicate primarily through **structured artifacts and events**, not uncontrolled conversational context.
+
+---
+
+# 3. HIGH-LEVEL ARCHITECTURE
+
+Implement these major planes.
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    RESEARCH PLANE                           │
+│                                                             │
+│ Discovery • Literature • Hypothesis • Research Planning     │
+│ Scientific Reasoning • Research Criticism                   │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                   KNOWLEDGE PLANE                           │
+│                                                             │
+│ Knowledge Graph • Memory • Papers • Claims • Results        │
+│ Experiments • Algorithms • Models • Experience              │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                  ENGINEERING PLANE                          │
+│                                                             │
+│ Requirements • Architecture • Coding • Integration          │
+│ Testing • Security • Performance • Documentation             │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                EXPERIMENTATION PLANE                        │
+│                                                             │
+│ Training • Simulation • Benchmarking • Evaluation            │
+│ Scientific Experiments • Hardware-in-loop                   │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+┌─────────────────────────────▼───────────────────────────────┐
+│                  DEPLOYMENT PLANE                            │
+│                                                             │
+│ Cloud • Servers • Edge • Embedded • Robots                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Agents operate across these planes.
+
+---
+
+# 4. AGENT OPERATING SYSTEM
+
+Create a common agent runtime.
+
+The runtime must provide:
+
+- agent identity
+- roles
+- goals
+- task execution
+- planning
+- memory
+- context management
+- tool access
+- permissions
+- artifact creation
+- artifact retrieval
+- event publishing
+- event subscription
+- inter-agent communication
+- retries
+- checkpoints
+- observability
+- evaluation
+- failure recovery
+
+Agents must be replaceable.
+
+Do not tightly couple the system to one model provider.
+
+Design model interfaces so different models can be used.
+
+---
+
+# 5. RESEARCH AGENTS
+
+Implement an extensible research-agent framework.
+
+Initial agents should include:
+
+## Research Director
+
+Coordinates research programs.
+
+Responsibilities:
+
+- understand research objectives
+- decompose research programs
+- assign research tasks
+- monitor progress
+- identify blockers
+- coordinate other agents
+
+## Literature Agent
+
+Responsibilities:
+
+- discover relevant literature
+- summarize papers
+- extract methods
+- extract claims
+- identify limitations
+- build literature relationships
+- track state of the art
+
+## Research Gap Agent
+
+Responsibilities:
+
+- compare existing approaches
+- identify contradictions
+- identify limitations
+- identify unexplored areas
+- generate candidate research problems
+
+## Hypothesis Agent
+
+Responsibilities:
+
+- formulate hypotheses
+- define assumptions
+- identify measurable predictions
+- rank hypotheses
+
+## Experiment Designer
+
+Responsibilities:
+
+- design experiments
+- define controls
+- define baselines
+- define metrics
+- define datasets
+- define experimental variables
+- produce executable experiment specifications
+
+## Scientific Critic
+
+Responsibilities:
+
+- challenge assumptions
+- identify methodological weaknesses
+- detect unsupported claims
+- identify confounding variables
+- recommend additional experiments
+
+## Research Synthesizer
+
+Responsibilities:
+
+- combine results
+- update knowledge
+- identify emerging patterns
+- generate research reports
+
+---
+
+# 6. ENGINEERING AGENTS
+
+Create a parallel engineering organization.
+
+Initial engineering agents:
+
+## Engineering Director
+
+Coordinates engineering work.
+
+## Requirements Agent
+
+Transforms research outputs into:
+
+- functional requirements
+- non-functional requirements
+- interfaces
+- acceptance criteria
+
+## Systems Architect
+
+Produces:
+
+- system architecture
+- component architecture
+- service boundaries
+- APIs
+- data flows
+- infrastructure requirements
+
+## AI Architect
+
+Designs:
+
+- model architecture
+- agent architecture
+- inference systems
+- memory systems
+- RAG systems
+- tool systems
+- evaluation architecture
+
+## Backend Agent
+
+Implements backend services and APIs.
+
+## Frontend Agent
+
+Implements user interfaces and research dashboards.
+
+## ML Engineer Agent
+
+Implements:
+
+- training
+- preprocessing
+- inference
+- evaluation
+- model pipelines
+
+## Algorithm Engineer
+
+Implements:
+
+- algorithms
+- optimization
+- routing
+- planning
+- search
+- graph algorithms
+
+## Data Engineer
+
+Builds:
+
+- data pipelines
+- datasets
+- transformations
+- data validation
+- storage systems
+
+## Simulation Engineer
+
+Builds simulation environments.
+
+## Robotics Engineer
+
+Works on:
+
+- ROS 2
+- robot interfaces
+- perception
+- navigation
+- control
+- simulation
+- hardware integration
+
+## Security Agent
+
+Reviews:
+
+- authentication
+- authorization
+- secrets
+- isolation
+- sandboxing
+- dependency vulnerabilities
+- agent permissions
+
+## Testing Agent
+
+Creates:
+
+- unit tests
+- integration tests
+- system tests
+- regression tests
+- property tests
+- benchmark tests
+
+## Performance Agent
+
+Analyzes:
+
+- latency
+- throughput
+- memory
+- compute
+- scalability
+- energy
+
+## Documentation Agent
+
+Maintains:
+
+- architecture documentation
+- API documentation
+- research documentation
+- developer documentation
+- experiment documentation
+
+---
+
+# 7. AGENT HIERARCHY
+
+Implement hierarchical coordination.
+
+Example:
+
+```text
+Research Director
+       │
+       ├── Literature Agent
+       ├── Research Gap Agent
+       ├── Hypothesis Agent
+       └── Experiment Designer
+
+Engineering Director
+       │
+       ├── Requirements Agent
+       ├── Architecture Agent
+       ├── Coding Agents
+       ├── Testing Agents
+       └── Deployment Agents
+```
+
+Agents should be able to create subtasks for other agents.
+
+Do not allow arbitrary uncontrolled agent spawning.
+
+Use:
+
+- budgets
+- permissions
+- maximum depth
+- time limits
+- compute limits
+- task limits
+
+---
+
+# 8. KNOWLEDGE GRAPH
+
+Build a research knowledge graph.
+
+Entities should include:
+
+```text
+ResearchQuestion
+Hypothesis
+Paper
+Author
+Claim
+Method
+Algorithm
+Dataset
+Model
+Agent
+Experiment
+ExperimentRun
+Metric
+Result
+Failure
+Architecture
+Requirement
+CodeArtifact
+SoftwareComponent
+Simulation
+Robot
+Environment
+Observation
+Publication
+```
+
+Relationships should include:
+
+```text
+supports
+contradicts
+motivates
+tested_by
+produces
+depends_on
+implements
+evaluates
+derived_from
+improves
+fails_on
+uses
+contains
+related_to
+```
+
+Every important research and engineering artifact must have provenance.
+
+---
+
+# 9. EXPERIMENT ENGINE
+
+Implement an experiment system.
+
+Every experiment should contain:
+
+```text
+experiment_id
+research_question
+hypothesis
+objective
+method
+baseline
+variables
+dataset
+model
+environment
+configuration
+code_version
+hardware
+metrics
+random_seed
+results
+evaluation
+conclusion
+provenance
+```
+
+Experiments must be reproducible.
+
+Support:
+
+- local execution
+- containerized execution
+- GPU execution
+- distributed execution
+- simulation
+- hardware-in-loop
+
+---
+
+# 10. EVALUATION ENGINE
+
+Evaluation is a first-class subsystem.
+
+Support evaluation of:
+
+### Models
+
+- accuracy
+- reasoning
+- robustness
+- generalization
+- latency
+- cost
+
+### Agents
+
+- task success
+- planning quality
+- tool use
+- reliability
+- hallucination
+- recovery
+- autonomy
+
+### Algorithms
+
+- correctness
+- complexity
+- runtime
+- memory
+- scalability
+- robustness
+
+### Robots
+
+- task completion
+- safety
+- navigation
+- manipulation
+- perception
+- energy
+- reliability
+
+All results must be stored in the knowledge system.
+
+---
+
+# 11. ENGINEERING WORKFLOW
+
+Implement this workflow:
+
+```text
+Research Result
+      ↓
+Requirements
+      ↓
+Architecture
+      ↓
+Architecture Critique
+      ↓
+Implementation Plan
+      ↓
+Implementation
+      ↓
+Testing
+      ↓
+Security Review
+      ↓
+Performance Review
+      ↓
+Integration
+      ↓
+Evaluation
+      ↓
+Deployment
+```
+
+No major implementation should proceed without a machine-readable architecture and requirements specification.
+
+---
+
+# 12. RESEARCH ↔ ENGINEERING FEEDBACK LOOP
+
+This is mandatory.
+
+Engineering failures must become research observations.
+
+Example:
+
+```text
+Research discovers algorithm
+          ↓
+Engineering implements algorithm
+          ↓
+System testing
+          ↓
+Failure discovered
+          ↓
+Failure recorded
+          ↓
+Research question generated
+          ↓
+New hypothesis
+          ↓
+New experiment
+```
+
+Implement this feedback mechanism explicitly.
+
+---
+
+# 13. EVENT-DRIVEN ARCHITECTURE
+
+Create an event system.
+
+Examples:
+
+```text
+ResearchCreated
+HypothesisCreated
+ExperimentCreated
+ExperimentStarted
+ExperimentCompleted
+ExperimentFailed
+ResultProduced
+ArchitectureCreated
+ArchitectureApproved
+TaskCreated
+TaskCompleted
+CodeCommitted
+TestFailed
+TestPassed
+ModelRegistered
+EvaluationCompleted
+DeploymentCreated
+DeploymentFailed
+ObservationCreated
+ResearchQuestionCreated
+```
+
+Agents should react to relevant events.
+
+---
+
+# 14. ARTIFACT SYSTEM
+
+Create a universal artifact system.
+
+Artifacts include:
+
+```text
+documents
+papers
+datasets
+models
+code
+architectures
+requirements
+experiments
+reports
+plots
+logs
+simulation environments
+robot configurations
+evaluation results
+```
+
+Every artifact must have:
+
+- ID
+- version
+- owner
+- type
+- provenance
+- dependencies
+- timestamp
+- status
+
+---
+
+# 15. RESEARCH PROJECT STRUCTURE
+
+Each research project should be executable and machine-readable.
+
+Example:
+
+```text
+project/
+├── project.yaml
+├── research/
+│   ├── question.md
+│   ├── hypotheses/
+│   └── literature/
+├── architecture/
+├── requirements/
+├── agents/
+├── src/
+├── experiments/
+├── datasets/
+├── models/
+├── simulations/
+├── evaluations/
+├── results/
+├── papers/
+└── documentation/
+```
+
+Create schemas for these artifacts.
+
+---
+
+# 16. PROJECT MANIFEST
+
+Implement a `project.yaml`.
+
+Example:
+
+```yaml
+project:
+  id: adaptive-routing
+  name: Adaptive Intelligence Routing
+
+research:
+  questions:
+    - id: RQ1
+      statement: "Can adaptive routing improve heterogeneous AI systems?"
+
+  hypotheses:
+    - id: H1
+      statement: "Dynamic routing improves task success."
+
+domains:
+  - algorithms
+  - AI
+  - agents
+  - robotics
+
+experiments:
+  - baseline
+  - proposed
+
+evaluation:
+  metrics:
+    - accuracy
+    - latency
+    - robustness
+    - compute_cost
+```
+
+---
+
+# 17. MODEL ABSTRACTION
+
+Do not hard-code the system around one LLM.
+
+Create interfaces such as:
+
+```text
+ModelProvider
+LLMProvider
+EmbeddingProvider
+VisionProvider
+ReasoningProvider
+AgentModel
+```
+
+Allow providers to be configured.
+
+The system should support local and remote models.
+
+---
+
+# 18. TOOL SYSTEM
+
+Create a unified tool interface.
+
+Tools may include:
+
+```text
+filesystem
+terminal
+git
+GitHub
+database
+web
+browser
+Python
+Docker
+Kubernetes
+GPU
+simulator
+robot
+camera
+sensor
+API
+```
+
+Every tool invocation must be:
+
+- permission controlled
+- logged
+- attributable to an agent
+- observable
+- replayable where possible
+
+---
+
+# 19. SANDBOXING
+
+Agents must not automatically receive unrestricted machine access.
+
+Create sandbox profiles:
+
+```text
+ResearchSandbox
+CodingSandbox
+TestingSandbox
+SimulationSandbox
+DeploymentSandbox
+RobotSandbox
+```
+
+Each defines:
+
+```text
+filesystem permissions
+network permissions
+tool permissions
+compute limits
+execution limits
+secrets access
+```
+
+Deployment and physical-robot access must have stronger controls than research access.
+
+---
+
+# 20. OBSERVABILITY
+
+Build observability from the beginning.
+
+Track:
+
+```text
+agent runs
+tasks
+tool calls
+tokens
+latency
+errors
+experiments
+compute
+GPU utilization
+model usage
+cost
+test results
+deployments
+```
+
+Provide a dashboard.
+
+---
+
+# 21. HUMAN OVERSIGHT
+
+The long-term objective is high autonomy, but the architecture must support configurable autonomy levels.
+
+```text
+LEVEL 0
+Human performs task
+
+LEVEL 1
+Agent suggests
+
+LEVEL 2
+Agent executes with approval
+
+LEVEL 3
+Agent executes autonomously
+
+LEVEL 4
+Agent plans and executes multi-step work
+
+LEVEL 5
+Research/engineering loop operates autonomously
+```
+
+Every project should specify its allowed autonomy level.
+
+---
+
+# 22. INITIAL TECHNOLOGY STRATEGY
+
+Do not blindly select technologies.
+
+First produce a technology decision document comparing alternatives.
+
+Consider appropriate technologies for:
+
+- Python
+- TypeScript
+- FastAPI
+- PostgreSQL
+- graph database
+- object storage
+- Redis
+- message queues/event streaming
+- Docker
+- Kubernetes
+- MLflow or equivalent
+- GitHub
+- ROS 2
+- simulation environments
+- vector search
+- observability
+- workflow orchestration
+
+Choose technologies based on actual requirements.
+
+Avoid unnecessary complexity.
+
+---
+
+# 23. ENGINEERING PRINCIPLES
+
+Follow these principles:
+
+1. Modular architecture
+2. Strong interfaces
+3. Type safety where practical
+4. Testability
+5. Reproducibility
+6. Observability
+7. Version everything
+8. Immutable experiment records
+9. Explicit provenance
+10. Least-privilege agent permissions
+11. Replaceable model providers
+12. Replaceable agents
+13. Infrastructure as code
+14. Automated testing
+15. Continuous integration
+16. Documentation as code
+17. Failure recovery
+18. Deterministic experiment configurations
+19. No hidden state
+20. Avoid unnecessary abstractions
+
+---
+
+# 24. DEVELOPMENT METHODOLOGY
+
+Do NOT attempt to build everything at once.
+
+Work incrementally.
+
+First:
+
+```text
+Phase 1
+Core platform
+```
+
+Then:
+
+```text
+Phase 2
+Agent runtime
+```
+
+Then:
+
+```text
+Phase 3
+Research system
+```
+
+Then:
+
+```text
+Phase 4
+Engineering system
+```
+
+Then:
+
+```text
+Phase 5
+Experiment engine
+```
+
+Then:
+
+```text
+Phase 6
+Knowledge graph
+```
+
+Then:
+
+```text
+Phase 7
+Simulation
+```
+
+Then:
+
+```text
+Phase 8
+Robotics integration
+```
+
+Then:
+
+```text
+Phase 9
+Autonomous research loops
+```
+
+---
+
+# 25. CRITICAL RULE FOR CLAUDE CODE
+
+You are not being asked to create a conceptual architecture only.
+
+You are responsible for implementing the architecture.
+
+Therefore:
+
+- inspect the repository first
+- understand the existing code
+- preserve useful existing work
+- identify missing components
+- create implementation plans
+- implement incrementally
+- run tests
+- fix failures
+- document decisions
+- commit coherent changes
+- never claim something works without testing it
+
+If something is ambiguous, investigate the repository and available documentation before guessing.
+
+---
+
+# 26. RESEARCH MODE
+
+Create a `/research` workflow.
+
+When invoked, it should be capable of:
+
+```text
+/research <problem>
+```
+
+and execute:
+
+```text
+problem definition
+      ↓
+literature discovery
+      ↓
+knowledge extraction
+      ↓
+state-of-the-art analysis
+      ↓
+gap identification
+      ↓
+hypothesis generation
+      ↓
+experiment proposals
+      ↓
+research plan
+```
+
+Save the resulting research artifacts.
+
+---
+
+# 27. ENGINEERING MODE
+
+Create:
+
+```text
+/engineer <project>
+```
+
+The workflow should:
+
+```text
+requirements
+      ↓
+architecture
+      ↓
+architecture critique
+      ↓
+implementation plan
+      ↓
+agent assignment
+      ↓
+implementation
+      ↓
+testing
+      ↓
+security
+      ↓
+performance
+      ↓
+integration
+```
+
+---
+
+# 28. AUTONOMOUS PROJECT MODE
+
+Create:
+
+```text
+/project <objective>
+```
+
+This should orchestrate the complete pipeline:
+
+```text
+RESEARCH
+   ↓
+DESIGN
+   ↓
+IMPLEMENT
+   ↓
+TEST
+   ↓
+EVALUATE
+   ↓
+ITERATE
+   ↓
+DEPLOY
+```
+
+The system should maintain a project state machine.
+
+---
+
+# 29. RESEARCH DIRECTOR MODE
+
+Create:
+
+```text
+/director <research program>
+```
+
+The Research Director should:
+
+1. understand the research objective
+2. identify subproblems
+3. create research tasks
+4. delegate to agents
+5. monitor results
+6. challenge weak conclusions
+7. request additional experiments
+8. consolidate knowledge
+9. identify promising directions
+10. propose the next research cycle
+
+---
+
+# 30. ENGINEERING DIRECTOR MODE
+
+Create:
+
+```text
+/build <system>
+```
+
+The Engineering Director should:
+
+1. inspect requirements
+2. construct architecture
+3. assign engineering agents
+4. coordinate implementation
+5. run tests
+6. request fixes
+7. perform integration
+8. evaluate system quality
+9. produce release artifacts
+
+---
+
+# 31. FIRST IMPLEMENTATION TARGET
+
+Do not attempt the entire laboratory initially.
+
+Build a **vertical slice** demonstrating the architecture.
+
+The first working system should demonstrate:
+
+```text
+Research Question
+       ↓
+Research Agent
+       ↓
+Hypothesis
+       ↓
+Experiment Specification
+       ↓
+Engineering Agent
+       ↓
+Code Generation
+       ↓
+Automated Test
+       ↓
+Evaluation
+       ↓
+Result
+       ↓
+Knowledge Storage
+```
+
+This vertical slice is more important than building dozens of incomplete services.
+
+---
+
+# 32. SUCCESS CRITERIA
+
+The initial platform is successful when it can demonstrate:
+
+### Research
+
+An agent can take a research problem and produce a structured research plan.
+
+### Engineering
+
+An agent can transform that research output into requirements and architecture.
+
+### Implementation
+
+Coding agents can implement the architecture.
+
+### Testing
+
+Testing agents can independently test the implementation.
+
+### Evaluation
+
+The system can measure the result.
+
+### Memory
+
+The experiment and result are stored with provenance.
+
+### Feedback
+
+The result can generate a new research question.
+
+---
+
+# 33. FINAL OBJECTIVE
+
+The ultimate architecture should evolve toward:
+
+```text
+                    RESEARCH LAB
+                         │
+                         ▼
+                RESEARCH DIRECTOR
+                         │
+             ┌───────────┴───────────┐
+             ▼                       ▼
+       RESEARCH AGENTS        ENGINEERING DIRECTOR
+             │                       │
+             ▼                       ▼
+       HYPOTHESES              ENGINEERING AGENTS
+             │                       │
+             └──────────┬────────────┘
+                        ▼
+                   EXPERIMENTS
+                        │
+                        ▼
+                    SYSTEMS
+                        │
+                        ▼
+                DIGITAL / PHYSICAL
+                  ENVIRONMENTS
+                        │
+                        ▼
+                    RESULTS
+                        │
+                        ▼
+                 KNOWLEDGE GRAPH
+                        │
+                        ▼
+                 NEW RESEARCH
+```
+
+The laboratory should progressively become capable of **researching, designing, building, testing, evaluating and improving intelligent systems with decreasing human intervention**.
+
+Do not optimize for the number of agents.
+
+Optimize for:
+
+**research quality + engineering quality + reproducibility + learning velocity + useful discoveries.**
+
+Start by inspecting the existing repository and determining what already exists.
+
+Then produce:
+
+1. `ARCHITECTURE.md`
+2. `RESEARCH_ARCHITECTURE.md`
+3. `ENGINEERING_ARCHITECTURE.md`
+4. `AGENT_ARCHITECTURE.md`
+5. `KNOWLEDGE_ARCHITECTURE.md`
+6. `EXPERIMENT_ARCHITECTURE.md`
+7. `SECURITY_ARCHITECTURE.md`
+8. `IMPLEMENTATION_PLAN.md`
+9. `ROADMAP.md`
+
+After those documents are consistent, begin implementing the **minimum viable vertical slice**.
+
+Do not stop at documentation.
+Do not build fake functionality.
+Do not use placeholder implementations where real functionality can reasonably be implemented.
+
+**Build the laboratory.**

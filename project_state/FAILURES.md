@@ -44,3 +44,9 @@
   its 12 h wait cap would have HALTed G1-6 (PRJ-0013, redesign built 84f6a44, tests passed). The queue was
   stopped while no agent ran; PRJ-0013 stays in ENGINEERING and resumes with `autolab queue`. The scientist role
   also uses Codex, so Gate 2 research is blocked too until the verifier/scientist backend is resolved.
+- F11 (2026-10-08, found in the security architecture review): the Gemini backend (D50) ran writable tasks with
+  `--dangerously-skip-permissions` and no `--sandbox`, so Gemini as robolab's backup verifier could run any shell
+  command (git included) with auto-approval; the old architecture doc still claimed "bypass flags are never used
+  (tested)", while a test actually asserted the flag's presence. Fix: writable Gemini tasks add agy's `--sandbox`;
+  test asserts it (and its absence for read-only tasks). Not yet probed live (Gemini quota): if agy's sandbox blocks
+  worktree edits on Windows, the verifier backup will fail visibly rather than run unconfined.

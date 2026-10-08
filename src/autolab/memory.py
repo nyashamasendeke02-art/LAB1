@@ -17,7 +17,7 @@ KINDS = [
     "project", "problem", "background", "claim", "question", "hypothesis",
     "requirements", "design", "protocol", "eng_task", "review", "run", "result",
     "challenge", "conclusion", "failure", "report", "future_question", "task",
-    "approval", "cycle", "delivery",
+    "approval", "cycle", "delivery", "programme", "observation", "triage",
 ]
 
 
@@ -141,6 +141,20 @@ def export_markdown(store: Store, out_dir: str | Path) -> list[Path]:
         lambda r: f"- **{r.id}** {', '.join(r.data.get('mandate_refs', [])) or '-'}: "
                   f"commit {r.data['commit'][:10]}, review {r.data['review']}: "
                   f"{r.data['spec'][:120]}"))
+    prog = ["# Programmes (hierarchical coordination)", ""]
+    for g in store.query("programme"):
+        d = g.data
+        prog += [f"## {g.id}: {d['objective']}", "", f"- state: **{d['state']}**",
+                 f"- reviews: {d.get('reviews', 0)}",
+                 f"- halted reason: {d.get('halt_reason') or '-'}", ""]
+        for key in d.get("order", []):
+            it = d["items"][key]
+            pad = "  " if it.get("parent") else ""
+            spec = f", {it['specialty']}" if it.get("specialty") else ""
+            prog.append(f"{pad}- `{key}` [{it['kind']}{spec}] **{it['status']}** "
+                        f"{', '.join(it.get('projects', []))} {it['objective'][:100]}")
+        prog.append("")
+    w("PROGRAMMES.md", "\n".join(prog) if len(prog) > 2 else "# Programmes\n\n_none_")
     w("EXPERIMENTS.md", "# Experiment Runs\n\n" + _md_list(
         store.query("run"),
         lambda r: f"- **{r.id}** protocol={r.data['refs']['protocol']} "

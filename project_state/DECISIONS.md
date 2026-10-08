@@ -259,3 +259,62 @@
   task-key/milestone patterns and the port moved to lab.toml [ui]. Tests: tests/test_registry.py (11), 3 web tests.
   The master prompt (Agent OS: research/knowledge/engineering/experimentation/deployment planes) arrived truncated;
   docs/AGENT_OS_ROADMAP.md maps it onto what exists and the next phases.
+- D53 (2026-10-08, human: master prompt sections 31-33 -- "inspect the existing repository ... produce ARCHITECTURE,
+  RESEARCH_, ENGINEERING_, AGENT_, KNOWLEDGE_, EXPERIMENT_, SECURITY_ARCHITECTURE, IMPLEMENTATION_PLAN, ROADMAP ...
+  then implement the minimum viable vertical slice"): inspection found the vertical slice already built and run live
+  (pilot-004); the missing link was knowledge -> new research. Docs: the old docs/ARCHITECTURE.md was split into
+  the nine documents (detailed sections moved, not copied; ARCHITECTURE.md is now the overview with the final
+  objective, planes, vertical slice and success-criteria tables); AGENT_OS_ROADMAP.md became ROADMAP.md.
+  Built K1, the knowledge plane (src/autolab/knowledge.py): a graph DERIVED from the ledgers (never stored, so it
+  cannot drift), nodes = knowledge records (stage_error failures excluded as noise), edges = refs, BM25 retrieval
+  (stdlib), cached per ledger head; other labs read-only via Store.open_readonly ([knowledge] include_labs).
+  Scientist stages define_problem/background_research/research_question/hypothesis/design get `lab_knowledge`
+  (top 8 of other projects + conclusions of matched research lines by graph expansion); engineer/verify packets
+  never do (also in BLINDED_KEYS). Claims citing `lab:<lab>/<id>` are verified against the ledgers. Projects can
+  be spawned from open future questions with origin provenance. `autolab knowledge`, dashboard Knowledge view.
+  Tests: tests/test_knowledge.py (9, full scripted A -> knowledge -> B loops incl. cross-lab), web test.
+  Security review while writing SECURITY_ARCHITECTURE.md found F11 (fixed): see FAILURES.md.
+- D54 (2026-10-08, human: "7. AGENT HIERARCHY" / "Implement hierarchical coordination"; section 7's text was not
+  received, so the design follows master prompt sections 5, 6 and 33): src/autolab/coordination.py. A `programme`
+  record (PLANNING -> RUNNING <-> REVIEWING -> COMPLETE | HALTED). Research Director (`programme_plan`) decomposes the
+  objective into research items (-> research projects) and engineering items; the Engineering Director
+  (`engineering_breakdown`, engineer role, read-only checkout of main) splits each engineering item into specialty
+  tasks (-> engineering projects with `specialty`, routed by allocation `<stage>@<specialty>` to specialist agents);
+  the Research Director (`programme_review`) continues, replans (new items, retries of halted items), completes or
+  escalates with blockers. The controller validates every plan (unique keys, known deps, no cycles, acceptance
+  criteria, budgets: [coordination] max_items 12, max_tasks_per_item 8, max_reviews 6), schedules by dependency then
+  priority, runs projects one at a time, and stops at the first human gate or halt. Honest completion: 'complete' is
+  refused unless every item is done or explicitly `dropped` with a reason (found while testing: a scripted director
+  "completed" a programme whose items had halted). Preset 'organisation' adds an Engineering Director and one
+  specialist engineer per specialty. Vendor names removed from role charters (any model plays any role since D52).
+  Fixed in passing: TOML keys with '@' are now quoted in agents.toml; tasks were inserted into the programme order
+  in reverse (stale item copy). CLI `autolab programme`, dashboard Programmes view, PROGRAMMES.md. Tests:
+  tests/test_coordination.py (10), web test. Not yet: running a programme's independent projects in parallel.
+- D55 (2026-10-08, human: "check for gaps and close them" + "use different claude models based on their strengths"):
+  (a) Research <-> engineering feedback loop, master prompt s.12 ("mandatory"), src/autolab/feedback.py: every
+  failure in OBSERVED_FAILURES (tests/review failed, escalation, smoke, validation, run/invalid experiment,
+  infeasible design) is recorded by the controller as an `observation` (event ObservationCreated); stage
+  `observation_triage` (research agent) answers every observation: research_question | engineering_fix | noise;
+  the controller creates `future_question` records (origin engineering_failure, refs to observation and failure,
+  event ResearchQuestionCreated); programme reviews triage their projects' observations first; `autolab observe`.
+  Tests: tests/test_feedback.py (5). (b) Claude models by strength: preset `claude-strengths` (data file
+  src/autolab/presets/claude-strengths.toml; models are data, not code): Opus 5.5 authors (designs, hypotheses,
+  architecture, code, plans), Sonnet 5.5 reviews everything Opus authors (author and reviewer always different
+  models), Haiku 4.5 writes reports; Fable 5.1 not allocated (no evidence of its relative strengths). All three
+  model ids probed live through the hermetic CLI. Applied to robolab (26 stages); G1-6 then passed review on
+  Sonnet (937 s) and waits on the safety gate APR-0006. Vendor names removed from role charters.
+- D56 (2026-10-08): engineering workflow, master prompt s.11/27/30, src/autolab/eng_workflow.py: engineering-track
+  SPEC runs `architecture` (machine-readable: components, interfaces, data flows, decisions, risks, test strategy,
+  implementation plan, requirements trace) and `architecture_critique` by a different agent; no worktree or code
+  until approved; HALT after [engineering] architecture_rounds. Before merge: `security_review` and
+  `performance_review` of the exact candidate (critical/major -> patch loop). Every delivery carries a release
+  manifest artifact (spec, architecture, all reviews, quality summary, commit, ledger head). Events
+  ArchitectureCreated/Approved, Security/PerformanceReviewCompleted, ReleaseProduced. Research track unchanged.
+  Tests: tests/test_eng_workflow.py (5); the shared fast test config disables these stages for unrelated tests.
+- D57 (2026-10-08): workflow modes, master prompt s.26-30: `autolab research` (plan-only: ends at the
+  critic-reviewed experiment proposal with a saved research plan report, guarded PROTOCOL_FREEZE -> COMPLETE),
+  `autolab engineer` (with --specialty), `autolab project` (full pipeline), `autolab director` (programme),
+  `autolab build` (programme starting at the Engineering Director with one engineering item); each with --run.
+  Claude Code commands /research /engineer /project /director /build in .claude/commands/. Dashboard: agents
+  that are allocated no stage no longer raise "blocked" alerts (a stale Codex usage-limit alert showed after
+  verification moved to Claude). Audit of PROMPT.txt: docs/PROMPT_ALIGNMENT.md. Tests: tests/test_modes.py (6).

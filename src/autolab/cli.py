@@ -84,6 +84,152 @@ def _print_steps(steps) -> None:
         _print_step(s)
 
 
+def _print_programme(co, prg: str) -> None:
+    st = co.status(prg)
+    rec = co.programme(prg).data
+    print(f"{prg}  state={st['state']}  reviews={st['reviews']}  "
+          f"halt={rec.get('halt_reason') or '-'}  blocked_on={rec.get('blocked_on') or '-'}")
+    print(f"    {st['objective']}")
+    for it in st["items"]:
+        latest = it["latest"] or {}
+        pad = "      " if it["parent"] else "    "
+        spec = f"/{it['specialty']}" if it["specialty"] else ""
+        print(f"{pad}{it['key']:20} [{it['kind']}{spec}] {it['status']:8} "
+              f"{latest.get('project', '')} {latest.get('state', '')}  {it['objective'][:80]}")
+    for dcs in st["decisions"]:
+        print(f"    {dcs['stage']}: {dcs.get('decision', '')} {dcs.get('summary') or dcs.get('assessment', '')}"[:200])
+
+
+def _programme_cmd(lab: Lab, a) -> int:
+    from .coordination import Coordinator
+    ctl = Controller(lab) if a.programme_cmd == "run" else Controller(lab, agents={})
+    co = Coordinator(ctl)
+    if a.programme_cmd == "new":
+        print(co.new_programme(a.objective, _refs(a.refs)))
+    elif a.programme_cmd == "run":
+        steps = co.run(a.programme, a.max_steps,
+                       on_step=lambda s: print(f"[{s.programme}] {s.before} -> {s.after}: {s.note}"
+                                               + (f" ERROR {s.error}" if s.error else "")),
+                       on_project_step=_print_step)
+        _print_programme(co, a.programme)
+        last = steps[-1] if steps else None
+        return 0 if last and last.after == "COMPLETE" else 2 if last and last.blocked_on else 1
+    elif a.programme_cmd == "resume":
+        co.resume(a.programme, a.note)
+        print(f"{a.programme} resumed (REVIEWING)")
+    else:
+        ids = [a.programme] if getattr(a, "programme", None) else [
+            r.id for r in lab.store.query("programme")]
+        for prg in ids:
+            _print_programme(co, prg)
+    return 0
+
+
+def _mode_cmd(lab: Lab, a) -> int:
+    """The five workflow modes. Each prints the id it created; --run executes it now."""
+    from .coordination import Coordinator
+    ctl = Controller(lab) if a.run else Controller(lab, agents={})
+    if a.cmd in ("research", "project"):
+        text = a.problem if a.cmd == "research" else a.objective
+        pid = ctl.new_project(text, _refs(getattr(a, "refs", "")),
+                              mode="plan" if a.cmd == "research" else "full")
+        print(pid)
+        if a.run:
+            steps = ctl.run(pid, on_step=_print_step)
+            state = ctl.project(pid).data["state"]
+            if a.cmd == "research" and state == "COMPLETE":
+                rep = lab.store.get(ctl.project(pid).data["current"]["report"]).data
+                print(f"research plan: {lab.root / rep['path']}")
+            return 0 if state == "COMPLETE" else 2 if steps and steps[-1].blocked_on else 1
+        return 0
+    if a.cmd == "engineer":
+        pid = ctl.new_engineering_project(a.spec, a.accept, _refs(a.refs), specialty=a.specialty)
+        print(pid)
+        if a.run:
+            steps = ctl.run(pid, on_step=_print_step)
+            state = ctl.project(pid).data["state"]
+            return 0 if state == "COMPLETE" else 2 if steps and steps[-1].blocked_on else 1
+        return 0
+    co = Coordinator(ctl)
+    if a.cmd == "director":
+        prg = co.new_programme(a.programme_objective, _refs(a.refs))
+    else:  # build: the Engineering Director takes the system as one engineering item
+        prg = co.new_programme(a.system, _refs(a.refs), items=[{
+            "key": "SYSTEM", "kind": "engineering", "objective": a.system,
+            "acceptance_criteria": a.accept, "rationale": "build request", "priority": 1}])
+    print(prg)
+    if a.run:
+        steps = co.run(prg, on_step=lambda s: print(f"[{s.programme}] {s.before} -> {s.after}: "
+                                                     f"{s.note}"), on_project_step=_print_step)
+        _print_programme(co, prg)
+        last = steps[-1] if steps else None
+        return 0 if last and last.after == "COMPLETE" else 2 if last and last.blocked_on else 1
+    return 0
+
+
+def _observe_cmd(lab: Lab, a) -> int:
+    from .feedback import open_observations, triage
+    if a.observe_cmd == "triage":
+        ctl = Controller(lab)
+        obs = open_observations(lab.store, set(a.project) if a.project else None)
+        out = triage(ctl, obs, "cli" + (f" {','.join(a.project)}" if a.project else ""), a.max)
+        print(f"{out['triage'] or 'nothing to triage'}: {out['counts']}")
+        for q in out["questions"]:
+            print(f"  {q}: {lab.store.get(q).data['question']}")
+        for pat in out.get("patterns", []):
+            print(f"  pattern: {pat}")
+        return 0
+    recs = lab.store.query("observation") if a.all else open_observations(lab.store)
+    for o in recs:
+        d = o.data
+        print(f"{o.id}  [{d['status']}] {d['kind']}/{d['category']} {d['project']}"
+              f"{'/' + d['specialty'] if d.get('specialty') else ''}  {d['summary'][:110]}")
+    print(f"{len(recs)} observation(s)")
+    return 0
+
+
+def _knowledge_cmd(lab: Lab, a) -> int:
+    ctl = Controller(lab, agents={})
+    kn = ctl.knowledge
+    for prob in kn.problems:
+        print(f"PROBLEM: {prob}")
+    g = kn.graph()
+    if a.knowledge_cmd in (None, "stats"):
+        st = g.stats()
+        print(f"labs: {', '.join(st['labs'])}; {st['nodes']} nodes, {st['edges']} edges, "
+              f"{st['open_questions']} open questions")
+        for kind, n in st["by_kind"].items():
+            print(f"  {kind:16} {n}")
+    elif a.knowledge_cmd == "search":
+        for score, n in g.search(a.text, a.k, tuple(a.kind) if a.kind else None):
+            print(f"{score:6.2f}  lab:{n.lab}/{n.record_id:12} {n.kind:15} {n.status or '':14} "
+                  f"{n.text[:110]}")
+    elif a.knowledge_cmd == "questions":
+        for n in g.open_questions():
+            print(f"lab:{n.lab}/{n.record_id}  p{n.data.get('priority', '-')}  "
+                  f"({n.project})  {n.data.get('question', '')[:140]}")
+    elif a.knowledge_cmd == "show":
+        lab_name, _, rid = a.node.removeprefix("lab:").partition("/")
+        node = g.nodes.get(f"{lab_name}:{rid}")
+        if node is None:
+            print(f"no node {a.node}")
+            return 1
+        print(json.dumps(node.brief(4000), indent=2))
+        nb = g.neighbours(node.id)
+        for rel, dst in nb["out"]:
+            print(f"  -{rel}-> {dst}")
+        for src, rel in nb["in"]:
+            print(f"  <-{rel}- {src}")
+    elif a.knowledge_cmd == "spawn":
+        try:
+            pid = ctl.new_project_from_question(a.source, author=a.by)
+        except ValueError as exc:
+            print(f"error: {exc}")
+            return 1
+        print(pid)
+    return 0
+
+
 def _agents_cmd(lab: Lab, a) -> int:
     from .registry import STAGE_BY_NAME, STAGES, Registry, RegistryError
     reg = Registry(lab.config, lab.root)
@@ -201,6 +347,71 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("agent")
     q = asub.add_parser("remove")
     q.add_argument("name")
+    p = sub.add_parser("programme", help="hierarchical coordination: programmes of projects")
+    p.add_argument("lab")
+    psub = p.add_subparsers(dest="programme_cmd")
+    q = psub.add_parser("new", help="submit a programme objective")
+    q.add_argument("objective")
+    q.add_argument("--refs", default="")
+    q = psub.add_parser("run", help="run a programme until it completes, halts or needs a human")
+    q.add_argument("programme")
+    q.add_argument("--max-steps", type=int, default=200)
+    q = psub.add_parser("status")
+    q.add_argument("programme", nargs="?")
+    q = psub.add_parser("resume", help="resume a HALTED programme (human)")
+    q.add_argument("programme")
+    q.add_argument("--note", required=True)
+    # Workflow modes (master prompt sections 26-30); each submits, and with --run executes.
+    p = sub.add_parser("research", help="/research: plan-only research -> saved research plan")
+    p.add_argument("lab")
+    p.add_argument("problem")
+    p.add_argument("--run", action="store_true")
+    p = sub.add_parser("engineer", help="/engineer: engineering workflow for one spec")
+    p.add_argument("lab")
+    p.add_argument("spec")
+    p.add_argument("--accept", action="append", required=True)
+    p.add_argument("--specialty")
+    p.add_argument("--refs", default="")
+    p.add_argument("--run", action="store_true")
+    p = sub.add_parser("project", help="/project: full research -> design -> implement -> test "
+                                       "-> evaluate -> iterate pipeline")
+    p.add_argument("lab")
+    p.add_argument("objective")
+    p.add_argument("--refs", default="")
+    p.add_argument("--run", action="store_true")
+    p = sub.add_parser("director", help="/director: Research Director runs a research programme")
+    p.add_argument("lab")
+    p.add_argument("programme_objective")
+    p.add_argument("--refs", default="")
+    p.add_argument("--run", action="store_true")
+    p = sub.add_parser("build", help="/build: Engineering Director builds a system")
+    p.add_argument("lab")
+    p.add_argument("system")
+    p.add_argument("--accept", action="append", required=True)
+    p.add_argument("--refs", default="")
+    p.add_argument("--run", action="store_true")
+    p = sub.add_parser("observe", help="engineering failures -> research observations -> questions")
+    p.add_argument("lab")
+    osub = p.add_subparsers(dest="observe_cmd")
+    q = osub.add_parser("list")
+    q.add_argument("--all", action="store_true", help="include triaged observations")
+    q = osub.add_parser("triage", help="have a research agent triage open observations")
+    q.add_argument("--project", action="append", help="only observations of these projects")
+    q.add_argument("--max", type=int, default=30)
+    p = sub.add_parser("knowledge", help="the lab's knowledge graph: search, questions, spawn")
+    p.add_argument("lab")
+    ksub = p.add_subparsers(dest="knowledge_cmd")
+    ksub.add_parser("stats")
+    q = ksub.add_parser("search")
+    q.add_argument("text")
+    q.add_argument("-k", type=int, default=10)
+    q.add_argument("--kind", action="append", help="limit to a record kind (repeatable)")
+    ksub.add_parser("questions", help="open future questions, ranked")
+    q = ksub.add_parser("show", help="a node and its edges")
+    q.add_argument("node", help="lab:RECORD-ID")
+    q = ksub.add_parser("spawn", help="start a research project from an open question")
+    q.add_argument("source", help="lab:FQ-NNNN")
+    q.add_argument("--as", dest="by", default="human")
     a = ap.parse_args(argv)
 
     if a.cmd == "init":
@@ -220,6 +431,14 @@ def main(argv: list[str] | None = None) -> int:
     lab = Lab(a.lab)
     if a.cmd == "agents":
         return _agents_cmd(lab, a)
+    if a.cmd == "knowledge":
+        return _knowledge_cmd(lab, a)
+    if a.cmd == "programme":
+        return _programme_cmd(lab, a)
+    if a.cmd == "observe":
+        return _observe_cmd(lab, a)
+    if a.cmd in ("research", "engineer", "project", "director", "build"):
+        return _mode_cmd(lab, a)
     if a.cmd == "ui":
         from .web import DashboardServer
         port = a.port or int(lab.config.get("ui", {}).get("port") or 8765)

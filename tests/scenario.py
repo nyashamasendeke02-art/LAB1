@@ -33,6 +33,8 @@ confirmatory_protocol_freeze = true
 merge_to_main = false
 compute_budget = true
 [engineering]
+architecture_stage = false   # D56 stages are tested in test_eng_workflow.py
+pre_merge_reviews = []
 test_command = "python -m pytest -q -p no:cacheprovider"
 protected_paths = ["protocols/*", "tests/verification/*"]
 verifier_allowed_paths = ["tests/verification/*"]

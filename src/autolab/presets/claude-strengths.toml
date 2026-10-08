@@ -1,0 +1,53 @@
+# Preset "claude-strengths" (D55): Claude models allocated by strength.
+# Authors and reviewers are always different models: Opus authors designs, hypotheses and code;
+# Sonnet independently reviews everything Opus authors; Haiku writes summaries.
+# Apply with `autolab agents LAB preset claude-strengths`; change any agent or stage afterwards.
+
+[agents.claude_opus]
+backend = "claude-cli"
+model = "claude-opus-5-5"
+title = "Claude Opus 5.5 (author: deep reasoning, safety-critical code)"
+charter = "You author the hardest work: experiment designs, hypotheses, architectures and safety-critical implementation. Be rigorous; prefer the simplest design that is correct."
+
+[agents.claude_sonnet]
+backend = "claude-cli"
+model = "claude-sonnet-5-5"
+title = "Claude Sonnet 5.5 (independent reviewer)"
+charter = "You review work authored by a different model. Be adversarial and concrete: find real defects, missing tests and unsupported claims; do not approve what you have not checked."
+
+[agents.claude_haiku]
+backend = "claude-cli"
+model = "claude-haiku-4-5-20251001"
+title = "Claude Haiku 4.5 (summaries)"
+charter = "You write concise, faithful summaries. Keep every evidence label and caveat."
+
+[allocation]
+# authors
+define_problem = "claude_opus"
+background_research = "claude_opus"
+research_question = "claude_opus"
+hypothesis = "claude_opus"
+requirements = "claude_opus"
+design = "claude_opus"
+interpret = "claude_opus"
+next_question = "claude_opus"
+implement = "claude_opus"
+redesign = "claude_opus"
+build = "claude_opus"
+rebuild = "claude_opus"
+architecture = "claude_opus"
+programme_plan = "claude_opus"
+observation_triage = "claude_opus"
+# independent reviewers (a different model from the author)
+scientific_review = "claude_sonnet"
+scientific_validation = "claude_sonnet"
+solution_design = "claude_sonnet"
+verify = "claude_sonnet"
+challenge = "claude_sonnet"
+architecture_critique = "claude_sonnet"
+security_review = "claude_sonnet"
+performance_review = "claude_sonnet"
+engineering_breakdown = "claude_sonnet"
+programme_review = "claude_sonnet"
+# summaries
+communicate = "claude_haiku"

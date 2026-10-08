@@ -96,7 +96,10 @@ def test_writing_stages_need_a_backend_with_tools(tmp_path):
 def test_organisation_preset_maps_master_prompt_agents_onto_stages(tmp_path):
     reg = Registry(BASE, tmp_path)
     created = reg.apply_preset()
-    assert set(created) == set(ORGANISATION)
+    from autolab.registry import DEFAULT_SPECIALTIES
+    # the master prompt's agents, plus one specialist engineer per specialty (D54)
+    assert set(created) == set(ORGANISATION) | {f"{s}_engineer" for s in DEFAULT_SPECIALTIES}
+    assert reg.resolve("build", Role.ENGINEER, "ml") == "ml_engineer"
     eff = reg.describe()["effective"]
     assert eff["background_research"] == "literature"
     assert eff["design"] == "experiment_designer"

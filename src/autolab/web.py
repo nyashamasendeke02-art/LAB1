@@ -37,6 +37,8 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from . import __version__
 from .controller import Controller, Lab
 from .gates import GateError, Gates
+from .coordination import PROGRAMME_STATES, PROGRAMME_TRANSITIONS, Coordinator
+from .knowledge import INDEXED_KINDS, Knowledge
 from .registry import BACKENDS, ORGANISATION, ROLE_AGENTS, STAGES, Registry, RegistryError
 from .state_machines import (ENGINEERING_PIPELINE, ENGINEERING_PIPELINE_ALIAS, RESEARCH_DONE,
                              RESEARCH_TERMINAL, STATE_TONES, EngineeringState, ResearchState)
@@ -64,7 +66,10 @@ STATUS_TONES = {"approved": "ok", "complete": "ok", "completed": "ok", "pass": "
                 "fail": "bad", "failed": "bad", "timeout": "bad", "challenged": "warn",
                 "needs_review": "warn", "pending": "warn", "blocked": "warn",
                 "usage_limit": "warn", "network": "warn", "working": "info",
-                "inconclusive": "warn", "unsupported": "info"}
+                "inconclusive": "warn", "unsupported": "info",
+                # programme states and work-item statuses (D54)
+                "PLANNING": "info", "RUNNING": "info", "REVIEWING": "review", "done": "ok",
+                "halted": "bad", "dropped": "warn", "split": "info", "running": "info"}
 _USAGE = re.compile(r"hit your (?:\w+ )?limit|usage limit|rate[ _-]?limit|quota|\b429\b", re.I)
 _NETWORK = re.compile(r"no response from api|econnreset|connection (?:dropped|reset|refused|"
                       r"aborted)|overloaded|service unavailable|\b50[0234]\b|\b529\b", re.I)
@@ -222,6 +227,17 @@ class DashboardServer:
                             unquote(route.removeprefix("/api/approvals/"))))
                     elif route == "/api/meta":
                         self._json(HTTPStatus.OK, owner.meta())
+                    elif route == "/api/programmes":
+                        self._json(HTTPStatus.OK, owner.programmes())
+                    elif route.startswith("/api/programmes/"):
+                        self._json(HTTPStatus.OK, owner.programme(
+                            unquote(route.removeprefix("/api/programmes/"))))
+                    elif route == "/api/knowledge":
+                        self._json(HTTPStatus.OK, owner.knowledge())
+                    elif route == "/api/knowledge/search":
+                        self._json(HTTPStatus.OK, owner.knowledge_search(query))
+                    elif route == "/api/knowledge/node":
+                        self._json(HTTPStatus.OK, owner.knowledge_node(query))
                     elif route == "/api/registry":
                         self._json(HTTPStatus.OK, owner.registry_state())
                     elif route == "/api/agents":
@@ -257,6 +273,10 @@ class DashboardServer:
                         result = owner.create_project(data)
                     elif route.startswith("/api/approvals/"):
                         result = owner.decide(unquote(route.removeprefix("/api/approvals/")), data)
+                    elif route == "/api/programmes":
+                        result = owner.create_programme(data)
+                    elif route == "/api/knowledge/spawn":
+                        result = owner.spawn_from_question(data)
                     elif route == "/api/allocation":
                         result = owner.allocate(data)
                     elif route == "/api/agents/preset":
@@ -360,6 +380,7 @@ class DashboardServer:
                 "cycle": d.get("cycle", 0), "blocked_on": d.get("blocked_on"),
                 "halt_reason": d.get("halt_reason"), "mandate_refs": d.get("mandate_refs", []),
                 "gate": gates[0] if gates else None, "eng": self._eng(rec),
+                "origin": d.get("origin"),
                 "created_at": history[0].created_at if history else rec.created_at,
                 "updated_at": rec.created_at}
 
@@ -467,7 +488,7 @@ class DashboardServer:
                       if p["key"] and p["state"] != ResearchState.HALTED.value}
         alerts = []
         for a in agents:
-            if a["status"] == "blocked":
+            if a["status"] == "blocked" and a["stages"]:  # unallocated agents do no work
                 kind = a["error_kind"] or "error"
                 alerts.append({"level": "warn" if kind in ("usage_limit", "network") else "error",
                                "title": f"{a['title']} blocked: {kind.replace('_', ' ')}",
@@ -553,6 +574,9 @@ class DashboardServer:
                         "writable": st.writable, "reads_files": st.reads_files,
                         "label": st.label} for st in STAGES],
             "planes": list(dict.fromkeys(st.plane for st in STAGES)),
+            "programme_states": list(PROGRAMME_STATES),
+            "programme_terminal": [s for s in PROGRAMME_STATES if not PROGRAMME_TRANSITIONS[s]],
+            "specialties": list((self.lab.config.get("coordination") or {}).get("specialties", [])),
             "backends": [{"name": n, **caps} for n, caps in BACKENDS.items()],
             "presets": [{"name": "organisation",
                          "agents": [{"name": n, "title": v[0], "role": v[1].value,
@@ -594,6 +618,103 @@ class DashboardServer:
         self._ensure_idle()
         created = self.registry().apply_preset(str(data.get("name") or "organisation"))
         return {**self.registry_state(), "created": created}
+
+    # ------------------------------------------------------------ programmes (D54)
+    def _coordinator(self) -> Coordinator:
+        return Coordinator(Controller(self.lab, agents={}))
+
+    def programmes(self) -> list[dict]:
+        co = self._coordinator()
+        out = []
+        for rec in reversed(self.store.query("programme")):
+            d = rec.data
+            counts = Counter(it["status"] for it in d.get("items", {}).values())
+            out.append({"id": rec.id, "objective": d["objective"], "title": _title(d["objective"]),
+                        "state": d["state"], "reviews": d.get("reviews", 0),
+                        "halt_reason": d.get("halt_reason"), "blocked_on": d.get("blocked_on"),
+                        "items": len(d.get("items", {})), "status_counts": dict(counts),
+                        "updated_at": rec.created_at})
+        return out
+
+    def programme(self, prg: str) -> dict:
+        co = self._coordinator()
+        rec = co.programme(prg)
+        d = rec.data
+        st = co.status(prg)
+        history = self.store.history(prg)
+        tasks = [{"id": t.id, "stage": t.data.get("stage"), "agent": t.data.get("agent"),
+                  "status": t.data.get("status"), "at": t.created_at}
+                 for t in self.store.query("task") if t.data.get("project") == prg]
+        for it in st["items"]:
+            full = d["items"][it["key"]]
+            it["projects"] = full.get("projects", [])
+            it["drop_reason"] = full.get("drop_reason")
+            it["architecture_notes"] = full.get("architecture_notes")
+            it["rationale"] = full.get("rationale")
+        return {"id": rec.id, **st, "title": _title(d["objective"]),
+                "halt_reason": d.get("halt_reason"), "blocked_on": d.get("blocked_on"),
+                "plan_summary": d.get("plan_summary"),
+                "success_criteria": d.get("success_criteria", []),
+                "decisions": d.get("decisions", []), "director_calls": tasks,
+                "created_at": history[0].created_at if history else rec.created_at,
+                "updated_at": rec.created_at, "events": self.store.events(subject=prg)[-30:]}
+
+    def create_programme(self, data: dict) -> dict:
+        self._ensure_idle()
+        objective = data.get("objective")
+        refs = data.get("refs", [])
+        if not isinstance(objective, str) or not objective.strip() or len(objective) > 4000:
+            raise ValueError("objective must contain 1–4000 characters")
+        if not isinstance(refs, list) or any(not isinstance(r, str) for r in refs):
+            raise ValueError("refs must be a list of strings")
+        return {"id": self._coordinator().new_programme(objective.strip(), refs)}
+
+    # ------------------------------------------------------------ knowledge (K1)
+    def _knowledge(self) -> Knowledge:
+        kn = getattr(self._local, "knowledge", None)
+        if kn is None:
+            kn = self._local.knowledge = Knowledge(self.root.name, self.store, self.root,
+                                                   self.lab.config)
+        return kn
+
+    def knowledge(self) -> dict:
+        kn = self._knowledge()
+        g = kn.graph()
+        conclusions = sorted((n for n in g.nodes.values() if n.kind == "conclusion"),
+                             key=lambda n: n.created_at, reverse=True)
+        return {"stats": g.stats(), "problems": kn.problems, "kinds": list(INDEXED_KINDS),
+                "open_questions": [{**n.brief(), "priority": n.data.get("priority"),
+                                    "question": n.data.get("question", ""),
+                                    "rationale": n.data.get("rationale", "")}
+                                   for n in g.open_questions()],
+                "conclusions": [n.brief() for n in conclusions[:20]]}
+
+    def knowledge_search(self, query: dict) -> list[dict]:
+        text = (query.get("q") or [""])[0]
+        if len(text) > 1000:
+            raise ValueError("query is limited to 1000 characters")
+        kinds = tuple(k for k in query.get("kind", []) if k in INDEXED_KINDS) or None
+        hits = self._knowledge().graph().search(text, k=40, kinds=kinds)
+        return [{**n.brief(), "score": round(score, 3)} for score, n in hits]
+
+    def knowledge_node(self, query: dict) -> dict:
+        g = self._knowledge().graph()
+        node = g.resolve_source((query.get("id") or [""])[0])
+        if node is None:
+            raise KeyError("node")
+        nb = g.neighbours(node.id)
+        brief = lambda nid: g.nodes[nid].brief(200)  # noqa: E731
+        return {**node.brief(6000), "out": [{"relation": r, **brief(d)} for r, d in nb["out"]],
+                "in": [{"relation": r, **brief(src)} for src, r in nb["in"]]}
+
+    def spawn_from_question(self, data: dict) -> dict:
+        self._ensure_idle()
+        source = data.get("source")
+        if not isinstance(source, str) or not source.startswith("lab:"):
+            raise ValueError("source must be 'lab:<lab>/<FQ id>'")
+        project_id = Controller(self.lab, agents={}).new_project_from_question(source)
+        self._local.knowledge = None  # the question's status changed
+        return {"id": project_id}
 
     def approvals(self) -> list[dict]:
         gates = Gates(self.store, self.lab.config["gates"].get("delegation"))

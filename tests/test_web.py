@@ -256,3 +256,55 @@ def test_registry_edits_refused_while_an_agent_call_is_in_flight(ui):
                         {"spec": {"backend": "claude-cli"}}, token=server.token)
     assert status == 400 and b"agent call is in progress" in data
     assert not (lab.root / "agents.toml").exists()
+
+
+def test_knowledge_api_search_node_and_spawn(ui):
+    lab, server = ui
+    hyp = lab.store.create("hypothesis", {"statement": "momentum lowers iterations",
+                                          "project": "PRJ-0001", "status": "supported",
+                                          "refs": {}}, prefix="HYP")
+    con = lab.store.create("conclusion", {
+        "hypothesis": hyp.id, "statement": "momentum lowers iterations", "outcome": "supported",
+        "label": "EXPERIMENTAL_RESULT", "experiment_kind": "exploratory",
+        "confidence": "preliminary (exploratory)", "project": "PRJ-0001",
+        "refs": {"hypothesis": hyp.id, "result": "RES-0001"}}, prefix="CON")
+    fq = lab.store.create("future_question", {"question": "Does momentum help on noisy losses?",
+                                              "priority": 1, "status": "open",
+                                              "project": "PRJ-0001",
+                                              "refs": {"conclusion": con.id}}, prefix="FQ")
+    k = json.loads(call(server, "GET", "/api/knowledge")[1])
+    assert k["stats"]["nodes"] == 3 and k["open_questions"][0]["source"] == f"lab:lab/{fq.id}"
+    hits = json.loads(call(server, "GET", "/api/knowledge/search?q=momentum&kind=conclusion")[1])
+    assert [h["source"] for h in hits] == [f"lab:lab/{con.id}"]
+    node = json.loads(call(server, "GET", f"/api/knowledge/node?id=lab:lab/{con.id}")[1])
+    assert node["out"][0]["relation"] == "hypothesis" and node["in"][0]["source"].endswith(fq.id)
+    assert call(server, "GET", "/api/knowledge/node?id=lab:lab/CON-9999")[0] == 404
+    assert call(server, "POST", "/api/knowledge/spawn", {"source": f"lab:lab/{fq.id}"})[0] == 403
+    status, data = call(server, "POST", "/api/knowledge/spawn", {"source": f"lab:lab/{fq.id}"},
+                        token=server.token)
+    assert status == 200
+    pid = json.loads(data)["id"]
+    assert lab.store.get(pid).data["origin"]["question"] == fq.id
+    assert lab.store.get(fq.id).data["status"] == "spawned"
+    detail = json.loads(call(server, "GET", f"/api/projects/{pid}")[1])
+    assert detail["origin"]["source"] == f"lab:lab/{fq.id}"
+
+
+def test_programmes_api(ui):
+    lab, server = ui
+    assert call(server, "POST", "/api/programmes", {"objective": "Build X"})[0] == 403
+    status, data = call(server, "POST", "/api/programmes",
+                        {"objective": "Answer R1 and build E1", "refs": ["Gate 2"]},
+                        token=server.token)
+    assert status == 200
+    prg = json.loads(data)["id"]
+    assert prg.startswith("PRG-")
+    listing = json.loads(call(server, "GET", "/api/programmes")[1])
+    assert listing[0]["id"] == prg and listing[0]["state"] == "PLANNING"
+    detail = json.loads(call(server, "GET", f"/api/programmes/{prg}")[1])
+    assert detail["objective"] == "Answer R1 and build E1" and detail["items"] == []
+    assert call(server, "GET", "/api/programmes/PRJ-0001")[0] == 404
+    meta = json.loads(call(server, "GET", "/api/meta")[1])
+    assert meta["programme_terminal"] == ["COMPLETE", "HALTED"]
+    assert "ml" in meta["specialties"] and "coordination" in meta["planes"]
+    assert call(server, "POST", "/api/programmes", {"objective": ""}, token=server.token)[0] == 400

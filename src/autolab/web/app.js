@@ -104,7 +104,7 @@ async function loadCore() {
   document.title = `${o.counts.approvals ? `(${o.counts.approvals}) ` : ""}Autolab · ${o.lab}`;
   $("nav-projects").textContent = o.counts.projects || "";
   $("nav-approvals").textContent = o.counts.approvals || "";
-  const blocked = o.agents.filter((a) => a.status === "blocked").length;
+  const blocked = o.agents.filter((a) => a.status === "blocked" && a.stages.length).length;
   $("nav-agents").textContent = blocked ? `${blocked} blocked` : "";
   const l = o.ledger;
   $("ledger-dot").className = `dot ${l.ok ? "ok" : "bad"}`;
@@ -309,6 +309,9 @@ async function projectDetail(id, tab) {
             .map(([l, v]) => h("div", { class: "metric" }, h("b", { text: v }), h("span", { text: l }))))) : null,
         p.halt_reason ? h("div", { class: "alert error" }, h("span", { class: "icon", text: "!" }), h("div", {}, h("div", { class: "title", text: "Halted" }), h("div", { class: "prose small", text: p.halt_reason })), h("span")) : null,
         card("Specification", null, h("div", { class: "prose", text: p.objective })),
+        p.origin ? card("Origin", "spawned from an open question", h("p", { class: "small" }, "From ",
+          knowledgeLink(p.origin.source), p.origin.conclusion ? [" (after ", knowledgeLink(`lab:${p.origin.lab}/${p.origin.conclusion}`), ")"] : null),
+          p.origin.rationale ? h("p", { class: "muted small", text: p.origin.rationale }) : null) : null,
         p.acceptance_criteria.length ? card("Acceptance criteria", null, h("ol", {}, p.acceptance_criteria.map((a) => h("li", { class: "prose", text: a })))) : null),
       h("div", { class: "stack" },
         card("Facts", null, h("div", { class: "list" },
@@ -529,6 +532,145 @@ async function applyPreset() {
   catch (err) { toast(err.message, "bad"); }
 }
 
+// ---------- programmes (D54): hierarchical coordination
+VIEWS.programmes = async (r) => {
+  if (r.id) return programmeDetail(r.id);
+  const list = await api("/api/programmes");
+  $("nav-programmes").textContent = list.filter((p) => !META.programme_terminal.includes(p.state)).length || "";
+  const out = h("div", {}, pageHead("Programmes", "Objectives too large for one project: the Research Director plans and reviews them, the Engineering Director splits engineering work into specialty tasks.",
+    h("button", { class: "primary", onclick: newProgrammeDialog, text: "New programme" })));
+  out.append(card(null, null, list.length ? h("table", { class: "table" },
+    h("thead", {}, h("tr", {}, ["Programme", "Objective", "State", "Items", "Reviews", "Updated"].map((t) => h("th", { text: t })))),
+    h("tbody", {}, list.map((p) => h("tr", { class: "click", tabindex: "0", onclick: () => go(`/programmes/${p.id}`), onkeydown: (ev) => ev.key === "Enter" && go(`/programmes/${p.id}`) },
+      h("td", {}, h("span", { class: "mono", text: p.id })), h("td", { class: "title-cell" }, p.title),
+      h("td", {}, badge(p.state)), h("td", {}, Object.entries(p.status_counts).map(([s, n]) => h("span", { class: "muted small", text: `${n} ${s} ` }))),
+      h("td", { text: p.reviews }), h("td", {}, time(p.updated_at)))))) : h("div", { class: "empty", text: "No programmes yet. Create one, then run it with `autolab programme LAB run PRG-…`." })));
+  return out;
+};
+
+async function programmeDetail(id) {
+  const p = await api(`/api/programmes/${encodeURIComponent(id)}`);
+  const out = h("div", {});
+  out.append(h("div", { class: "crumbs" }, h("a", { href: "#/programmes", text: "Programmes" }), ` / ${p.id}`));
+  out.append(pageHead(p.title, null, badge(p.state)));
+  if (p.halt_reason) out.append(h("div", { class: "alerts" }, alertBox({ level: "error", title: "Halted: needs a human", detail: p.halt_reason })));
+  if (p.blocked_on) out.append(h("div", { class: "alerts" }, alertBox({ level: "warn", title: `Waiting on ${p.blocked_on}`, detail: "A project in this programme needs a human decision; the programme continues when it is resolved." })));
+  const tree = h("div", { class: "list" }, p.items.map((it) => {
+    const latest = it.latest || {};
+    return h("div", { class: `item ${it.parent ? "child" : ""}` },
+      h("div", {}, badge(it.kind, "plain"), it.specialty ? h("span", { class: "tag", text: it.specialty }) : null),
+      h("div", {}, h("b", { class: "mono", text: it.key }), " ", h("span", { class: "prose small", text: it.objective }),
+        it.depends_on.length ? h("div", { class: "muted small", text: `after ${it.depends_on.join(", ")}` }) : null,
+        it.projects.length ? h("div", { class: "small" }, it.projects.map((pid) => [h("a", { href: `#/projects/${pid}`, class: "mono", text: pid }), " "]),
+          latest.conclusions ? latest.conclusions.map((c) => [badge(c.outcome), " "]) : null,
+          latest.delivery ? h("span", { class: "muted", text: `delivered ${String(latest.delivery.commit || "").slice(0, 10)}` }) : null) : null,
+        it.drop_reason ? h("div", { class: "muted small", text: `dropped: ${it.drop_reason}` }) : null,
+        it.architecture_notes ? h("details", {}, h("summary", { class: "small muted", text: "Engineering Director's notes" }), h("div", { class: "prose small", text: it.architecture_notes })) : null),
+      badge(it.status));
+  }));
+  const decisions = h("ol", { class: "timeline" }, p.decisions.slice().reverse().map((x) => h("li", { class: x.decision === "complete" ? "ok" : x.decision === "escalate" ? "bad" : "" },
+    h("div", { class: "t", text: `${human(x.stage)}${x.decision ? ` · ${x.decision}` : ""}` }),
+    h("div", { class: "r", text: x.assessment || x.summary || "" }),
+    (x.blockers || []).length ? h("div", { class: "r", text: `blockers: ${x.blockers.join("; ")}` }) : null,
+    x.dropped && Object.keys(x.dropped).length ? h("div", { class: "r", text: `dropped: ${Object.entries(x.dropped).map(([k, v]) => `${k} (${v})`).join("; ")}` }) : null)));
+  out.append(h("div", { class: "grid two" },
+    h("div", { class: "stack" }, card("Work items", "Research Director → items; Engineering Director → specialty tasks", tree)),
+    h("div", { class: "stack" },
+      card("Objective", null, h("div", { class: "prose", text: p.objective }), p.plan_summary ? h("p", { class: "muted small", text: p.plan_summary }) : null,
+        p.success_criteria.length ? h("ul", {}, p.success_criteria.map((c) => h("li", { class: "small", text: c }))) : null),
+      card("Director decisions", `${p.reviews} review(s)`, p.decisions.length ? decisions : h("div", { class: "empty", text: "Not planned yet. Run the programme." })),
+      card("Director calls", null, p.director_calls.length ? h("div", { class: "list" }, p.director_calls.map((t) => h("div", { class: "item" },
+        subjectLink(t.id), h("span", { class: "small", text: `${human(t.stage)} · ${t.agent || ""}` }), badge(t.status)))) : h("div", { class: "empty", text: "None yet." })))));
+  return out;
+}
+
+function newProgrammeDialog() {
+  const m = $("modal");
+  const objective = h("textarea", { id: "pg-objective", maxlength: "4000", placeholder: "The research and engineering objective", required: true });
+  const refs = h("input", { id: "pg-refs", placeholder: `${META.ui.milestone_label || "Milestone"} 2, REQ-…` });
+  const submit = async () => {
+    try { const res = await api("/api/programmes", { method: "POST", body: { objective: objective.value, refs: refs.value.split(",").map((x) => x.trim()).filter(Boolean) } });
+      m.close(); toast(`${res.id} created`, "ok"); go(`/programmes/${res.id}`); }
+    catch (err) { toast(err.message, "bad"); }
+  };
+  m.replaceChildren(h("div", { class: "modal-body" }, h("h2", { text: "New programme" }),
+    h("p", { class: "muted small", text: "Creates the programme in the ledger. Run it with `autolab programme LAB run PRG-…`; the Research Director plans it on the first step." }),
+    h("label", {}, "Objective", objective), h("label", {}, "Mandate references", h("span", { class: "hint", text: "Optional, comma-separated" }), refs)),
+    h("div", { class: "modal-actions" }, h("button", { onclick: () => m.close(), text: "Cancel" }), h("button", { class: "primary", onclick: submit, text: "Create programme" })));
+  m.showModal();
+  objective.focus();
+}
+
+// ---------- knowledge (K1)
+function knowledgeLink(source) {
+  return h("a", { href: "#", class: "mono", text: source.replace(/^lab:/, ""), onclick: (ev) => { ev.preventDefault(); openNode(source); } });
+}
+function nodeRow(n) {
+  return h("div", { class: "item" }, badge(n.kind, "plain"),
+    h("div", {}, knowledgeLink(n.source), n.status ? [" ", badge(n.status)] : null, n.label ? h("span", { class: "muted small", text: ` ${n.label}` }) : null,
+      h("div", { class: "prose small", text: n.text })),
+    n.score !== undefined ? h("span", { class: "muted small mono", text: n.score.toFixed(2) }) : time(n.created_at));
+}
+VIEWS.knowledge = async () => {
+  const k = await api("/api/knowledge");
+  const st = k.stats;
+  $("nav-knowledge").textContent = st.open_questions || "";
+  const out = h("div", {}, pageHead("Knowledge", `What the lab has learned, across ${st.labs.length === 1 ? "this lab" : `${st.labs.length} labs (${st.labs.join(", ")})`}: results, failures, methods and open questions, each traceable to its records.`));
+  if (k.problems.length) out.append(h("div", { class: "alerts" }, k.problems.map((pr) => alertBox({ level: "warn", title: "Included lab unavailable", detail: pr }))));
+  out.append(h("div", { class: "grid kpis" }, kpi("Knowledge records", st.nodes), kpi("Links", st.edges),
+    kpi("Conclusions", st.by_kind.conclusion || 0), kpi("Failures kept", st.by_kind.failure || 0), kpi("Open questions", st.open_questions, st.open_questions ? "attn" : "")));
+  // search
+  const results = h("div", { class: "list" });
+  const kindSel = h("select", { "aria-label": "Record kind" }, h("option", { value: "", text: "All kinds" }), k.kinds.map((x) => h("option", { value: x, text: human(x) })));
+  kindSel.style.maxWidth = "200px";
+  const box = h("input", { type: "search", id: "knowledge-search", placeholder: "Search what the lab knows…", "aria-label": "Search knowledge" });
+  let timer = null;
+  const run = async () => {
+    const q = box.value.trim();
+    if (!q) { results.replaceChildren(h("div", { class: "empty", text: "Type to search conclusions, failures, methods, hypotheses and deliveries." })); return; }
+    const params = new URLSearchParams({ q }); if (kindSel.value) params.append("kind", kindSel.value);
+    try { const hits = await api(`/api/knowledge/search?${params}`);
+      results.replaceChildren(...(hits.length ? hits.map(nodeRow) : [h("div", { class: "empty", text: "Nothing matches. Retrieval is lexical: try the words the records use." })])); }
+    catch (err) { results.replaceChildren(h("div", { class: "empty", text: err.message })); }
+  };
+  box.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(run, 250); });
+  kindSel.addEventListener("change", run);
+  run();
+  const left = h("div", { class: "stack" }, card("Search", null, h("div", { class: "toolbar" }, box, kindSel), results),
+    card("Conclusions", null, k.conclusions.length ? h("div", { class: "list" }, k.conclusions.map(nodeRow)) : h("div", { class: "empty", text: "No conclusions yet." })));
+  const right = h("div", { class: "stack" }, card("Open questions", "results that raised new research",
+    k.open_questions.length ? h("div", { class: "list" }, k.open_questions.map((q) => h("div", { class: "item" },
+      h("span", { class: "badge plain", text: `p${q.priority ?? "-"}` }),
+      h("div", {}, h("div", { class: "prose small", text: q.question }), h("div", { class: "muted small" }, knowledgeLink(q.source), q.project ? ` · ${q.project}` : "")),
+      h("button", { class: "small", onclick: () => spawnProject(q), text: "Start project" }))))
+      : h("div", { class: "empty", text: "No open questions. They appear when a research cycle ends." })),
+    card("By kind", null, h("div", { class: "list" }, Object.entries(st.by_kind).map(([kind, n]) => h("div", { class: "item" }, badge(kind, "plain"), h("span", { text: "" }), h("b", { text: n }))))));
+  out.append(h("div", { class: "grid two" }, left, right));
+  return out;
+};
+async function spawnProject(q) {
+  if (!(await confirmDialog("Start a research project from this question?", q.question, "Start project", "primary"))) return;
+  try { const res = await api("/api/knowledge/spawn", { method: "POST", body: { source: q.source } }); toast(`${res.id} created`, "ok"); go(`/projects/${res.id}`); }
+  catch (err) { toast(err.message, "bad"); }
+}
+async function openNode(source) {
+  const drawer = $("drawer");
+  drawer.hidden = false;
+  drawer.replaceChildren(skeleton());
+  try {
+    const n = await api(`/api/knowledge/node?id=${encodeURIComponent(source)}`);
+    const rel = (list, dir) => list.length ? h("div", { class: "list" }, list.map((e) => h("div", { class: "item" },
+      h("span", { class: "muted small mono", text: dir === "out" ? `${e.relation} →` : `← ${e.relation}` }),
+      h("div", {}, knowledgeLink(e.source), " ", badge(e.kind, "plain"), h("div", { class: "prose small", text: e.text })), h("span")))) : h("p", { class: "muted small", text: "None." });
+    drawer.replaceChildren(
+      h("div", { class: "row" }, h("h2", { text: `${n.source.replace(/^lab:/, "")} · ${human(n.kind)}` }), h("button", { class: "ghost", onclick: closeDrawer, "aria-label": "Close", text: "✕" })),
+      h("div", { class: "row start wrap" }, n.status ? badge(n.status) : null, n.label ? h("span", { class: "agent-meta", text: n.label }) : null, n.project ? h("span", { class: "muted small", text: n.project }) : null, time(n.created_at)),
+      card("Content", null, h("div", { class: "prose", text: n.text })),
+      card("Derived from", null, rel(n.out, "out")), card("Led to", null, rel(n.in, "in")));
+    drawer.querySelector("button")?.focus();
+  } catch (err) { drawer.replaceChildren(h("p", { text: err.message }), h("button", { onclick: closeDrawer, text: "Close" })); }
+}
+
 // ---------- activity
 VIEWS.activity = async () => {
   const events = await api("/api/activity?limit=300");
@@ -610,7 +752,8 @@ async function openPalette() {
   const base = [
     { label: "Overview", kind: "view", run: () => go("/overview") }, { label: "Projects", kind: "view", run: () => go("/projects") },
     { label: "Approvals", kind: "view", run: () => go("/approvals") }, { label: "Agents", kind: "view", run: () => go("/agents") },
-    { label: "Activity", kind: "view", run: () => go("/activity") }, { label: "New project…", kind: "command", run: newProjectDialog },
+    { label: "Activity", kind: "view", run: () => go("/activity") }, { label: "Knowledge", kind: "view", run: () => go("/knowledge") },
+    { label: "Programmes", kind: "view", run: () => go("/programmes") }, { label: "New programme…", kind: "command", run: newProgrammeDialog }, { label: "New project…", kind: "command", run: newProjectDialog },
     { label: "Toggle theme", kind: "command", run: () => $("theme-btn").click() },
     ...(store.overview?.approvals || []).map((a) => ({ label: `${a.id} · ${a.summary}`, kind: "approval", run: () => go(`/approvals/${a.id}`) })),
     ...projects.map((p) => ({ label: `${p.id}${p.key ? ` · ${p.key}` : ""} · ${p.title}`, kind: human(p.state), run: () => go(`/projects/${p.id}`) })),
@@ -643,7 +786,7 @@ document.addEventListener("keydown", (ev) => {
   if (ev.key === "/") { const s = $("project-search"); if (s) { ev.preventDefault(); s.focus(); } else { ev.preventDefault(); go("/projects"); } return; }
   if (gPending) {
     gPending = false;
-    const map = { o: "/overview", p: "/projects", a: "/approvals", g: "/agents", e: "/activity" };
+    const map = { o: "/overview", p: "/projects", a: "/approvals", g: "/agents", e: "/activity", k: "/knowledge", r: "/programmes" };
     if (map[ev.key]) { go(map[ev.key]); ev.preventDefault(); }
     return;
   }

@@ -5,9 +5,17 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** autolab 0.5.0 (D52, 2026-10-08: agent registry -- any backend/model on any stage via
+- **Version:** autolab 0.8.0 (D55-D57, 2026-10-08: research<->engineering feedback loop, engineering
+  workflow with architecture/critique/security/performance reviews and release manifests, /research
+  /engineer /project /director /build modes, preset claude-strengths; 204/204 tests pass).
+  0.7.0 (D54, 2026-10-08: hierarchical coordination -- programmes planned and
+  reviewed by a Research Director, engineering split into specialty tasks by an Engineering Director,
+  specialist routing <stage>@<specialty>; `autolab programme`, dashboard Programmes view).
+  0.6.0 (D53, 2026-10-08: knowledge plane K1 -- graph over lab ledgers, prior
+  knowledge in research stages, verified lab sources, projects spawned from open questions; the nine
+  architecture documents in docs/; F11 Gemini sandbox fix). 0.5.0 (D52, 2026-10-08: agent registry -- any backend/model on any stage via
   [allocation]/agents.toml, `autolab agents`, organisation preset from the master prompt; dashboard
-  vocabulary from /api/meta, Agents page edits agents and allocation; docs/AGENT_OS_ROADMAP.md).
+  vocabulary from /api/meta, Agents page edits agents and allocation; docs/ROADMAP.md).
   0.4.0 (D51, 2026-10-08: domain-general research -- item-level analysis
   for LLM/agent/code benchmarks, transient-failure retries, parallel trials, spend cap, pinned data;
   see docs/ARCHITECTURE.md 8a). Before that: 0.3.0 + statistics + design-convergence fixes + independent-reviewer
@@ -19,6 +27,10 @@ and `project_state/` (decisions, failures, open questions)._
   via `claude -p`; Codex verifier via `codex exec --sandbox workspace-write`.
 
 ## Reference documents
+
+- `PROMPT.txt` (repo root): the master prompt; alignment audit in `docs/PROMPT_ALIGNMENT.md`.
+- `docs/ARCHITECTURE.md`: entry point to the lab's nine architecture documents (research, engineering,
+  agent, knowledge, experiment, security, implementation plan, roadmap) -- D53.
 
 - `docs/REQUIREMENTS.md`: robot brain requirements v0.1 (D32): functional, safety, performance,
   reproducibility; research measures kept separate from pass/fail requirements.
@@ -47,6 +59,9 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress (checked 2026-10-08)
+- [ ] APR-0006 (G1-6 safety review, delegated to claude-code) IN PROGRESS: candidate passes its 452 tests, but it
+      commits 59 `.scratch/` test-output files (224k lines) -> will be rejected back to the engineer unless the
+      kernel review finds more; fault injection not yet run. robolab now runs on preset claude-strengths.
 - [ ] robolab Gate 1 in progress (D50): Codex kept as primary; Gemini (gemini-3.8-flash-high via
       gemini-cli / agy) configured as automatic backup on usage limit. G1-6 (PRJ-0013) redesign built
       (84f6a44) and tests passed; waiting at adversarial review. Resuming with
@@ -106,8 +121,13 @@ and `project_state/` (decisions, failures, open questions)._
        at each merge/run.
 5b. [x] autolab: agent usage limits wait and retry instead of HALT (D35).
 5d. [x] D52: agent registry + stage allocation + config-driven dashboard (see roadmap).
-5e. [ ] Agent OS phases from docs/AGENT_OS_ROADMAP.md: specialist engineering agents, agent
-       scorecards, knowledge plane, programme-level director, verified literature access.
+5e. [x] D53: nine architecture docs (docs/ARCHITECTURE.md is the index) + K1 knowledge plane.
+5f. [x] D54: hierarchical coordination (ROADMAP phases 1 and 4).
+5h. [ ] Close PROMPT.txt gaps in docs/PROMPT_ALIGNMENT.md order: 1 research<->engineering feedback (s.12,
+       mandatory), 2 engineering workflow stages (s.11/27/30), 3 slash workflows (s.26-30), 4 autonomy
+       levels, 5 technology decision doc, 6 knowledge vocabulary, ...
+5g. [ ] Next ROADMAP phases: 2 agent scorecards, 3 release bundles, 5 verified external
+       literature, 6 semantic knowledge; parallel projects within a programme.
 5c. [x] D51: autolab can run AI/LLM/agent/software research (item unit, retries, cost cap,
        data pinning, domain prompts). Next: a first LLM pilot lab to validate it live (todo 8).
 6. [ ] Citation verification step (more important now: LLM/AI literature moves fast and the
@@ -198,7 +218,9 @@ Residual risks the fixes do NOT remove:
   `autolab agents labs/robolab set claude_verifier --backend claude-cli --title "Verification Engineer"`
   then `autolab agents labs/robolab allocate verify claude_verifier` (same model family as the engineer, so
   less independent; your call).
-- **Send the rest of the master prompt** (it arrived cut off after "Simulation Engineer").
+
+- **Live-probe Gemini's sandbox (F11)** when its quota allows: one verifier call on robolab. If agy's
+  `--sandbox` blocks worktree edits on Windows, the backup verifier will fail visibly.
 - Nothing blocking: the lab runs unattended (D35).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.

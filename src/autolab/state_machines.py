@@ -44,7 +44,8 @@ RESEARCH_TRANSITIONS: dict[ResearchState, set[ResearchState]] = {
     R.REQUIREMENTS: {R.DESIGN, R.HYPOTHESIS},
     R.DESIGN: {R.SCIENTIFIC_REVIEW, R.REQUIREMENTS},
     R.SCIENTIFIC_REVIEW: {R.PROTOCOL_FREEZE, R.DESIGN},
-    R.PROTOCOL_FREEZE: {R.ENGINEERING, R.DESIGN},
+    R.PROTOCOL_FREEZE: {R.ENGINEERING, R.DESIGN,
+                        R.COMPLETE},  # COMPLETE: plan-only research (/research), guarded
     R.ENGINEERING: {R.SCIENTIFIC_VALIDATION, R.DESIGN,
                     R.COMPLETE},  # COMPLETE: engineering-track projects only (controller-guarded)
     R.SCIENTIFIC_VALIDATION: {R.RUN_EXPERIMENT, R.ENGINEERING, R.DESIGN},

@@ -295,3 +295,6 @@ dialog::backdrop { background: #05080d99; backdrop-filter: blur(3px) }
 .table.alloc tr.group th { padding-top: 18px; color: var(--text); font-size: 12px }
 .table.alloc select { width: 100%; max-width: 420px }
 #modal .modal-body { max-height: 78vh; overflow: auto }
+
+/* D54: programme tree */
+.list .item.child { padding-left: 28px; border-left: 2px solid var(--line-2); margin-left: 10px }

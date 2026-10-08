@@ -118,6 +118,21 @@ class Store:
         self._conn.executescript(_SCHEMA)
         self._depth = 0
 
+    @classmethod
+    def open_readonly(cls, db_path: str | Path) -> "Store":
+        """Open another lab's ledger for reading only (SQLite ``mode=ro``): no schema
+        creation, and any write raises ``sqlite3.OperationalError``."""
+        path = Path(db_path).resolve()
+        if not path.is_file():
+            raise FileNotFoundError(f"no ledger at {path}")
+        self = cls.__new__(cls)
+        self.path = path
+        self._conn = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True,
+                                     isolation_level=None, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        self._depth = 0
+        return self
+
     def close(self) -> None:
         self._conn.close()
 

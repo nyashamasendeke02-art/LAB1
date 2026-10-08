@@ -92,3 +92,58 @@ def build_report(store: Store, project_id: str, cycle: int, cur: dict,
     lines += ["", "## Scientist summary", "", scientist_summary, "",
               "## Provenance trace", "", "```", format_trace(trace(store, con.id)), "```", ""]
     return "\n".join(lines)
+
+
+def research_plan_markdown(store: Store, project_id: str, cur: dict) -> str:
+    """The saved artifact of plan-only research (/research)."""
+    proj = store.get(project_id).data
+    get = lambda key: store.get(cur[key]).data if cur.get(key) else {}  # noqa: E731
+    prb, bkg, q, req = get("problem"), get("background"), get("question"), get("requirements")
+    hyp, prot = get("hypothesis"), get("protocol")
+    p = prot.get("protocol", {})
+    claims = [store.get(c).data for c in (bkg.get("refs") or {}).get("claims", [])]
+    reviews = [r.data for r in store.query("review", project=project_id)
+               if r.data.get("review_type") == "scientific_review"]
+    design = store.get(prot["refs"]["design"]).data if prot.get("refs", {}).get("design") else {}
+    lines = [f"# Research plan: {proj['objective']}", "",
+             f"_Project {project_id} (plan-only research). Generated from the lab ledger; "
+             f"every item is traceable by its record id._", "",
+             "## 1. Problem", "", _fmt(prb.get("problem_statement")), "",
+             f"- scope: {_fmt(prb.get('scope'))}",
+             f"- out of scope: {_fmt(prb.get('out_of_scope'))}",
+             f"- success: {_fmt(prb.get('success_notion'))}", "",
+             "## 2. Literature and knowledge", ""]
+    for c in claims:
+        ver = "verified" if c.get("sources_verified") else "unverified"
+        lines.append(f"- [{c.get('label')}] {c.get('statement')} "
+                     f"(sources: {', '.join(c.get('sources', [])) or '-'}; {ver})")
+    lines += ["", "## 3. State of the art and gaps", "",
+              "Known methods:", *[f"- {m}" for m in bkg.get("known_methods", [])], "",
+              "Gaps:", *[f"- {g}" for g in bkg.get("gaps", [])], "",
+              "## 4. Research question", "", _fmt(q.get("question")), "",
+              f"Rationale: {_fmt(q.get('rationale'))}", "",
+              "## 5. Hypothesis", "", f"- statement: {_fmt(hyp.get('statement'))}",
+              f"- prediction: {_fmt(hyp.get('prediction'))}",
+              f"- null: {_fmt(hyp.get('null_hypothesis'))}",
+              f"- falsification: {_fmt(hyp.get('falsification'))}", "",
+              "## 6. Requirements", "",
+              "Validity criteria:", *[f"- {v}" for v in req.get("validity_criteria", [])], "",
+              "Engineering requirements:", *[f"- {v}" for v in req.get("engineering", [])], "",
+              "## 7. Experiment proposals", ""]
+    for o in design.get("options", []):
+        mark = " (chosen)" if o.get("name") == design.get("chosen") else ""
+        lines.append(f"- **{o.get('name')}**{mark}: {o.get('description')}")
+    lines += ["", f"Rationale: {_fmt(design.get('rationale'))}", "",
+              "## 8. Proposed protocol", "", f"- title: {_fmt(p.get('title'))} ({_fmt(p.get('kind'))})",
+              f"- conditions: {', '.join(c['name'] + ' (' + c['role'] + ')' for c in p.get('conditions', []))}",
+              f"- primary metric: {_fmt((p.get('metrics') or {}).get('primary'))}",
+              f"- decision rule: {_fmt(p.get('decision_rule'))}",
+              f"- seeds: {_fmt(p.get('seeds'))}", "",
+              "## 9. Scientific review", ""]
+    for r in reviews:
+        lines.append(f"- verdict **{r.get('verdict')}**: "
+                     + "; ".join(f"[{i.get('severity')}] {i.get('description')}"
+                                 for i in r.get("issues", [])))
+    lines += ["", "## 10. Next step", "",
+              "Run this plan as a full research project (`autolab project`), or refine it."]
+    return "\n".join(lines) + "\n"

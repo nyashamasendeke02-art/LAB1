@@ -34,6 +34,10 @@ from xml.etree import ElementTree
 
 from . import __version__
 from .agents import Agent, AgentBackend, agent_wait_kind, make_backend
+from .eng_workflow import EngineeringWorkflowMixin
+from .report import research_plan_markdown
+from .feedback import OBSERVED_FAILURES, record_observation
+from .knowledge import Knowledge
 from .registry import AGENTS_FILE, Registry
 from .config import DEFAULT_TOML, load_config
 from .experiments import (COST_METRIC, Trial, analysed_items, check_lock, contrasts,
@@ -174,7 +178,20 @@ class Lab:
 
 
 # =============================================================== Controller
-class Controller:
+def _text(value) -> str:
+    """Flatten a context value (str, dict or list) into searchable text."""
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        return " ".join(_text(v) for v in value.values())
+    if isinstance(value, (list, tuple)):
+        return " ".join(_text(v) for v in value)
+    return str(value)
+
+
+class Controller(EngineeringWorkflowMixin):
     def __init__(self, lab: Lab, agents: dict[Role, Agent] | None = None,
                  reviewer: AgentBackend | None = None):
         self.lab = lab
@@ -197,6 +214,8 @@ class Controller:
                 self.registry.agents["reviewer"] = {"backend": "", "title": "Reviewer"}
                 self.registry.allocation.setdefault("scientific_review", "reviewer")
         self._backends: dict[str, tuple[str, AgentBackend]] = {}
+        # K1: knowledge plane over this lab's ledger and read-only included labs.
+        self.knowledge = Knowledge(lab.root.name, self.store, lab.root, self.cfg)
 
     def _backend_for(self, name: str) -> AgentBackend:
         """The backend of a named agent, cached per spec (fallback cooldowns persist)."""
@@ -211,10 +230,12 @@ class Controller:
             self._backends[name] = cached
         return cached[1]
 
-    def agent_for(self, role: Role, stage: str) -> tuple[str, Agent]:
-        """(agent name, Agent) allocated to ``stage``; the Agent keeps the stage's role."""
+    def agent_for(self, role: Role, stage: str,
+                  specialty: str | None = None) -> tuple[str, Agent]:
+        """(agent name, Agent) allocated to ``stage`` (and the project's engineering
+        specialty, if any); the Agent keeps the stage's role."""
         self.registry.reload()
-        name = self.registry.resolve(stage, role)
+        name = self.registry.resolve(stage, role, specialty)
         spec = self.registry.spec(name)
         persona = None
         if spec.get("title") or spec.get("charter"):
@@ -230,9 +251,15 @@ class Controller:
 
     # ------------------------------------------------------------ projects
     def new_project(self, objective: str, mandate_refs: list[str] | None = None,
-                    author: str = "human") -> str:
+                    author: str = "human", mode: str = "full") -> str:
+        """``mode='plan'`` (/research): problem -> literature -> knowledge -> gaps -> hypotheses
+        -> experiment proposal reviewed by a critic -> saved research plan; nothing is built
+        or run. ``mode='full'``: the whole research cycle."""
+        if mode not in ("full", "plan"):
+            raise ValueError("mode must be 'full' or 'plan'")
         rec = self.store.create("project", {
-            "kind": "research", "objective": objective, "state": R.DEFINE_PROBLEM.value,
+            "kind": "research", "mode": mode, "objective": objective,
+            "state": R.DEFINE_PROBLEM.value,
             "cycle": 1, "current": {}, "retries": {}, "design_iterations": 0, "feedback": [],
             "blocked_on": None, "halt_reason": None, "halted_from": None,
             "mandate_refs": list(mandate_refs or []), "refs": {},
@@ -242,7 +269,7 @@ class Controller:
 
     def new_engineering_project(self, spec: str, acceptance: list[str],
                                 mandate_refs: list[str] | None = None,
-                                author: str = "human") -> str:
+                                author: str = "human", specialty: str | None = None) -> str:
         """Engineering track: gate work with no hypothesis (contracts, simulator, safety).
         It goes through the same engineering machine (tests, adversarial review with
         hermetic independent tests, path policies, review gates, merge) and ends COMPLETE
@@ -251,6 +278,7 @@ class Controller:
             raise ValueError("an engineering task needs a spec and acceptance criteria")
         rec = self.store.create("project", {
             "kind": "engineering", "objective": spec, "acceptance_criteria": list(acceptance),
+            "specialty": specialty,
             "state": R.ENGINEERING.value, "cycle": 1, "current": {}, "retries": {},
             "design_iterations": 0, "feedback": [], "blocked_on": None, "halt_reason": None,
             "halted_from": None, "mandate_refs": list(mandate_refs or []), "refs": {},
@@ -281,6 +309,9 @@ class Controller:
         if (cur, target) == (R.ENGINEERING, R.COMPLETE) and proj.data.get("kind") != "engineering":
             raise IllegalTransition("a research project cannot complete without validation, "
                                     "data and evaluation")
+        if (cur, target) == (R.PROTOCOL_FREEZE, R.COMPLETE) and proj.data.get("mode") != "plan":
+            raise IllegalTransition("only a plan-only research project (/research) ends at its "
+                                    "reviewed protocol")
         current = {**proj.data.get("current", {}), **(pointers or {})}
         self.store.update(pid, {"state": target.value, "current": current, "retries": {},
                                 **changes}, reason=f"{cur.value} -> {target.value}: {reason}")
@@ -383,6 +414,10 @@ class Controller:
             "details": details or {}, "refs": refs or {},
             "state": self.project(pid).data["state"],
         }, prefix="FAIL", reason=f"failure recorded: {category}")
+        if category in OBSERVED_FAILURES:
+            # Research <-> engineering feedback (D55, master prompt s.12): engineering and
+            # experiment failures become research observations, triaged into questions.
+            record_observation(self.store, rec, self.project(pid).data)
         return rec
 
     def _block(self, pid: str, approval: Record) -> str:
@@ -504,6 +539,10 @@ class Controller:
             role == Role.ENGINEER or (role == Role.VERIFIER and stage == "verify"))
         if role == Role.SCIENTIST and self._charter():
             context = {"lab_charter": self._charter(), **context}
+        if role == Role.SCIENTIST and stage in self.KNOWLEDGE_STAGES:
+            prior = self._prior_knowledge(pid, proj, context)
+            if prior:
+                context = {**context, "lab_knowledge": prior}
         if proj.data.get("mandate_refs"):
             context = {"project_mandate_refs": proj.data["mandate_refs"], **context}
         packet = TaskPacket(task_id=task_id, role=role, stage=stage,
@@ -511,7 +550,7 @@ class Controller:
                             context={"project": pid, "cycle": proj.data["cycle"], **context},
                             constraints=self._constraints(role),
                             workdir=str(workdir) if workdir else None, writable=writable)
-        agent_name, agent = self.agent_for(role, stage)
+        agent_name, agent = self.agent_for(role, stage, proj.data.get("specialty"))
         hdir = self.lab.handoffs / task_id
         hdir.mkdir(parents=True, exist_ok=True)
         (hdir / "task.json").write_text(json.dumps(packet.to_dict(), indent=2, default=str),
@@ -600,7 +639,11 @@ class Controller:
     # Context the engineer and verifier do not get (blinding): which outcome is
     # hypothesised, how it will be decided, and earlier results.
     BLINDED_KEYS = ("question", "hypothesis", "background", "feedback_from_previous_iterations",
-                    "previous_failures")
+                    "previous_failures", "lab_knowledge")
+    # Research stages that frame the work receive the lab's prior knowledge (K1).
+    KNOWLEDGE_STAGES = ("define_problem", "background_research", "research_question",
+                        "hypothesis", "design", "programme_plan", "programme_review",
+                        "observation_triage")
     BLINDED_OBJECTIVE = ("Implement and verify the frozen experiment protocol in the task context "
                          "exactly as specified. The research hypothesis and decision rule are "
                          "withheld on purpose (blinding).")
@@ -645,6 +688,40 @@ class Controller:
             if res.data["refs"].get("hypothesis") == hypothesis:
                 items.update(res.data.get("item_ids", []))
         return items
+
+    def _prior_knowledge(self, pid: str, proj, context: dict) -> dict | None:
+        if not self.cfg.get("knowledge", {}).get("enabled", True):
+            return None
+        hyp = context.get("hypothesis")
+        parts = [proj.data.get("objective", ""), _text(context.get("question")),
+                 _text(hyp.get("statement") if isinstance(hyp, dict) else hyp)]
+        return self.knowledge.context_for(pid, " ".join(p for p in parts if p))
+
+    def new_project_from_question(self, source: str, author: str = "human") -> str:
+        """Feedback loop: start a research project from an open future question of this lab
+        or an included lab (``lab:<lab>/<FQ id>``), with its origin as provenance."""
+        node = self.knowledge.graph().resolve_source(source)
+        if node is None or node.kind != "future_question":
+            raise ValueError(f"{source!r} is not a future question in this lab's knowledge")
+        if node.status != "open":
+            raise ValueError(f"{source} is {node.status}, not open")
+        same_lab = node.lab == self.knowledge.lab_name
+        refs = (self.store.get(node.project).data.get("mandate_refs", [])
+                if same_lab and node.project and self.store.exists(node.project) else [])
+        pid = self.new_project(node.data["question"], refs, author=author)
+        origin = {"source": f"lab:{node.lab}/{node.record_id}", "lab": node.lab,
+                  "question": node.record_id, "project": node.project,
+                  "conclusion": (node.data.get("refs") or {}).get("conclusion"),
+                  "rationale": node.data.get("rationale", "")}
+        self.store.update(pid, {"origin": origin}, author=author,
+                          reason=f"spawned from {origin['source']}")
+        if node.lab == self.knowledge.lab_name:
+            fq = self.store.get(node.record_id)
+            self.store.update(fq.id, {"status": "spawned",
+                                      "refs": {**fq.data.get("refs", {}), "spawned_project": pid}},
+                              author=author, reason=f"spawned research project {pid}")
+        self._export()
+        return pid
 
     def _seeds_used_for(self, pid: str, hypothesis: str) -> set[int]:
         """Seeds of every analysed run that tested ``hypothesis`` (fresh data rule)."""
@@ -707,10 +784,14 @@ class Controller:
         claim_ids = []
         for f in payload["findings"]:
             errs = validate_claim(f)
+            # Claims citing only lab records are checked against the ledgers (K1); external
+            # sources stay unverified.
+            lab_verified = not errs and self.knowledge.verify_sources(f.get("sources", []))
             rec = self.store.create("claim", {
                 "label": f["type"], "statement": f["statement"],
                 "sources": f.get("sources", []), "status": "rejected" if errs else "recorded",
-                "errors": errs, "sources_verified": False, "project": pid,
+                "errors": errs, "sources_verified": lab_verified,
+                **({"verification": "lab-ledger"} if lab_verified else {}), "project": pid,
                 "refs": {"task": tid}}, prefix="CLM", author="scientist",
                 reason="background claim" + (" (rejected)" if errs else ""))
             if not errs:
@@ -878,6 +959,8 @@ class Controller:
         cur = self._cur(pid)
         prot = self.store.get(cur["protocol"])
         p = prot.data["protocol"]
+        if self.project(pid).data.get("mode") == "plan":
+            return self._finish_research_plan(pid, cur, prot)
         if p["kind"] == "confirmatory" and self.cfg["gates"]["confirmatory_protocol_freeze"]:
             status, apr = self._gate(pid, CONFIRMATORY_FREEZE, prot.id,
                                      f"Pre-register confirmatory protocol {prot.id}: {p['title']}",
@@ -908,6 +991,27 @@ class Controller:
                          {"eng_task": eng.id})
         return eng.id
 
+    def _finish_research_plan(self, pid: str, cur: dict, prot: Record) -> str:
+        """Plan-only research: save the research plan (problem, literature and claims,
+        state of the art and gaps, question, hypotheses, requirements, design options and
+        the critic-reviewed experiment proposal) as a report and finish."""
+        text = research_plan_markdown(self.store, pid, cur)
+        path = self.lab.reports / f"{pid}-research-plan.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        sha = self.lab.artifacts.put_text(text)
+        rep = self.store.create("report", {
+            "type": "research_plan", "path": str(path.relative_to(self.lab.root)),
+            "artifact": "sha256:" + sha, "cycle": self.project(pid).data["cycle"],
+            "project": pid, "refs": {k: v for k, v in cur.items() if isinstance(v, str)}},
+            prefix="REP", reason="research plan saved (plan-only research)")
+        self.store.update(prot.id, {"status": "proposed_in_plan"},
+                          reason="experiment proposal of a research plan (not frozen, not run)")
+        self.store.append_event("controller", "ResearchPlanProduced", pid,
+                                {"report": rep.id, "artifact": "sha256:" + sha})
+        self._transition(pid, R.COMPLETE, f"research plan saved ({rep.id})", {"report": rep.id})
+        return rep.id
+
     def _new_eng_task(self, pid: str, protocol_id: str, feedback: list[str]) -> Record:
         return self.store.create("eng_task", {
             "state": E.SPEC.value, "project": pid, "patch_attempts": 0, "redesigns": 0,
@@ -922,13 +1026,19 @@ class Controller:
         engineering = self._is_engineering(pid)
         if state == E.MERGED and engineering:
             proj = self.project(pid)
+            release, quality = self._release_manifest(pid, eng)
             dlv = self.store.create("delivery", {
                 "spec": proj.data["objective"],
                 "acceptance_criteria": proj.data["acceptance_criteria"],
                 "mandate_refs": proj.data.get("mandate_refs", []),
+                "specialty": proj.data.get("specialty"),
                 "commit": eng.data["merge_commit"], "review": eng.data["last_review"],
-                "project": pid, "refs": {"eng_task": eng.id, "review": eng.data["last_review"]}},
+                "quality": quality, "project": pid,
+                "refs": {"eng_task": eng.id, "review": eng.data["last_review"],
+                         "release": release}},
                 prefix="DLV", reason="engineering task delivered (merged after review)")
+            self.store.append_event("controller", "ReleaseProduced", dlv.id,
+                                    {"commit": eng.data["merge_commit"], "manifest": release})
             self._transition(pid, R.COMPLETE, f"{eng.id} merged as {eng.data['merge_commit'][:10]}",
                              {"commit": eng.data["merge_commit"], "delivery": dlv.id})
             return dlv.id
@@ -994,6 +1104,10 @@ class Controller:
         return branch, wt, base
 
     def _eng_spec(self, pid: str, eng: Record) -> str:
+        # D56: engineering-track work needs an approved, machine-readable architecture first.
+        note = self._architecture_step(pid, eng)
+        if note is not None:
+            return note
         branch, wt, base = self._eng_worktree(eng, 0)
         self._eng_to(eng, E.IMPLEMENTING, "worktree created", branch=branch,
                      worktree=str(wt), base=base, head=base, pending_redesign=False)
@@ -1011,6 +1125,7 @@ class Controller:
             req = ctx.pop("requirements", {})
             ctx["engineering_requirements"] = req.get("engineering", [])
             ctx["validity_criteria"] = req.get("validity_criteria", [])
+        ctx.update(self._architecture_context(eng))
         ctx["engineering_task"] = eng.id
         ctx["patch_attempt"] = eng.data["patch_attempts"]
         ctx["redesign_index"] = eng.data["redesigns"]
@@ -1246,6 +1361,10 @@ class Controller:
     def _eng_merge(self, pid: str, eng: Record) -> str:
         cand = eng.data["merge_candidate"]
         head = self.repo.rev(cand)
+        # D56: security and performance reviews of the exact candidate before integration.
+        note = self._quality_review_step(pid, eng, head)
+        if note is not None:
+            return note
         changed = self.repo.changed_files(eng.data["base"], head)
         for rule in self.cfg["gates"].get("review_paths", []):
             hits = [f for f in changed if fnmatch.fnmatch(f, rule["pattern"])]

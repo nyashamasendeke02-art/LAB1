@@ -71,6 +71,21 @@ review_paths = []   # e.g. [{pattern = "src/safety/*", gate = "safety"}]
 delegate = ""
 gates = []
 
+# Hierarchical coordination (D54): programmes decomposed by the Research Director into research
+# projects and engineering items, which the Engineering Director splits into specialty tasks.
+[coordination]
+specialties = ["backend", "frontend", "ml", "algorithm", "data", "simulation", "safety", "infrastructure"]
+max_items = 12           # work items per programme (plan + replans)
+max_tasks_per_item = 8   # engineering tasks per engineering item
+max_reviews = 6          # Research Director reviews before the programme HALTs for a human
+
+# Knowledge plane (K1): research stages receive prior knowledge from this lab's other projects
+# and from these labs (paths relative to this lab's folder, opened read-only).
+[knowledge]
+enabled = true
+include_labs = []      # e.g. ["../pilot-004"]
+context_items = 8
+
 # Dashboard (autolab ui). Projects whose objective starts with a task key (e.g. "G1-6 ...")
 # and whose mandate_refs name a milestone (e.g. "Gate 1") appear on the milestone board.
 [ui]
@@ -81,6 +96,11 @@ milestone_label = "Gate"
 refresh_fallback_s = 30
 
 [engineering]
+# D56 engineering workflow (engineering-track projects): an approved machine-readable
+# architecture before any code, then security and performance reviews before integration.
+architecture_stage = true
+architecture_rounds = 2          # critique rounds before the project HALTs for a human
+pre_merge_reviews = ["security", "performance"]
 test_command = "python -m pytest -q"
 protected_paths = ["protocols/*", "tests/verification/*"]
 verifier_allowed_paths = ["tests/verification/*"]

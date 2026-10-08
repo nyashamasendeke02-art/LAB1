@@ -65,9 +65,29 @@ def is_usage_limit(exc: BaseException) -> bool:
     return isinstance(exc, BackendError) and bool(_USAGE_LIMIT.search(str(exc)))
 
 
+USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
+                "cost_usd", "api_duration_s", "turns")
+
+
+def add_usage(total: dict | None, part: dict | None) -> dict | None:
+    """Sum two usage dicts field by field (None = unknown)."""
+    if not part:
+        return total
+    out = dict(total or {})
+    for k in USAGE_FIELDS:
+        if part.get(k) is not None:
+            out[k] = round((out.get(k) or 0) + part[k], 6)
+    if part.get("model"):
+        out["model"] = part["model"]
+    return out
+
+
 class AgentBackend(ABC):
     name: str = "backend"
     model: str | None = None
+    # Usage reported by the last invoke() (tokens, cost, time), when the backend reports it;
+    # None means the backend does not report usage (never estimated).
+    last_usage: dict | None = None
 
     @abstractmethod
     def invoke(self, task: TaskPacket, prompt: str) -> str:
@@ -92,9 +112,11 @@ class ScriptedBackend(AgentBackend):
 
     name = "scripted"
 
-    def __init__(self, handlers: dict[str, Handler | list[Handler]], model: str = "script"):
+    def __init__(self, handlers: dict[str, Handler | list[Handler]], model: str = "script",
+                 usage: dict | None = None):
         self.handlers = handlers
         self.model = model
+        self.usage = usage  # reported per call, to test accounting
         self.calls: list[tuple[str, str]] = []
         self._idx: dict[str, int] = {}
 
@@ -108,6 +130,7 @@ class ScriptedBackend(AgentBackend):
             self._idx[task.stage] = i + 1
             h = h[min(i, len(h) - 1)]
         out = h(task)
+        self.last_usage = dict(self.usage) if self.usage else None
         return out if isinstance(out, str) else json.dumps(out)
 
 
@@ -160,9 +183,31 @@ class ClaudeCLIBackend(AgentBackend):
         return cmd
 
     def invoke(self, task: TaskPacket, prompt: str) -> str:
+        self.last_usage = None
         proc = _run(self.command(task), cwd=task.workdir, stdin=prompt, timeout=self.timeout,
                     env={**os.environ, **self.HERMETIC_ENV})
+        self.last_usage = self.usage_of(proc.stdout)
         return self.parse_output(proc.returncode, proc.stdout, proc.stderr)
+
+    @staticmethod
+    def usage_of(stdout: str) -> dict | None:
+        """Tokens, cost and time from Claude Code's JSON result (also on errors)."""
+        try:
+            data = json.loads(stdout)
+        except (json.JSONDecodeError, TypeError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        u = data.get("usage") or {}
+        models = list((data.get("modelUsage") or {}).keys())
+        out = {"input_tokens": u.get("input_tokens"), "output_tokens": u.get("output_tokens"),
+               "cache_read_tokens": u.get("cache_read_input_tokens"),
+               "cache_write_tokens": u.get("cache_creation_input_tokens"),
+               "cost_usd": data.get("total_cost_usd"),
+               "api_duration_s": (data["duration_api_ms"] / 1000
+                                  if isinstance(data.get("duration_api_ms"), (int, float)) else None),
+               "turns": data.get("num_turns"), "model": models[0] if len(models) == 1 else None}
+        return out if any(v is not None for k, v in out.items() if k != "model") else None
 
     @staticmethod
     def parse_output(returncode: int, stdout: str, stderr: str) -> str:
@@ -257,6 +302,10 @@ class OpenAIBackend(AgentBackend):
                 data = json.loads(resp.read())
         except Exception as exc:  # network errors become backend errors
             raise BackendError(f"OpenAI request failed: {exc}") from None
+        u = data.get("usage") or {}
+        self.last_usage = {"input_tokens": u.get("input_tokens"),
+                           "output_tokens": u.get("output_tokens"),
+                           "model": data.get("model")} if u else None
         if "output_text" in data:
             return data["output_text"]
         texts = [c.get("text", "") for item in data.get("output", [])
@@ -371,11 +420,15 @@ class FallbackBackend(AgentBackend):
         now = time.time()
         if now < self._primary_limited_until:
             self.active = self.backup
-            return self.backup.invoke(task, prompt)
+            out = self.backup.invoke(task, prompt)
+            self.last_usage = self.backup.last_usage
+            return out
 
         try:
             self.active = self.primary
-            return self.primary.invoke(task, prompt)
+            out = self.primary.invoke(task, prompt)
+            self.last_usage = self.primary.last_usage
+            return out
         except BackendError as exc:
             if is_usage_limit(exc) or any(phrase in str(exc).lower() for phrase in (
                 "usage limit", "rate limit", "upgrade to plus", "quota exceeded", "too many requests", "429"
@@ -386,7 +439,9 @@ class FallbackBackend(AgentBackend):
                     f"[autolab] Automatically falling back to backup backend {self.backup.name}...\n"
                 )
                 self.active = self.backup
-                return self.backup.invoke(task, prompt)
+                out = self.backup.invoke(task, prompt)
+                self.last_usage = self.backup.last_usage
+                return out
             raise
 
 
@@ -414,6 +469,7 @@ class AgentResult:
     raw_responses: list[str]
     attempts: int
     rejections: list[str]
+    usage: dict | None = None
 
 
 class Agent:
@@ -431,12 +487,18 @@ class Agent:
         prompt = base_prompt
         raws: list[str] = []
         rejections: list[str] = []
+        usage: dict | None = None
         for attempt in range(1, self.max_protocol_retries + 2):
-            raw = self.backend.invoke(task, prompt)
+            try:
+                raw = self.backend.invoke(task, prompt)
+            except Exception as exc:
+                exc.usage = add_usage(usage, getattr(self.backend, "last_usage", None))
+                raise
+            usage = add_usage(usage, getattr(self.backend, "last_usage", None))
             raws.append(raw)
             try:
                 completion = validate_completion(task.stage, extract_json(raw))
-                return AgentResult(completion, base_prompt, raws, attempt, rejections)
+                return AgentResult(completion, base_prompt, raws, attempt, rejections, usage)
             except ProtocolError as exc:
                 rejections.append(str(exc))
                 prompt = (base_prompt + "\n\nYOUR PREVIOUS ANSWER WAS REJECTED BY THE "
@@ -444,4 +506,5 @@ class Agent:
         err = ProtocolError(f"{self.role.value}/{task.stage}: {rejections[-1]}")
         # Keep the evidence: the controller stores rejected responses as artifacts.
         err.prompt, err.raw_responses, err.rejections = base_prompt, raws, rejections
+        err.usage = usage
         raise err

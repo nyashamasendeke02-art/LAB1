@@ -22,7 +22,7 @@ that can be down when an unattended run needs it.
 
 | Technology area | Options considered | Decision | Why | Revisit when |
 |---|---|---|---|---|
-| Language | Python, TypeScript | **Python 3.13** (standard library + jsonschema) | the research and ML ecosystem; agents write Python experiments; one language for controller and experiments | a large front-end application is needed |
+| Language | Python, TypeScript | **Python 3.13** (standard library + jsonschema + PyYAML) | the research and ML ecosystem; agents write Python experiments; one language for controller and experiments | a large front-end application is needed |
 | Web UI | React/TypeScript SPA, server-rendered, dependency-free ES module | **dependency-free ES module + stdlib `ThreadingHTTPServer`** | no build step or npm supply chain; strict CSP; loopback only; works offline | multi-user or remote access is required |
 | API framework | FastAPI, Flask, stdlib | **stdlib `http.server`** | ~20 JSON endpoints on loopback; FastAPI adds a server process and dependencies for no current need | the API is exposed beyond the machine or needs auth/OpenAPI clients |
 | Records / provenance store | PostgreSQL, SQLite, event store | **SQLite (WAL) with append-only, hash-chained records** | a file, no server (T1); SQL triggers forbid UPDATE/DELETE; transactional; read-only opening for cross-lab knowledge | concurrent writers from several machines |
@@ -30,6 +30,7 @@ that can be down when an unattended run needs it.
 | Object / artifact storage | S3/MinIO, filesystem | **content-addressed filesystem store (sha256, read-only files)** | integrity checked on read; no service; trivially backed up | artifacts outgrow one disk or must be shared between machines |
 | Cache / coordination | Redis | **none** | state lives in the ledger; one controller process per lab | several controllers must coordinate on one lab |
 | Events / messaging | Kafka, RabbitMQ, NATS, ledger events | **ledger events (hash-chained) + Server-Sent Events to the dashboard** | events are already durable and ordered in the ledger; agents are dispatched by the controller, not by subscriptions | agents must react to events asynchronously across processes or machines |
+| Manifest format | YAML (PyYAML), TOML (stdlib), JSON (stdlib) | **YAML via PyYAML 6** (D61) | s.16 requires `project.yaml`; hand-writing a YAML parser would be fragile; PyYAML is small, mature, `safe_load` only | - |
 | Containers | Docker, none | **none yet** (trials run as subprocesses with resource accounting and a pinned interpreter + lock check) | Docker Desktop on this PC is an extra moving part; reproducibility is enforced by commit + lock + seeds | experiments need system libraries, GPUs or stronger isolation (planned: containerised trial runner) |
 | Cluster / distributed | Kubernetes, Ray, none | **none** | one machine | multi-GPU or multi-machine experiments |
 | Experiment tracking | MLflow, Weights & Biases, ledger | **the lab's own run/result records** | pre-registration, freeze hashes, decision rules and provenance are first-class here and absent in MLflow | model training at scale needs model registries and artifact lineage MLflow provides |

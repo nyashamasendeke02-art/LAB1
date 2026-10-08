@@ -12,15 +12,15 @@ built). Evidence names the code or test; nothing here is claimed from documentat
 | Core method: vertical slice, provenance, research <-> engineering, replaceable agents (1-6, 14, 23-25, 31-33) | aligned |
 | Agent hierarchy (7) | aligned, two small gaps (programme time limit, configurable depth) |
 | Knowledge graph (8) | **closed (D59)** for 16 of 24 entity types and the named relationships; Author, Simulation, Robot, Environment, Publication not yet |
-| Experiment engine (9) | partial: reproducible local/simulation runs; no container, GPU, distributed or hardware execution |
+| Experiment engine (9) | partial: reproducible local/simulation runs; containers/GPU **blocked on this machine** (no Docker, no NVIDIA GPU, checked 2026-10-08) |
 | Evaluation engine (10) | partial: experiment evaluation is mechanical; no model/agent/algorithm/robot evaluation suites |
 | Engineering workflow (11) | **closed (D56)** except deployment |
 | Research <-> engineering feedback (12, "mandatory") | **closed (D55)** |
 | Events (13) | partial: ledger events are generic; agents do not subscribe |
-| Project structure and manifest (15, 16) | **gap** |
+| Project structure and manifest (15, 16) | **closed (D61)** |
 | Model abstraction (17) | partial: LLM backends only |
-| Tools, sandboxes (18, 19) | partial: per-stage permissions through CLI backends; no unified tool layer or per-call log |
-| Observability (20) | partial: no token, cost or GPU tracking |
+| Tools, sandboxes (18, 19) | sandboxes **closed (D62)** (six named profiles, secrets scrubbed for executed code; network not enforceable on Windows); tool-call logging still a gap |
+| Observability (20) | **closed (D60)** for tokens, cost and time per call (where backends report them) and agent scorecards; tool calls and GPU not tracked |
 | Autonomy levels (21) | **closed (D58)** |
 | Technology decision document (22) | **closed** (docs/TECHNOLOGY_DECISIONS.md) |
 | Slash workflows /research /engineer /project /director /build (26-30) | **closed (D57)**; deployment steps remain a gap |
@@ -88,6 +88,9 @@ built). Evidence names the code or test; nothing here is claimed from documentat
 | 22 technology decisions | docs/TECHNOLOGY_DECISIONS.md | - |
 | 8 knowledge vocabulary | D59: entity types, derived Agent/Model/Dataset/Metric/Paper/CodeArtifact/Architecture, typed relations | tests/test_knowledge.py |
 | (found in review) generated data in branches | D58: controller removes generated/oversized files after engineer commits | test_generated_data_never_reaches_a_branch |
+| 20 observability + 10 agent evaluation | D60: tokens/cost/time per call, agent scorecards (CLI + dashboard) | tests/test_scorecard.py |
+| 15/16 project manifest | D61: export project folder + project.yaml, import (incl. the s.16 example) | tests/test_manifest.py |
+| 19 sandbox profiles | D62: six profiles, secrets scrubbed for trials and test runs | tests/test_sandbox.py |
 
 ## Priority order to close the gaps (as of the audit)
 

@@ -40,6 +40,7 @@ from .gates import GateError, Gates
 from .autonomy import LEVELS, delegation, lab_level
 from .coordination import PROGRAMME_STATES, PROGRAMME_TRANSITIONS, Coordinator
 from .knowledge import INDEXED_KINDS, Knowledge
+from .scorecard import scorecards, totals
 from .registry import BACKENDS, ORGANISATION, ROLE_AGENTS, STAGES, Registry, RegistryError
 from .state_machines import (ENGINEERING_PIPELINE, ENGINEERING_PIPELINE_ALIAS, RESEARCH_DONE,
                              RESEARCH_TERMINAL, STATE_TONES, EngineeringState, ResearchState)
@@ -426,6 +427,7 @@ class DashboardServer:
                 active[name] = event
         reg = self.registry()
         effective = reg.describe()["effective"]
+        cards = {c["agent"]: c for c in scorecards(self.store)}
         out = []
         for name, settings in sorted(reg.agents.items(),
                                      key=lambda kv: (kv[0] not in ROLE_AGENTS, kv[0])):
@@ -447,6 +449,7 @@ class DashboardServer:
                 "backup_backend": settings.get("backup_backend") or None,
                 "backup_model": settings.get("backup_model") or None,
                 "spec": {k: v for k, v in settings.items() if k != "stages"},
+                "scorecard": cards.get(name),
                 "status": "working" if act else ("blocked" if err else "idle"),
                 "error_kind": classify_error(err), "error": err[-600:] if err else None,
                 "error_message": readable_error(err),
@@ -517,6 +520,7 @@ class DashboardServer:
                        "deliveries": len(self.store.query("delivery")),
                        "agents_working": sum(a["status"] == "working" for a in agents)},
             "ledger": self._verify(), "queue": self._queue(), "gates": board,
+            "usage": totals(scorecards(self.store)),
             "active": active, "approvals": approvals, "agents": agents, "alerts": alerts,
             "activity": self.activity(14), "pipeline": ENG_PIPELINE,
         }

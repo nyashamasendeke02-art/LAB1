@@ -337,3 +337,24 @@
   protocol tested_by run; run uses dataset/code; agent produces records and uses a model). On the real ledgers:
   pilot-004 CON-0001 supports HYP-0001 and motivates FQ-0001..4. Dashboard Knowledge view lists entities and
   relationships. Not derived yet: Author, Simulation, Robot, Environment, Publication.
+- D60 (2026-10-08, human: "Close remaining gaps"): observability and agent scorecards (s.20, s.10). Backends report
+  usage per call when they can (Claude CLI JSON: tokens incl. cache, cost USD, API time, turns, model; OpenAI API:
+  tokens); Codex/Gemini CLIs report nothing structured, so their usage stays unknown (never estimated). Agent.run sums
+  usage across protocol retries; the controller stores usage and measured wall time on every task record (also on
+  errors). src/autolab/scorecard.py: per agent -- calls, success rate, protocol rejections, avg time, tokens, cost,
+  models, stages, and quality: reviews of the code it authored (passed/failed, findings caused) and findings it
+  raised as reviewer. `autolab agents LAB scorecard`, dashboard Agents scorecards, Overview cost KPI. robolab history:
+  default engineer 66 calls / 33% ok, 10 of 20 reviews passed, 9 major findings caused; Codex verifier raised 10 major.
+  Tests: tests/test_scorecard.py (4). Docker and NVIDIA GPU are absent on this PC: container/GPU execution (s.9) is
+  blocked by hardware, not built.
+- D61: project manifest and structure (s.15/16), src/autolab/manifest.py: `autolab manifest LAB export PRJ` writes
+  project.yaml (s.16 shape + provenance: ledger head) and research/, requirements/, architecture/, agents/,
+  experiments/, datasets/, models/, results/, evaluations/, papers/, src/SOURCE.md (exact commits), documentation/;
+  `import` creates a project from project.yaml (the s.16 example verbatim works) and briefs research stages with its
+  questions, hypotheses, metrics and domains (`project_manifest` context; engineers stay blinded). New dependency
+  PyYAML 6 (requirement-driven, TECHNOLOGY_DECISIONS.md). Tests: tests/test_manifest.py (4).
+- D62: sandbox profiles (s.19), src/autolab/sandbox.py: Research/Coding/Testing/Simulation/Deployment/Robot profiles
+  with enforced vs not-enforced parts, recorded per task; credentials scrubbed from experiment trials and controller
+  test runs (protocol.secrets allows named ones, frozen with the protocol); network not enforceable on Windows
+  without admin firewall rules (documented). Tests: tests/test_sandbox.py (3). Remaining s.18 gap: per-tool-call
+  logging (needs the Claude backend on stream-json; deferred to its own change with a live check).

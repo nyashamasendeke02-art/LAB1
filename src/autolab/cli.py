@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 from datetime import datetime
 
 from .controller import Controller, Lab
@@ -235,6 +236,26 @@ def _knowledge_cmd(lab: Lab, a) -> int:
 def _agents_cmd(lab: Lab, a) -> int:
     from .registry import STAGE_BY_NAME, STAGES, Registry, RegistryError
     reg = Registry(lab.config, lab.root)
+    if a.agents_cmd == "scorecard":
+        from .scorecard import scorecards, totals
+        cards = scorecards(lab.store)
+        fmt = lambda v, unit="": "-" if v is None else f"{v}{unit}"  # noqa: E731
+        print(f"{'agent':16} {'calls':>5} {'ok%':>5} {'rej':>4} {'avg s':>7} {'tokens in/out':>17} "
+              f"{'cost $':>8}  reviews of code (pass/fail; findings C/M/m)   findings raised")
+        for c in cards:
+            rv, fc, fr = c["reviews_of_my_code"], c["findings_caused"], c["findings_raised"]
+            tok = (f"{c['input_tokens']}/{c['output_tokens']}"
+                   if c["input_tokens"] is not None else "-")
+            print(f"{c['agent']:16} {c['calls']:>5} {fmt(round(100 * c['success_rate']) if c['success_rate'] is not None else None):>5} "
+                  f"{c['protocol_rejections']:>4} {fmt(c['avg_wall_s']):>7} {tok:>17} "
+                  f"{fmt(c['cost_usd']):>8}  {rv['passed']}/{rv['failed']}; "
+                  f"{fc['critical']}/{fc['major']}/{fc['minor']}{'':>25}"
+                  f"{fr['critical']}/{fr['major']}/{fr['minor']}")
+        t = totals(cards)
+        print(f"\nlab: {t['calls']} calls, {t['errors']} errors, {t['wall_s']} s agent time; "
+              f"tokens/cost reported for {t['usage_reported_calls']} calls: "
+              f"in {fmt(t['input_tokens'])}, out {fmt(t['output_tokens'])}, ${fmt(t['cost_usd'])}")
+        return 0
     try:
         if a.agents_cmd == "preset":
             print("created: " + ", ".join(reg.apply_preset(a.name)))
@@ -336,6 +357,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("lab")
     asub = p.add_subparsers(dest="agents_cmd")
     asub.add_parser("list")
+    asub.add_parser("scorecard", help="evidence per agent: success, time, tokens, cost, reviews")
     q = asub.add_parser("preset", help="create the research/engineering organisation")
     q.add_argument("name", nargs="?", default="organisation")
     q = asub.add_parser("set", help="create or update an agent")
@@ -395,6 +417,15 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("research", "engineer", "project"):
         sub.choices[name].add_argument("--autonomy", type=int, default=None,
                                        help="autonomy level 0-5 for this project (<= lab max)")
+    p = sub.add_parser("manifest", help="project.yaml: export a project's structure, or import one")
+    p.add_argument("lab")
+    msub = p.add_subparsers(dest="manifest_cmd")
+    q = msub.add_parser("export")
+    q.add_argument("project")
+    q.add_argument("--out", default=None, help="default: <lab>/projects")
+    q = msub.add_parser("import")
+    q.add_argument("file")
+    q.add_argument("--run", action="store_true")
     p = sub.add_parser("observe", help="engineering failures -> research observations -> questions")
     p.add_argument("lab")
     osub = p.add_subparsers(dest="observe_cmd")
@@ -442,6 +473,18 @@ def main(argv: list[str] | None = None) -> int:
         return _programme_cmd(lab, a)
     if a.cmd == "observe":
         return _observe_cmd(lab, a)
+    if a.cmd == "manifest":
+        from .manifest import export_project, import_project
+        if a.manifest_cmd == "export":
+            print(export_project(lab, a.project, Path(a.out) if a.out else lab.root / "projects"))
+            return 0
+        ctl = Controller(lab) if a.run else Controller(lab, agents={})
+        pid = import_project(ctl, Path(a.file))
+        print(pid)
+        if a.run:
+            steps = ctl.run(pid, on_step=_print_step)
+            return 0 if ctl.project(pid).data["state"] == "COMPLETE" else 1
+        return 0
     if a.cmd in ("research", "engineer", "project", "director", "build"):
         return _mode_cmd(lab, a)
     if a.cmd == "ui":

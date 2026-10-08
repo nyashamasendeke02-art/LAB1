@@ -46,6 +46,19 @@ read-only; the engineer runs `claude -p` with git disallowed; the verifier runs
 Codex; Gemini's headless mode needs `--dangerously-skip-permissions` and is therefore
 confined by `--sandbox` (F11). All of this is asserted in tests. The lab never pushes, deploys or touches remotes.
 
+## Sandbox profiles (D62)
+
+Every stage and trial runs under a named profile (`src/autolab/sandbox.py`, recorded on each task
+record and dispatch event): ResearchSandbox (scientist stages and read-only engineer/verifier
+stages), CodingSandbox (engineer writing stages), TestingSandbox (verifier), SimulationSandbox
+(experiment trials), DeploymentSandbox and RobotSandbox (unavailable: no deployment plane; no
+hardware before Gate 7). Each states what is enforced and what is not. Secrets: experiment trials
+and controller test runs get an environment scrubbed of credential-like variables (KEY, TOKEN,
+SECRET, PASSWORD, CREDENTIAL, AUTH, COOKIE, SESSION); a trial receives only the variables its
+frozen protocol lists in `secrets`. On the lab PC this removed CLAUDE_CODE_MESSAGING_TOKEN from
+code the lab executes. Network access is not enforceable without OS firewall rules and is
+documented as not enforced.
+
 ## Findings and residual risks
 
 - **F11 (2026-10-08, fixed):** the Gemini backend (D50) auto-approved every tool request on
@@ -54,8 +67,7 @@ confined by `--sandbox` (F11). All of this is asserted in tests. The lab never p
   probe that the sandbox still lets agy edit the worktree is pending (Gemini quota).
 - Engineer-written code runs outside an OS sandbox (tests, trials); tampering with controller
   state is detected, other writes on the machine are not.
-- Experiment trials inherit the controller's environment, including API keys, so experiment
-  code can read them; use keys with spending limits.
+- (fixed D62) Experiment trials no longer inherit credentials; only protocol-declared secrets.
 - The verifier sandbox can read outside its worktree.
 - The ledger is tamper-evident, not tamper-proof: rewriting both the database and git history
   is possible for someone with full disk access.

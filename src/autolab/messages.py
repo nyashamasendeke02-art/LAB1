@@ -118,6 +118,8 @@ PROTOCOL_SCHEMA = {
         },
         "n_items": {"type": "integer", "minimum": 2},
         "data_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "secrets": {"type": "array", "items": {"type": "string",
+                                               "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"}},
         "budget": {
             "type": "object",
             "additionalProperties": False,

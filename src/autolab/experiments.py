@@ -37,6 +37,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .procs import run_tree
+from .sandbox import scrubbed_env
 from .taxonomy import Outcome
 
 
@@ -174,7 +175,7 @@ def check_lock(lock_file: Path) -> list[str]:
 def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
               seed: int, required_metrics: list[str], timeout_s: float,
               params: dict | None = None, output_cap_mb: float | None = None,
-              require_items: bool = False) -> Trial:
+              require_items: bool = False, secrets: list[str] | None = None) -> Trial:
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = build_command(entrypoint) + [
         "--condition", condition["name"], "--seed", str(seed),
@@ -182,7 +183,9 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
         "--params", json.dumps(condition.get("params", {}) if params is None else params,
                                sort_keys=True),
     ]
-    env = {**os.environ, "PYTHONHASHSEED": str(seed), "AUTOLAB_SEED": str(seed)}
+    # SimulationSandbox (D62): no credentials except those the frozen protocol declares.
+    env = {**scrubbed_env(os.environ, secrets or []), "PYTHONHASHSEED": str(seed),
+           "AUTOLAB_SEED": str(seed)}
     t0 = time.perf_counter()
     error = None
     proc = run_tree(cmd, cwd=str(workdir), timeout=timeout_s, env=env,
@@ -281,7 +284,7 @@ def run_protocol(protocol: dict, workdir: Path, out_root: Path,
         while True:
             t = run_trial(protocol["entrypoint"], workdir, d, cond, seed, required, timeout,
                           params=trial_params(protocol, cond), output_cap_mb=output_cap_mb,
-                          require_items=need_items)
+                          require_items=need_items, secrets=protocol.get("secrets"))
             t.attempts = attempt
             if not t.transient or attempt > max_retries:
                 break

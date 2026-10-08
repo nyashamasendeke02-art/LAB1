@@ -37,6 +37,7 @@ from .agents import Agent, AgentBackend, agent_wait_kind, make_backend
 from .autonomy import AutonomyError, delegation, project_level, resolve_level
 from .eng_workflow import EngineeringWorkflowMixin
 from .report import research_plan_markdown
+from .sandbox import profile_for, scrubbed_env
 from .feedback import OBSERVED_FAILURES, record_observation
 from .knowledge import Knowledge
 from .registry import AGENTS_FILE, Registry
@@ -561,6 +562,10 @@ class Controller(EngineeringWorkflowMixin):
             prior = self._prior_knowledge(pid, proj, context)
             if prior:
                 context = {**context, "lab_knowledge": prior}
+        if (role == Role.SCIENTIST and proj.data.get("manifest_seed")
+                and stage in ("define_problem", "research_question", "hypothesis", "design")):
+            # D61: a project created from project.yaml starts from its manifest's content.
+            context = {"project_manifest": proj.data["manifest_seed"], **context}
         if proj.data.get("mandate_refs"):
             context = {"project_mandate_refs": proj.data["mandate_refs"], **context}
         packet = TaskPacket(task_id=task_id, role=role, stage=stage,
@@ -575,13 +580,17 @@ class Controller(EngineeringWorkflowMixin):
                                         encoding="utf-8")
         self.store.append_event("controller", "task.dispatched", task_id,
                                 {"role": role.value, "stage": stage, "project": pid,
-                                 "agent": agent_name, **agent.backend.describe()})
+                                 "agent": agent_name, "sandbox": profile_for(role, writable),
+                                 **agent.backend.describe()})
         before = self._integrity_snapshot()
+        t0 = time.perf_counter()
         try:
             result = agent.run(packet)
         except Exception as exc:
             self._check_integrity(before, f"{role.value}/{stage} ({task_id})")
-            refs, extra = {}, {}
+            refs = {}
+            extra = {"wall_s": round(time.perf_counter() - t0, 3),
+                     "usage": getattr(exc, "usage", None)}
             raws = getattr(exc, "raw_responses", None)
             if raws:  # protocol violations: keep what the agent actually said
                 (hdir / "rejected_responses.md").write_text(
@@ -589,7 +598,7 @@ class Controller(EngineeringWorkflowMixin):
                 refs = {"prompt": "sha256:" + self.lab.artifacts.put_text(exc.prompt),
                         "responses": "sha256:" + self.lab.artifacts.put_text(
                             "\n\n-----\n\n".join(raws))}
-                extra = {"rejections": exc.rejections}
+                extra = {**extra, "rejections": exc.rejections}
             self.store.create("task", {
                 "project": pid, "role": role.value, "stage": stage, "status": "error",
                 "error": f"{type(exc).__name__}: {exc}"[:2000], **extra,
@@ -613,6 +622,8 @@ class Controller(EngineeringWorkflowMixin):
             "project": pid, "role": role.value, "stage": stage, "status": comp["status"],
             "summary": comp.get("summary", ""), "attempts": result.attempts,
             "rejections": result.rejections, "agent": agent_name,
+            "sandbox": profile_for(role, writable),
+            "wall_s": round(time.perf_counter() - t0, 3), "usage": result.usage,
             "backend": agent.backend.describe(), "claims": ok_claims,
             "rejected_claims": rejected, "risks": comp.get("risks", []), "refs": refs,
         }, record_id=task_id, author=role.value, reason=f"{stage} completed")
@@ -1242,7 +1253,7 @@ class Controller(EngineeringWorkflowMixin):
         if cmd and cmd[0] in ("python", "python3", "py"):
             cmd[0] = sys.executable
         proc = run_tree(cmd, cwd=str(cwd), timeout=self.limits["test_timeout_s"],
-                        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"})
+                        env={**scrubbed_env(os.environ), "PYTHONDONTWRITEBYTECODE": "1"})
         out, rc = proc.stdout + proc.stderr, proc.returncode
         if proc.timed_out:
             out += "\n[controller] test command timed out"

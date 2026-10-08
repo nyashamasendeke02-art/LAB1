@@ -185,7 +185,8 @@ VIEWS.overview = async () => {
   if (o.alerts.length) out.append(h("div", { class: "alerts" }, o.alerts.map(alertBox)));
   out.append(h("div", { class: "grid kpis" },
     kpi("Active projects", c.active, c.active ? "attn" : ""), kpi("Awaiting your decision", c.approvals, c.approvals ? "attn" : ""),
-    kpi("Agents working", c.agents_working), kpi("Delivered", c.deliveries), kpi("Halted", c.halted, c.halted ? "bad" : "")));
+    kpi("Agents working", c.agents_working), kpi("Delivered", c.deliveries), kpi("Halted", c.halted, c.halted ? "bad" : ""),
+    kpi("Agent cost (reported)", o.usage && o.usage.cost_usd !== null ? `$${o.usage.cost_usd.toFixed(2)}` : "–")));
   const left = h("div", { class: "stack" });
   const right = h("div", { class: "stack" });
 
@@ -445,6 +446,7 @@ VIEWS.agents = async () => {
     a.charter ? h("p", { class: "prose small", text: a.charter }) : null,
     h("div", { class: "tags" }, a.stages.length ? a.stages.map((st) => h("span", { class: "tag", text: stageLabel(st) })) : h("span", { class: "muted small", text: "Not allocated to any stage" })),
     h("div", { class: "metrics" }, [["Calls", a.calls], ["Completed", a.completed], ["Errors", a.errors]].map(([l, v]) => h("div", { class: "metric" }, h("b", { text: v }), h("span", { text: l })))),
+    scorecardView(a.scorecard),
     h("div", { class: "spark", "aria-label": "Recent calls, oldest to newest" }, a.recent.slice().reverse().map((t) => h("span", { class: `s-${t.status} k-${t.error_kind || ""}`, title: `${t.id} · ${t.stage} · ${t.error_kind || t.status} · ${absTime(t.at)}` }))),
     a.active ? h("p", { class: "small" }, "Working on ", subjectLink(a.active.task), ` (${human(a.active.stage)}) since ${ago(a.active.since)}`) : null,
     a.error_message ? h("div", { class: `alert ${a.error_kind === "usage_limit" || a.error_kind === "network" ? "warn" : "error"}` },
@@ -456,6 +458,23 @@ VIEWS.agents = async () => {
   out.append(allocationCard(reg));
   return out;
 };
+
+function scorecardView(c) {
+  if (!c || !c.calls) return null;
+  const v = (x, unit = "") => (x === null || x === undefined ? "–" : `${x}${unit}`);
+  const rv = c.reviews_of_my_code, fc = c.findings_caused, fr = c.findings_raised;
+  const rows = [
+    ["Success", c.success_rate === null ? "–" : `${Math.round(100 * c.success_rate)}%`],
+    ["Avg time", v(c.avg_wall_s, " s")],
+    ["Tokens in / out", c.input_tokens === null ? "not reported" : `${c.input_tokens.toLocaleString()} / ${c.output_tokens.toLocaleString()}`],
+    ["Cost", c.cost_usd === null ? "not reported" : `$${c.cost_usd.toFixed(4)}`],
+    ["Protocol rejections", c.protocol_rejections],
+  ];
+  if (rv.passed + rv.failed) rows.push(["Reviews of its code", `${rv.passed} passed · ${rv.failed} failed (critical ${fc.critical}, major ${fc.major}, minor ${fc.minor})`]);
+  if (fr.critical + fr.major + fr.minor) rows.push(["Findings it raised", `critical ${fr.critical} · major ${fr.major} · minor ${fr.minor}`]);
+  return h("details", { class: "scorecard" }, h("summary", { class: "small", text: "Scorecard (evidence for choosing models)" }),
+    h("div", { class: "list" }, rows.map(([k, val]) => h("div", { class: "item" }, h("span", { class: "muted small", text: k }), h("span", { class: "small", text: String(val) }), h("span")))));
+}
 
 function allocationCard(reg) {
   const names = Object.keys(reg.agents).sort();

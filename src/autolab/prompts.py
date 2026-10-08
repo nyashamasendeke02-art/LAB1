@@ -72,7 +72,9 @@ budget.max_cost_usd is set, report the trial's spend as metrics.json cost_usd.
 Exit with code 75 ONLY for a transient external failure (API rate or usage limit,
 network outage): the controller waits and re-runs the trial from an empty DIR.
 Evaluation data must be read from the repo paths listed in protocol.data_paths;
-never download data or models during a trial."""
+never download data or models during a trial. Trials run with credentials removed from
+the environment; a trial that genuinely needs one (e.g. an API key for the model under
+test) receives only the variables named in protocol.secrets."""
 
 ANALYSIS_METHOD = """Analysis method (applied mechanically by the controller; the protocol cannot change it):
 each trial is one (condition, seed) run; failed trials are excluded. The decision rule

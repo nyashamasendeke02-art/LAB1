@@ -5,7 +5,9 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** autolab 0.10.0 (D60-D62, 2026-10-08: tokens/cost/time per agent call + agent scorecards,
+- **Version:** autolab 0.11.0 (D63, 2026-10-08: dashboard upgrade -- research view, charts, agents page,
+  plain-language states, phone menu, caching/paging; live /research demo in labs/workbench: $2.53, plan saved).
+  0.10.0 (D60-D62, 2026-10-08: tokens/cost/time per agent call + agent scorecards,
   project.yaml manifest export/import, sandbox profiles with secrets scrubbing; PyYAML dependency).
   0.9.0 (D58-D59, 2026-10-08: autonomy levels 0-5, generated-data guard,
   technology decisions doc, knowledge-graph entity types and typed relations).

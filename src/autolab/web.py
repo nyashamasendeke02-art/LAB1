@@ -43,7 +43,8 @@ from .knowledge import INDEXED_KINDS, Knowledge
 from .scorecard import scorecards, totals
 from .registry import BACKENDS, ORGANISATION, ROLE_AGENTS, STAGES, Registry, RegistryError
 from .state_machines import (ENGINEERING_PIPELINE, ENGINEERING_PIPELINE_ALIAS, RESEARCH_DONE,
-                             RESEARCH_TERMINAL, STATE_TONES, EngineeringState, ResearchState)
+                             RESEARCH_PIPELINE, RESEARCH_TERMINAL, STATE_LABELS, STATE_TONES,
+                             EngineeringState, ResearchState)
 from .taxonomy import Role
 
 WEB_DIR = Path(__file__).with_name("web")
@@ -249,7 +250,9 @@ class DashboardServer:
                             unquote(route.removeprefix("/api/tasks/"))))
                     elif route == "/api/activity":
                         limit = int((query.get("limit") or ["120"])[0])
-                        self._json(HTTPStatus.OK, owner.activity(max(1, min(limit, 1000))))
+                        before = query.get("before")
+                        self._json(HTTPStatus.OK, owner.activity(
+                            max(1, min(limit, 1000)), int(before[0]) if before else None))
                     elif route == "/api/state":  # v1 compatibility
                         self._json(HTTPStatus.OK, owner.state())
                     else:
@@ -380,7 +383,8 @@ class DashboardServer:
         return {"id": rec.id, "kind": d.get("kind", "research"), "key": key.group(1) if key else None,
                 "title": _title(objective), "objective": objective, "state": d.get("state", "UNKNOWN"),
                 "cycle": d.get("cycle", 0), "blocked_on": d.get("blocked_on"),
-                "halt_reason": d.get("halt_reason"), "mandate_refs": d.get("mandate_refs", []),
+                "halt_reason": d.get("halt_reason"), "halted_from": d.get("halted_from"),
+                "mandate_refs": d.get("mandate_refs", []),
                 "gate": gates[0] if gates else None, "eng": self._eng(rec),
                 "origin": d.get("origin"), "autonomy_level": d.get("autonomy_level"),
                 "created_at": history[0].created_at if history else rec.created_at,
@@ -412,6 +416,100 @@ class DashboardServer:
                                                       dt.timezone.utc).isoformat()}
 
     # ------------------------------------------------------------ API
+    def _scorecards(self) -> list[dict]:
+        """Scorecards are recomputed only when the ledger changes (D63)."""
+        head = self.store.head()
+        cached = getattr(self._local, "scorecards", None)
+        if not cached or cached[0] != head:
+            cached = self._local.scorecards = (head, scorecards(self.store))
+        return cached[1]
+
+    def usage_series(self) -> list[dict]:
+        """Calls, agent time, tokens and reported cost per day (for charts)."""
+        days: dict[str, dict] = {}
+        for t in self._tasks():
+            day = str(t.created_at)[:10]
+            d = days.setdefault(day, {"day": day, "calls": 0, "wall_s": 0.0, "cost_usd": 0.0,
+                                      "tokens": 0, "reported": 0})
+            d["calls"] += 1
+            d["wall_s"] += t.data.get("wall_s") or 0
+            u = t.data.get("usage") or {}
+            if u:
+                d["reported"] += 1
+                d["cost_usd"] += u.get("cost_usd") or 0
+                d["tokens"] += sum(u.get(k) or 0 for k in ("input_tokens", "output_tokens",
+                                                            "cache_read_tokens", "cache_write_tokens"))
+        return [{**d, "wall_s": round(d["wall_s"], 1), "cost_usd": round(d["cost_usd"], 4)}
+                for _, d in sorted(days.items())]
+
+    def research(self, pid: str) -> dict:
+        """A research project's content, readable (D63): what each research stage produced."""
+        st = self.store
+
+        def mine(kind):
+            return [r for r in st.query(kind) if r.data.get("project") == pid]
+
+        cur = (st.get(pid).data.get("current") or {})
+        bkg = mine("background")
+        claims = []
+        for b in bkg:
+            for cid in (b.data.get("refs") or {}).get("claims", []):
+                if st.exists(cid):
+                    c = st.get(cid).data
+                    claims.append({"id": cid, "label": c.get("label"), "statement": c.get("statement"),
+                                   "sources": c.get("sources", []),
+                                   "verified": bool(c.get("sources_verified")),
+                                   "verification": c.get("verification")})
+        reports = []
+        for r in mine("report"):
+            path = self.root / r.data.get("path", "")
+            text = path.read_text(encoding="utf-8")[:60000] if path.is_file() else None
+            reports.append({"id": r.id, "type": r.data.get("type", "cycle_report"),
+                            "path": r.data.get("path"), "text": text})
+        return {
+            "current": cur,
+            "problem": next(({"id": p.id, **{k: p.data.get(k) for k in
+                             ("problem_statement", "scope", "out_of_scope", "success_notion")}}
+                             for p in mine("problem")[-1:]), None),
+            "background": {"known_methods": [m for b in bkg for m in b.data.get("known_methods", [])],
+                           "gaps": [g for b in bkg for g in b.data.get("gaps", [])],
+                           "claims": claims},
+            "questions": [{"id": q.id, "question": q.data.get("question"),
+                           "rationale": q.data.get("rationale"), "cycle": q.data.get("cycle")}
+                          for q in mine("question")],
+            "hypotheses": [{"id": h.id, "statement": h.data.get("statement"),
+                            "prediction": h.data.get("prediction"),
+                            "null_hypothesis": h.data.get("null_hypothesis"),
+                            "falsification": h.data.get("falsification"),
+                            "status": h.data.get("status"),
+                            "current": h.id == cur.get("hypothesis")} for h in mine("hypothesis")],
+            "requirements": [{"id": r.id, "validity_criteria": r.data.get("validity_criteria", []),
+                              "success_criteria": r.data.get("success_criteria", []),
+                              "engineering": r.data.get("engineering", [])}
+                             for r in mine("requirements")],
+            "designs": [{"id": d.id, "options": d.data.get("options", []),
+                         "chosen": d.data.get("chosen"), "rationale": d.data.get("rationale")}
+                        for d in mine("design")],
+            "protocols": [{"id": p.id, "version": p.version, "status": p.data.get("status"),
+                           "frozen": p.frozen, **{k: (p.data.get("protocol") or {}).get(k) for k in
+                           ("title", "kind", "conditions", "metrics", "decision_rule", "seeds")}}
+                          for p in mine("protocol")],
+            "reviews": [{"id": r.id, "type": r.data.get("review_type"),
+                         "verdict": r.data.get("verdict"), "approved": r.data.get("approved"),
+                         "issues": r.data.get("issues") or r.data.get("findings") or []}
+                        for r in mine("review") if r.data.get("review_type") in
+                        ("scientific_review", "scientific_validation", "interpretation")],
+            "results": [{"id": r.id, "outcome": r.data.get("outcome"),
+                         "decision": r.data.get("decision")} for r in mine("result")],
+            "conclusions": [{"id": c.id, "statement": c.data.get("statement"),
+                             "outcome": c.data.get("outcome"), "confidence": c.data.get("confidence"),
+                             "caveats": c.data.get("caveats", [])} for c in mine("conclusion")],
+            "future_questions": [{"id": q.id, "question": q.data.get("question"),
+                                  "priority": q.data.get("priority"), "status": q.data.get("status")}
+                                 for q in mine("future_question")],
+            "reports": reports,
+        }
+
     def registry(self) -> Registry:
         return Registry(self.lab.config, self.root)
 
@@ -427,7 +525,7 @@ class DashboardServer:
                 active[name] = event
         reg = self.registry()
         effective = reg.describe()["effective"]
-        cards = {c["agent"]: c for c in scorecards(self.store)}
+        cards = {c["agent"]: c for c in self._scorecards()}
         out = []
         for name, settings in sorted(reg.agents.items(),
                                      key=lambda kv: (kv[0] not in ROLE_AGENTS, kv[0])):
@@ -520,7 +618,10 @@ class DashboardServer:
                        "deliveries": len(self.store.query("delivery")),
                        "agents_working": sum(a["status"] == "working" for a in agents)},
             "ledger": self._verify(), "queue": self._queue(), "gates": board,
-            "usage": totals(scorecards(self.store)),
+            "usage": {**totals(self._scorecards()), "by_day": self.usage_series(),
+                      "by_agent": [{"agent": c["agent"], "cost_usd": c["cost_usd"],
+                                    "calls": c["calls"], "success_rate": c["success_rate"]}
+                                   for c in self._scorecards()]},
             "active": active, "approvals": approvals, "agents": agents, "alerts": alerts,
             "activity": self.activity(14), "pipeline": ENG_PIPELINE,
         }
@@ -556,6 +657,7 @@ class DashboardServer:
                       "at": r.created_at} for r in mine("approval")]
         by_time = lambda rows: sorted(rows, key=lambda r: r["at"], reverse=True)  # noqa: E731
         return {**summary, "acceptance_criteria": rec.data.get("acceptance_criteria", []),
+                "research": self.research(rec.id) if summary["kind"] == "research" else None,
                 "pipeline": ENG_PIPELINE, "eng_history": eng_history,
                 "reviews": by_time(reviews), "failures": by_time(failures), "tasks": by_time(tasks),
                 "deliveries": deliveries, "approvals": approvals,
@@ -572,6 +674,8 @@ class DashboardServer:
             "research_terminal": [s.value for s in RESEARCH_TERMINAL],
             "research_done": [s.value for s in RESEARCH_DONE],
             "engineering_pipeline": ENG_PIPELINE,
+            "research_pipeline": [s.value for s in RESEARCH_PIPELINE],
+            "state_labels": {k.value: v for k, v in STATE_LABELS.items()},
             "pipeline_alias": {k.value: v.value for k, v in ENGINEERING_PIPELINE_ALIAS.items()},
             "tones": tones, "project_kinds": PROJECT_KINDS,
             "roles": [{"value": r.value, "default_agent": r.value} for r in Role],
@@ -766,9 +870,13 @@ class DashboardServer:
             result = {"status": "working"}
         return {"id": task_id, "packet": packet, "completion": completion, "result": result}
 
-    def activity(self, limit: int = 120) -> list[dict]:
+    def activity(self, limit: int = 120, before: int | None = None) -> list[dict]:
+        """Newest first; ``before`` = a sequence number to page further back (D63)."""
         out = []
-        for e in self.store.events()[-limit:][::-1]:
+        events = self.store.events()
+        if before is not None:
+            events = [e for e in events if e["seq"] < before]
+        for e in events[-limit:][::-1]:
             data = e.get("data") or {}
             brief = ((data.get("to") and f"{data.get('from', '?')} → {data.get('to')}")
                      or data.get("reason") or data.get("stage") or data.get("gate")

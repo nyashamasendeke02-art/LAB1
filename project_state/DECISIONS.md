@@ -358,3 +358,18 @@
   test runs (protocol.secrets allows named ones, frozen with the protocol); network not enforceable on Windows
   without admin firewall rules (documented). Tests: tests/test_sandbox.py (3). Remaining s.18 gap: per-tool-call
   logging (needs the Claude backend on stream-json; deferred to its own change with a live check).
+- D63 (2026-10-08, human: "is the ui standard ... functionality, UI design, UX design and backend design" then
+  "AUTO MODE ON"): an evidence-based UI review (desktop + phone screenshots, accessibility counts, API timings 6-42 ms)
+  rated backend good, functionality/UI/UX fair; fixed: (1) research projects get a Research tab -- 17-step research
+  progress bar with plain-language state labels and readable cards for problem, literature claims (verified/unverified
+  badges, lab-record citations link into the knowledge graph), state of the art and gaps, question, hypotheses (tested
+  one marked), requirements, design options (chosen marked), protocol, reviews, result with an effect/CI chart,
+  conclusion, next questions and the saved research plan; (2) Agents page: active agents first, unallocated ones
+  collapsed, short titles, success/time/cost always visible, success-rate and cost charts; (3) dependency-free SVG
+  charts (agent cost or calls per day on Overview; CI chart; linked-records graph in the knowledge drawer); (4) gate
+  board only when a lab has milestone tasks; state badges explain themselves (tooltips + header label); collapsible
+  menu on phones; palette input labelled; (5) backend: scorecards cached per ledger head, activity paging (?before=).
+  Scorecard input tokens now include cached prompt tokens (fresh input alone read "20" for 307k tokens read).
+  Live demo (workbench lab, plan-only /research on Nesterov vs heavy-ball, pilot-004 as read-only knowledge):
+  8 calls, 757 s agent time, $2.53; claims citing pilot-004 verified against its ledger; Sonnet approved Opus's
+  design with a major numerical caveat (validity check V6 likely unsatisfiable at ~1e-14 noise).

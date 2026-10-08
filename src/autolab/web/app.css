@@ -298,3 +298,30 @@ dialog::backdrop { background: #05080d99; backdrop-filter: blur(3px) }
 
 /* D54: programme tree */
 .list .item.child { padding-left: 28px; border-left: 2px solid var(--line-2); margin-left: 10px }
+
+/* D63: charts, research view, agents, mobile menu */
+.chart { width: 100%; height: auto; display: block; margin-top: 4px }
+.chart .c-label { font: 500 11px var(--font); fill: var(--muted) }
+.chart .c-value { font: 650 11px var(--font); fill: var(--text) }
+.chart .c-bar { fill: var(--accent) } .chart .c-bar.warn { fill: var(--warn) }
+.chart .c-axis { stroke: var(--line-2); stroke-width: 1 }
+.chart .c-zero { stroke: var(--muted); stroke-dasharray: 3 3 } .chart .c-ref { stroke: var(--warn); stroke-dasharray: 5 3 }
+.chart .c-ci { stroke: var(--accent); stroke-width: 4; stroke-linecap: round } .chart .c-point { fill: var(--accent); stroke: var(--panel); stroke-width: 2 }
+.chart.graph .g-edge { stroke: var(--line-2); stroke-width: 1.5 } .chart.graph .g-supports { stroke: var(--ok) } .chart.graph .g-contradicts { stroke: var(--bad) }
+.chart.graph .g-motivates { stroke: var(--violet) } .chart.graph .g-rel { font: 500 10px var(--font); fill: var(--muted) }
+.chart.graph .g-dot { fill: var(--panel-2); stroke: var(--accent); stroke-width: 2 } .chart.graph .g-center { fill: var(--accent) }
+.chart.graph .g-node { cursor: pointer } .chart.graph .g-node:hover .g-dot, .chart.graph .g-node:focus .g-dot { fill: var(--accent) }
+.list .item.current { background: var(--panel-2); border-radius: var(--radius-sm) }
+pre.code.doc { white-space: pre-wrap; max-height: 520px; overflow: auto }
+details.unused { margin: 6px 0 16px } details.unused > summary { cursor: pointer; padding: 6px 0 }
+#menu-btn { display: none; margin-left: auto }
+@media (max-width: 860px) {
+  #menu-btn { display: inline-flex }
+  .brand { width: 100% }
+  .sidebar .nav, .sidebar .sidebar-foot { display: none }
+  .sidebar.open .nav, .sidebar.open .sidebar-foot { display: flex }
+}
+.grid.halves { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 16px }
+@media (max-width: 1100px) { .grid.halves { grid-template-columns: 1fr } }
+.chart.graph .g-center-label { paint-order: stroke; stroke: var(--panel); stroke-width: 4px }
+.chart.graph .g-rel { paint-order: stroke; stroke: var(--panel); stroke-width: 3px }

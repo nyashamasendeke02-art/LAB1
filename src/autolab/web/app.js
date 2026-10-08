@@ -45,7 +45,7 @@ const isTerminal = (state) => META.research_terminal.includes(state);
 const pipelineStep = (state) => META.pipeline_alias[state] || state;
 function badge(value, extra = "") {
   const v = String(value ?? "");
-  return h("span", { class: `badge ${toneOf(v)} ${extra}`, text: human(v) });
+  return h("span", { class: `badge ${toneOf(v)} ${extra}`, text: human(v), title: (META.state_labels || {})[v] || null });
 }
 
 // ------------------------------------------------------------------ API
@@ -173,6 +173,127 @@ function logView(lines) {
   })));
 }
 
+
+// ------------------------------------------------------------------ charts (D63)
+// Dependency-free SVG; colours come from CSS classes so both themes work under the strict CSP.
+const SVGNS = "http://www.w3.org/2000/svg";
+function s(tag, attrs = {}, ...children) {
+  const el = document.createElementNS(SVGNS, tag);
+  for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== null) el.setAttribute(k, String(v));
+  for (const c of children.flat()) if (c !== null && c !== undefined) el.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return el;
+}
+function barChart(rows, { fmt = (v) => String(v), max = null, title = "" } = {}) {
+  if (!rows.length) return h("div", { class: "empty", text: "No data yet." });
+  const top = max ?? Math.max(...rows.map((r) => r.value), 1e-9);
+  const rowH = 26, labelW = 150, w = 520, barW = w - labelW - 70;
+  return s("svg", { viewBox: `0 0 ${w} ${rows.length * rowH + 4}`, class: "chart", role: "img", "aria-label": title },
+    rows.map((r, i) => s("g", { transform: `translate(0 ${i * rowH})` },
+      s("text", { x: 0, y: 17, class: "c-label" }, r.label.length > 22 ? `${r.label.slice(0, 21)}…` : r.label),
+      s("rect", { x: labelW, y: 5, width: Math.max(2, (r.value / top) * barW), height: 15, rx: 3, class: `c-bar ${r.cls || ""}` }),
+      s("text", { x: labelW + Math.max(2, (r.value / top) * barW) + 6, y: 17, class: "c-value" }, fmt(r.value)),
+      s("title", {}, `${r.label}: ${fmt(r.value)}`))));
+}
+function columnChart(points, { fmt = (v) => String(v), title = "" } = {}) {
+  if (!points.length) return h("div", { class: "empty", text: "No data yet." });
+  const w = 520, hgt = 150, pad = 28, top = Math.max(...points.map((p) => p.value), 1e-9);
+  const bw = Math.min(46, (w - pad * 2) / points.length - 6);
+  return s("svg", { viewBox: `0 0 ${w} ${hgt + 26}`, class: "chart", role: "img", "aria-label": title },
+    s("line", { x1: pad, y1: hgt, x2: w - pad, y2: hgt, class: "c-axis" }),
+    points.map((p, i) => {
+      const x = pad + 6 + i * ((w - pad * 2) / points.length), bh = Math.max(2, (p.value / top) * (hgt - 24));
+      return s("g", {}, s("rect", { x, y: hgt - bh, width: bw, height: bh, rx: 3, class: "c-bar" }),
+        s("text", { x: x + bw / 2, y: hgt - bh - 5, class: "c-value", "text-anchor": "middle" }, fmt(p.value)),
+        s("text", { x: x + bw / 2, y: hgt + 16, class: "c-label", "text-anchor": "middle" }, p.label),
+        s("title", {}, `${p.label}: ${fmt(p.value)}`));
+    }));
+}
+function ciChart(d) {
+  // The pre-registered decision: effect with its confidence interval against 0 and the
+  // smallest effect of interest (or the non-inferiority margin).
+  if (!d || d.effect === undefined || d.ci_low === undefined) return null;
+  const ref = d.type === "non_inferiority" ? -(d.margin || 0) : (d.min_effect || 0);
+  const lo = Math.min(d.ci_low, 0, ref), hi = Math.max(d.ci_high, 0, ref);
+  const span = (hi - lo) || 1, w = 520, x = (v) => 30 + ((v - lo + span * 0.08) / (span * 1.16)) * (w - 60);
+  return s("svg", { viewBox: `0 0 ${w} 90`, class: "chart", role: "img", "aria-label": "Effect and confidence interval" },
+    s("line", { x1: 20, y1: 50, x2: w - 20, y2: 50, class: "c-axis" }),
+    s("line", { x1: x(0), y1: 22, x2: x(0), y2: 70, class: "c-zero" }), s("text", { x: x(0), y: 84, class: "c-label", "text-anchor": "middle" }, "0"),
+    s("line", { x1: x(ref), y1: 22, x2: x(ref), y2: 70, class: "c-ref" }),
+    s("text", { x: x(ref), y: 16, class: "c-label", "text-anchor": "middle" }, d.type === "non_inferiority" ? "−margin" : "min effect"),
+    s("line", { x1: x(d.ci_low), y1: 50, x2: x(d.ci_high), y2: 50, class: "c-ci" }),
+    s("circle", { cx: x(d.effect), cy: 50, r: 6, class: "c-point" }),
+    s("text", { x: x(d.effect), y: 38, class: "c-value", "text-anchor": "middle" }, `${(+d.effect).toPrecision(4)} [${(+d.ci_low).toPrecision(3)}, ${(+d.ci_high).toPrecision(3)}]`));
+}
+function egoGraph(n) {
+  const nb = [...n.out.map((e) => ({ ...e, dir: "out" })), ...n.in.map((e) => ({ ...e, dir: "in" }))].slice(0, 14);
+  if (!nb.length) return null;
+  const w = 560, hgt = 300, cx = w / 2, cy = hgt / 2, r = 115;
+  const label = (src) => src.replace(/^lab:[^/]+\//, "");
+  return s("svg", { viewBox: `0 0 ${w} ${hgt}`, class: "chart graph", role: "img", "aria-label": "Linked records" },
+    nb.map((e, i) => {
+      const a = (2 * Math.PI * i) / nb.length - Math.PI / 2, x = cx + r * Math.cos(a), y = cy + r * Math.sin(a) * 0.9;
+      const link = s("g", { class: "g-node", tabindex: "0" },
+        s("line", { x1: cx, y1: cy, x2: x, y2: y, class: `g-edge g-${e.relation}` }),
+        s("text", { x: cx + (x - cx) * 0.64, y: cy + (y - cy) * 0.64 - 4, class: "g-rel", "text-anchor": "middle" }, e.dir === "out" ? `${e.relation} →` : `← ${e.relation}`),
+        s("circle", { cx: x, cy: y, r: 7, class: "g-dot" }),
+        s("text", { x, y: y + (y > cy ? 20 : -12), class: "c-label", "text-anchor": "middle" }, label(e.source)),
+        s("title", {}, `${e.entity || e.kind}: ${e.text || ""}`));
+      link.addEventListener("click", () => openNode(e.source));
+      link.addEventListener("keydown", (ev) => ev.key === "Enter" && openNode(e.source));
+      return link;
+    }),
+    s("circle", { cx, cy, r: 11, class: "g-center" }),
+    s("text", { x: cx, y: cy - 18, class: "c-value g-center-label", "text-anchor": "middle" }, label(n.source)));
+}
+const money = (v) => (v === null || v === undefined ? "–" : `$${(+v).toFixed(v < 1 ? 3 : 2)}`);
+
+function researchView(p) {
+  const r = p.research;
+  const label = (st) => META.state_labels[st] || human(st);
+  const done = isDone(p.state);
+  const parts = [card("Research progress", label(p.state), stepper(META.research_pipeline, p.state === "HALTED" ? (p.halted_from || p.state) : p.state, done))];
+  if (r.problem) parts.push(card("1 · Problem", r.problem.id, h("div", { class: "prose", text: r.problem.problem_statement || "" }),
+    h("div", { class: "list" }, [["Scope", r.problem.scope], ["Out of scope", (r.problem.out_of_scope || []).join("; ")], ["Success means", r.problem.success_notion]]
+      .filter(([, v]) => v).map(([k, v]) => h("div", { class: "item" }, h("span", { class: "muted small", text: k }), h("span", { class: "small", text: v }), h("span"))))));
+  const claims = r.background.claims;
+  if (claims.length) {
+    const verified = claims.filter((c) => c.verified).length;
+    parts.push(card("2 · Literature and knowledge", `${claims.length} claims · ${verified} verified`, h("div", { class: "list" }, claims.map((c) => h("div", { class: "item" },
+      h("div", {}, h("span", { class: "badge plain", text: c.label }), " ", h("span", { class: `badge ${c.verified ? "b-ok" : ""}`, text: c.verified ? `verified · ${c.verification || ""}` : "unverified" })),
+      h("div", {}, h("div", { class: "prose small", text: c.statement }), c.sources.length ? h("div", { class: "muted small" }, "Sources: ",
+        c.sources.map((src, i) => [i ? "; " : "", src.startsWith("lab:") ? knowledgeLink(src) : h("span", { text: src })])) : null), h("span"))))));
+  }
+  if (r.background.known_methods.length || r.background.gaps.length)
+    parts.push(card("3 · State of the art and gaps", null, h("div", { class: "grid two" },
+      h("div", {}, h("b", { class: "small", text: "Known methods" }), h("ul", {}, r.background.known_methods.map((m) => h("li", { class: "small", text: m })))),
+      h("div", {}, h("b", { class: "small", text: "Gaps" }), h("ul", {}, r.background.gaps.map((g) => h("li", { class: "small", text: g })))))));
+  for (const q of r.questions) parts.push(card("4 · Research question", q.id, h("div", { class: "prose", text: q.question }), h("p", { class: "muted small", text: q.rationale })));
+  if (r.hypotheses.length) parts.push(card("5 · Hypotheses", `${r.hypotheses.length} formulated`, h("div", { class: "list" }, r.hypotheses.map((x) => h("div", { class: `item ${x.current ? "current" : ""}` },
+    h("div", {}, x.current ? h("span", { class: "badge b-info", text: "tested" }) : null, " ", badge(x.status || "proposed")),
+    h("div", {}, h("div", { class: "prose small", text: x.statement }), h("details", {}, h("summary", { class: "small muted", text: "Prediction, null and falsification" }),
+      h("ul", {}, [["Prediction", x.prediction], ["Null", x.null_hypothesis], ["Falsified if", x.falsification]].filter(([, v]) => v).map(([k, v]) => h("li", { class: "small" }, h("b", { text: `${k}: ` }), v))))), h("span"))))));
+  for (const q of r.requirements) parts.push(card("6 · Requirements", q.id, h("b", { class: "small", text: "Validity criteria (the experiment must be a working instrument)" }),
+    h("ul", {}, q.validity_criteria.map((v) => h("li", { class: "small", text: v }))), q.engineering.length ? [h("b", { class: "small", text: "Engineering requirements" }), h("ul", {}, q.engineering.map((v) => h("li", { class: "small", text: v })))] : null));
+  for (const d of r.designs) parts.push(card("7 · Experiment design", d.id, h("div", { class: "list" }, d.options.map((o) => h("div", { class: `item ${o.name === d.chosen ? "current" : ""}` },
+    o.name === d.chosen ? h("span", { class: "badge b-ok", text: "chosen" }) : h("span", { class: "badge plain", text: "option" }), h("div", {}, h("b", { class: "small", text: o.name }), h("div", { class: "prose small", text: o.description })), h("span")))),
+    h("p", { class: "muted small", text: d.rationale || "" })));
+  for (const pr of r.protocols.slice(-1)) parts.push(card("8 · Protocol (pre-registration)", `${pr.id} v${pr.version} · ${human(pr.status || "")}${pr.frozen ? " · frozen" : ""}`,
+    h("div", { class: "list" }, [["Title", pr.title], ["Kind", pr.kind], ["Conditions", (pr.conditions || []).map((c) => `${c.name} (${c.role})`).join(", ")],
+      ["Primary metric", pr.metrics && pr.metrics.primary], ["Decision rule", pr.decision_rule && `${pr.decision_rule.treatment} vs ${pr.decision_rule.control} on ${pr.decision_rule.metric}, ${pr.decision_rule.direction}, min effect ${pr.decision_rule.min_effect ?? pr.decision_rule.margin}`],
+      ["Seeds", (pr.seeds || []).join(", ")]].filter(([, v]) => v).map(([k, v]) => h("div", { class: "item" }, h("span", { class: "muted small", text: k }), h("span", { class: "small mono", text: String(v) }), h("span"))))));
+  for (const rv of r.reviews) parts.push(card(`Review · ${human(rv.type)}`, rv.id, h("p", {}, badge(rv.verdict || (rv.approved ? "approved" : ""))),
+    (rv.issues || []).length ? rv.issues.map(findingView) : h("p", { class: "muted small", text: "No issues raised." })));
+  for (const res of r.results) parts.push(card("Result (computed by the controller)", res.id, h("p", {}, badge(res.outcome)), ciChart(res.decision)));
+  for (const c of r.conclusions) parts.push(card("Conclusion", c.id, h("p", {}, badge(c.outcome), h("span", { class: "muted small", text: ` ${c.confidence || ""}` })),
+    h("div", { class: "prose small", text: c.statement }), c.caveats.length ? h("ul", {}, c.caveats.map((x) => h("li", { class: "small muted", text: x }))) : null));
+  if (r.future_questions.length) parts.push(card("Next questions", null, h("div", { class: "list" }, r.future_questions.map((q) => h("div", { class: "item" },
+    h("span", { class: "badge plain", text: `p${q.priority ?? "-"}` }), h("div", { class: "prose small", text: q.question }), badge(q.status))))));
+  for (const rep of r.reports) if (rep.text) parts.push(card(rep.type === "research_plan" ? "Research plan (saved artifact)" : "Report", rep.path,
+    h("details", { open: rep.type === "research_plan" }, h("summary", { class: "small muted", text: "Show the document" }), h("pre", { class: "code doc", text: rep.text }))));
+  if (parts.length === 1) parts.push(card(null, null, h("div", { class: "empty", text: "The research agents have not produced anything yet; this page updates live." })));
+  return h("div", { class: "stack" }, parts);
+}
+
 // ------------------------------------------------------------------ views
 const VIEWS = {};
 
@@ -203,8 +324,14 @@ VIEWS.overview = async () => {
         onclick: () => go(`/projects/${t.project}`), title: t.title,
       }, h("span", { class: "k", text: t.key }), h("span", { class: "s", text: isDone(t.state) ? human(t.state) : human(t.eng_state || t.state) })))));
   }) : h("div", { class: "empty", text: `No ${label.toLowerCase()} tasks yet.` }));
-  if (META.ui.milestones_enabled || o.gates.length)
+  if (o.gates.length) // D63: only labs that have milestone tasks show the board
     left.append(card(`${label} progress`, `engineering tasks tagged with a ${label.toLowerCase()}`, gates));
+  const days = (o.usage && o.usage.by_day) || [];
+  if (days.length) {
+    const reported = days.some((d) => d.reported);
+    left.append(card(reported ? "Agent cost per day" : "Agent calls per day", reported ? "reported by the backends" : "cost not reported by these backends",
+      columnChart(days.slice(-14).map((d) => ({ label: d.day.slice(5), value: reported ? d.cost_usd : d.calls })), { fmt: reported ? money : String, title: "Per day" })));
+  }
 
   // active work
   for (const p of o.active) {
@@ -291,18 +418,20 @@ VIEWS.projects = async (r) => {
 
 async function projectDetail(id, tab) {
   const p = await api(`/api/projects/${encodeURIComponent(id)}`);
-  tab = tab || "overview";
+  tab = tab || (p.research ? "research" : "overview");
   const out = h("div", {});
   out.append(h("div", { class: "crumbs" }, h("a", { href: "#/projects", text: "Projects" }), ` / ${p.id}`));
   const shownTitle = p.key && p.title.startsWith(p.key) ? p.title : `${p.key ? `${p.key} · ` : ""}${p.title}`;
-  out.append(pageHead(shownTitle, null, badge(p.state), p.eng ? badge(p.eng.state) : null));
-  const tabs = [["overview", "Overview"], ["pipeline", "Pipeline", p.eng_history.length], ["reviews", "Reviews", p.reviews.length],
+  out.append(pageHead(shownTitle, (META.state_labels || {})[p.state] || null, badge(p.state), p.eng ? badge(p.eng.state) : null));
+  const tabs = [...(p.research ? [["research", "Research"]] : []), ["overview", "Overview"], ["pipeline", "Pipeline", p.eng_history.length], ["reviews", "Reviews", p.reviews.length],
     ["failures", "Failures", p.failures.length], ["calls", "Agent calls", p.tasks.length], ["events", "Ledger", p.events.length]];
   out.append(h("div", { class: "tabs", role: "tablist" }, tabs.map(([k, label, n]) => h("button", {
     role: "tab", "aria-selected": String(k === tab), onclick: () => go(`/projects/${p.id}/${k}`) }, label, n ? h("span", { class: "n", text: n }) : null))));
   const panel = h("div", { role: "tabpanel" });
   out.append(panel);
-  if (tab === "overview") {
+  if (tab === "research" && p.research) {
+    panel.append(researchView(p));
+  } else if (tab === "overview") {
     panel.append(h("div", { class: "grid two" },
       h("div", { class: "stack" },
         p.eng ? card("Pipeline", p.eng.id, stepper(p.pipeline, pipelineStep(p.eng.state), isDone(p.state)),
@@ -430,6 +559,8 @@ function avatar(a) {
   const label = (a.title || a.name || "?").split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
   return h("div", { class: `avatar av-${a.role || "custom"}`, text: label, "aria-hidden": "true" });
 }
+const shortTitle = (t) => String(t || "").split(" (")[0];
+const subTitle = (t) => { const m = String(t || "").match(/\((.*)\)\s*$/); return m ? m[1] : ""; };
 const agentModel = (a) => `${a.backend || "no backend"} · ${a.model || "default model"}${a.backup_backend ? ` (backup ${a.backup_backend}${a.backup_model ? ` · ${a.backup_model}` : ""})` : ""}`;
 const stageLabel = (name) => (META.stages.find((s) => s.name === name) || { label: human(name) }).label;
 
@@ -439,13 +570,22 @@ VIEWS.agents = async () => {
     h("button", { onclick: () => applyPreset(), text: "Create organisation preset" }),
     h("button", { class: "primary", onclick: () => agentDialog(null, reg), text: "New agent" })));
   if (reg.problems.length) out.append(h("div", { class: "alerts" }, reg.problems.map((pr) => alertBox({ level: "error", title: "Configuration problem", detail: pr }))));
-  out.append(h("div", { class: "grid cards" }, agents.map((a) => h("section", { class: "card" },
+  const active = agents.filter((a) => a.stages.length || a.calls);
+  const unused = agents.filter((a) => !(a.stages.length || a.calls));
+  const withCalls = active.filter((a) => a.scorecard && a.scorecard.calls);
+  if (withCalls.length) out.append(h("div", { class: "grid halves" },
+    card("Success rate by agent", "completed calls / all calls", barChart(withCalls.map((a) => ({ label: shortTitle(a.title), value: a.scorecard.success_rate || 0, cls: (a.scorecard.success_rate || 0) < 0.6 ? "warn" : "" })), { fmt: (v) => `${Math.round(v * 100)}%`, max: 1, title: "Success rate" })),
+    card("Reported cost by agent", "Claude CLI and OpenAI report cost; Codex and Gemini do not", barChart(withCalls.filter((a) => a.scorecard.cost_usd !== null).map((a) => ({ label: shortTitle(a.title), value: a.scorecard.cost_usd })), { fmt: money, title: "Cost" }))));
+  const agentCard = (a) => h("section", { class: "card" },
     h("div", { class: "agent-top" }, avatar(a),
-      h("div", {}, h("h2", { text: a.title }), h("div", { class: "agent-meta", text: `${a.name} · ${agentModel(a)}` })),
+      h("div", {}, h("h2", { text: shortTitle(a.title) }), subTitle(a.title) ? h("div", { class: "muted small", text: subTitle(a.title) }) : null,
+        h("div", { class: "agent-meta", text: `${a.name} · ${agentModel(a)}` })),
       h("div", { class: "actions" }, badge(a.status === "blocked" ? a.error_kind : a.status))),
     a.charter ? h("p", { class: "prose small", text: a.charter }) : null,
     h("div", { class: "tags" }, a.stages.length ? a.stages.map((st) => h("span", { class: "tag", text: stageLabel(st) })) : h("span", { class: "muted small", text: "Not allocated to any stage" })),
-    h("div", { class: "metrics" }, [["Calls", a.calls], ["Completed", a.completed], ["Errors", a.errors]].map(([l, v]) => h("div", { class: "metric" }, h("b", { text: v }), h("span", { text: l })))),
+    h("div", { class: "metrics" }, [["Calls", a.calls], ["Success", a.scorecard && a.scorecard.success_rate !== null ? `${Math.round(100 * a.scorecard.success_rate)}%` : "–"],
+      ["Avg time", a.scorecard && a.scorecard.avg_wall_s !== null ? `${a.scorecard.avg_wall_s}s` : "–"], ["Cost", money(a.scorecard && a.scorecard.cost_usd)]]
+      .map(([l, v]) => h("div", { class: "metric" }, h("b", { text: v }), h("span", { text: l })))),
     scorecardView(a.scorecard),
     h("div", { class: "spark", "aria-label": "Recent calls, oldest to newest" }, a.recent.slice().reverse().map((t) => h("span", { class: `s-${t.status} k-${t.error_kind || ""}`, title: `${t.id} · ${t.stage} · ${t.error_kind || t.status} · ${absTime(t.at)}` }))),
     a.active ? h("p", { class: "small" }, "Working on ", subjectLink(a.active.task), ` (${human(a.active.stage)}) since ${ago(a.active.since)}`) : null,
@@ -454,7 +594,10 @@ VIEWS.agents = async () => {
     a.error ? h("details", {}, h("summary", { class: "small muted", text: "Raw error" }), h("pre", { class: "code", text: a.error })) : null,
     a.last_task ? h("p", { class: "muted small" }, "Last call ", subjectLink(a.last_task.id), ` · ${human(a.last_task.stage)} · ${ago(a.last_task.at)}`) : null,
     h("div", { class: "actions" }, h("button", { class: "small", onclick: () => agentDialog(a, reg), text: "Edit" }),
-      a.default_for_role ? null : h("button", { class: "small ghost", onclick: () => removeAgent(a), text: "Remove" }))))));
+      a.default_for_role ? null : h("button", { class: "small ghost", onclick: () => removeAgent(a), text: "Remove" })));
+  out.append(h("div", { class: "grid cards" }, active.map(agentCard)));
+  if (unused.length) out.append(h("details", { class: "unused" }, h("summary", { class: "small muted", text: `${unused.length} agent(s) not allocated to any stage` }),
+    h("div", { class: "grid cards" }, unused.map(agentCard))));
   out.append(allocationCard(reg));
   return out;
 };
@@ -687,7 +830,8 @@ async function openNode(source) {
       h("div", { class: "row" }, h("h2", { text: `${n.source.replace(/^lab:/, "")} · ${human(n.kind)}` }), h("button", { class: "ghost", onclick: closeDrawer, "aria-label": "Close", text: "✕" })),
       h("div", { class: "row start wrap" }, n.status ? badge(n.status) : null, n.label ? h("span", { class: "agent-meta", text: n.label }) : null, n.project ? h("span", { class: "muted small", text: n.project }) : null, time(n.created_at)),
       card("Content", null, h("div", { class: "prose", text: n.text })),
-      card("Derived from", null, rel(n.out, "out")), card("Led to", null, rel(n.in, "in")));
+      egoGraph(n) ? card("Linked records", "click a node to open it", egoGraph(n)) : null,
+      card("Links from this record", null, rel(n.out, "out")), card("Links to this record", null, rel(n.in, "in")));
     drawer.querySelector("button")?.focus();
   } catch (err) { drawer.replaceChildren(h("p", { text: err.message }), h("button", { onclick: closeDrawer, text: "Close" })); }
 }
@@ -695,6 +839,11 @@ async function openNode(source) {
 // ---------- activity
 VIEWS.activity = async () => {
   const events = await api("/api/activity?limit=300");
+  const more = h("button", { class: "small", text: "Load older events", onclick: async () => {
+    const older = await api(`/api/activity?limit=300&before=${events[events.length - 1].seq}`);
+    if (!older.length) { more.disabled = true; more.textContent = "No older events"; return; }
+    events.push(...older); draw();
+  } });
   const types = [...new Set(events.map((e) => e.type))].sort();
   const out = h("div", {}, pageHead("Activity", "The lab's tamper-evident ledger, newest first."));
   let chosen = "all";
@@ -703,7 +852,7 @@ VIEWS.activity = async () => {
   const select = h("select", { "aria-label": "Event type", onchange: (ev) => { chosen = ev.target.value; draw(); } },
     h("option", { value: "all", text: "All event types" }), types.map((t) => h("option", { value: t, text: t })));
   select.style.maxWidth = "260px";
-  out.append(h("div", { class: "toolbar" }, select), card(null, null, list));
+  out.append(h("div", { class: "toolbar" }, select), card(null, null, list, events.length >= 300 ? h("div", { class: "actions" }, more) : null));
   draw();
   return out;
 };
@@ -835,6 +984,13 @@ function connect() {
   es.addEventListener("change", scheduleRefresh);
   es.addEventListener("error", () => set("warn", "Reconnecting…"));
 }
+
+// ------------------------------------------------------------------ mobile menu (D63)
+$("menu-btn")?.addEventListener("click", () => {
+  const open = document.querySelector(".sidebar").classList.toggle("open");
+  $("menu-btn").setAttribute("aria-expanded", String(open));
+});
+window.addEventListener("hashchange", () => document.querySelector(".sidebar")?.classList.remove("open"));
 
 // ------------------------------------------------------------------ boot
 applyTheme();

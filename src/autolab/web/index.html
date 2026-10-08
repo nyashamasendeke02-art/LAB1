@@ -16,6 +16,7 @@
       <div class="brand">
         <div class="mark" aria-hidden="true">A</div>
         <div><div class="brand-name">Autolab</div><div class="brand-lab" id="lab-name">loading…</div></div>
+        <button class="ghost small" id="menu-btn" type="button" aria-expanded="false" aria-controls="nav">Menu</button>
       </div>
       <nav class="nav" id="nav">
         <a href="#/overview" data-route="overview"><span class="ico" aria-hidden="true">◎</span>Overview</a>
@@ -39,7 +40,7 @@
   </div>
 
   <dialog id="palette" aria-label="Search and commands">
-    <input id="palette-input" type="search" placeholder="Jump to a project, approval, view or command…" autocomplete="off" aria-controls="palette-list">
+    <input id="palette-input" type="search" aria-label="Search and commands" placeholder="Jump to a project, approval, view or command…" autocomplete="off" aria-controls="palette-list">
     <ul id="palette-list" role="listbox"></ul>
     <div class="palette-hint"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close</div>
   </dialog>

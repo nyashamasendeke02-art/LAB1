@@ -5,4 +5,4 @@ Agents (scientist / engineer / verifier) propose; the controller records,
 verifies, gates and decides state transitions.
 """
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"

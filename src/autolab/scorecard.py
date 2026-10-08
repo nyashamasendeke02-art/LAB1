@@ -31,7 +31,7 @@ def scorecards(store: Store) -> list[dict]:
     cards: dict[str, dict] = defaultdict(lambda: {
         "calls": 0, "completed": 0, "errors": 0, "other": 0, "protocol_rejections": 0,
         "wall_s": 0.0, "timed_calls": 0, "usage_calls": 0, "input_tokens": 0,
-        "output_tokens": 0, "cache_read_tokens": 0, "cost_usd": 0.0,
+        "output_tokens": 0, "cache_read_tokens": 0, "cache_write_tokens": 0, "cost_usd": 0.0,
         "stages": Counter(), "models": Counter(),
         "reviews_of_my_code": {"passed": 0, "failed": 0},
         "findings_caused": Counter(), "findings_raised": Counter()})
@@ -51,7 +51,8 @@ def scorecards(store: Store) -> list[dict]:
         u = d.get("usage")
         if u:
             c["usage_calls"] += 1
-            for k in ("input_tokens", "output_tokens", "cache_read_tokens", "cost_usd"):
+            for k in ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
+                      "cost_usd"):
                 if isinstance(u.get(k), (int, float)):
                     c[k] += u[k]
     # Quality: each adversarial code review is credited to the author of the reviewed code (the
@@ -84,7 +85,11 @@ def scorecards(store: Store) -> list[dict]:
             "avg_wall_s": round(c["wall_s"] / c["timed_calls"], 1) if c["timed_calls"] else None,
             "total_wall_s": round(c["wall_s"], 1),
             "usage_reported_calls": c["usage_calls"],
-            "input_tokens": c["input_tokens"] if c["usage_calls"] else None,
+            # Input = fresh + cached prompt tokens: Claude reports cached input separately,
+            # and fresh input alone (often a few dozen tokens) understates what was read.
+            "input_tokens": (c["input_tokens"] + c["cache_read_tokens"] + c["cache_write_tokens"])
+            if c["usage_calls"] else None,
+            "fresh_input_tokens": c["input_tokens"] if c["usage_calls"] else None,
             "output_tokens": c["output_tokens"] if c["usage_calls"] else None,
             "cache_read_tokens": c["cache_read_tokens"] if c["usage_calls"] else None,
             "cost_usd": round(c["cost_usd"], 4) if c["usage_calls"] else None,

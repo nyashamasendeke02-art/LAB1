@@ -310,3 +310,32 @@ def test_programmes_api(ui):
     assert meta["programme_terminal"] == ["COMPLETE", "HALTED"]
     assert "ml" in meta["specialties"] and "coordination" in meta["planes"]
     assert call(server, "POST", "/api/programmes", {"objective": ""}, token=server.token)[0] == 400
+
+
+def test_research_view_meta_charts_and_activity_paging(tmp_path):
+    """D63: research content, research pipeline + state labels, usage per day, paging."""
+    from scenario import make
+    lab, ctl = make(tmp_path)
+    ctl.injected["scientist"].usage = {"input_tokens": 10, "output_tokens": 2, "cost_usd": 0.01}
+    pid = ctl.new_project("Investigate whether treat can produce higher score")
+    ctl.run(pid)
+    srv = DashboardServer(lab, "127.0.0.1", 0)
+    try:
+        r = srv.project(pid)["research"]
+        assert r["problem"]["problem_statement"] and r["questions"] and r["hypotheses"]
+        assert any(h["current"] for h in r["hypotheses"])
+        assert r["designs"][0]["chosen"] and r["protocols"][-1]["frozen"]
+        assert r["results"][0]["decision"]["ci_low"] is not None
+        assert r["conclusions"][0]["outcome"] == "supported" and r["reports"][0]["text"]
+        meta = srv.meta()
+        assert meta["research_pipeline"][0] == "DEFINE_PROBLEM"
+        assert meta["research_pipeline"][-1] == "COMPLETE"
+        assert meta["state_labels"]["ADVERSARIAL_REVIEW"] == "Independent review"
+        usage = srv.overview()["usage"]
+        assert usage["by_day"][0]["cost_usd"] > 0 and usage["by_agent"]
+        newest = srv.activity(5)
+        older = srv.activity(5, before=newest[-1]["seq"])
+        assert older and all(e["seq"] < newest[-1]["seq"] for e in older)
+        assert srv.project(ctl.new_engineering_project("x", ["y"]))["research"] is None
+    finally:
+        srv.httpd.server_close()

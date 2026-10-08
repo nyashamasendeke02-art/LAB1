@@ -114,3 +114,25 @@ STATE_TONES = {
     E.IMPLEMENTING: "info", E.TESTING: "info", E.ADVERSARIAL_REVIEW: "review",
     E.REDESIGN: "warn", E.MERGED: "ok", E.ESCALATED: "bad",
 }
+
+# The research cycle as a pipeline for user interfaces (D63), and plain-language state labels.
+RESEARCH_PIPELINE = (R.DEFINE_PROBLEM, R.BACKGROUND_RESEARCH, R.RESEARCH_QUESTION, R.HYPOTHESIS,
+                     R.REQUIREMENTS, R.DESIGN, R.SCIENTIFIC_REVIEW, R.PROTOCOL_FREEZE,
+                     R.ENGINEERING, R.SCIENTIFIC_VALIDATION, R.RUN_EXPERIMENT, R.ANALYZE,
+                     R.CHALLENGE, R.EVALUATE, R.COMMUNICATE, R.NEXT_QUESTION, R.COMPLETE)
+STATE_LABELS = {
+    R.DEFINE_PROBLEM: "Defining the problem", R.BACKGROUND_RESEARCH: "Studying existing knowledge",
+    R.RESEARCH_QUESTION: "Choosing the research question", R.HYPOTHESIS: "Forming hypotheses",
+    R.REQUIREMENTS: "Setting validity requirements", R.DESIGN: "Designing the experiment",
+    R.SCIENTIFIC_REVIEW: "Independent review of the design",
+    R.PROTOCOL_FREEZE: "Freezing the pre-registration", R.ENGINEERING: "Building the experiment",
+    R.SCIENTIFIC_VALIDATION: "Checking the build matches the plan",
+    R.RUN_EXPERIMENT: "Running the experiment", R.ANALYZE: "Analysing results",
+    R.CHALLENGE: "Adversarial challenge of results", R.EVALUATE: "Evaluating validity",
+    R.COMMUNICATE: "Writing the report", R.NEXT_QUESTION: "Choosing what to study next",
+    R.COMPLETE: "Complete", R.HALTED: "Halted: needs a human",
+    E.SPEC: "Architecture and specification", E.IMPLEMENTING: "Implementing",
+    E.TESTING: "Running tests", E.ADVERSARIAL_REVIEW: "Independent review",
+    E.REDESIGN: "Redesigning after failures", E.MERGE: "Final reviews and integration",
+    E.MERGED: "Merged", E.ESCALATED: "Escalated: approach inadequate",
+}

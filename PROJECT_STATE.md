@@ -5,7 +5,9 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** autolab 0.8.0 (D55-D57, 2026-10-08: research<->engineering feedback loop, engineering
+- **Version:** autolab 0.9.0 (D58-D59, 2026-10-08: autonomy levels 0-5, generated-data guard,
+  technology decisions doc, knowledge-graph entity types and typed relations).
+  0.8.0 (D55-D57, 2026-10-08: research<->engineering feedback loop, engineering
   workflow with architecture/critique/security/performance reviews and release manifests, /research
   /engineer /project /director /build modes, preset claude-strengths; 204/204 tests pass).
   0.7.0 (D54, 2026-10-08: hierarchical coordination -- programmes planned and
@@ -59,9 +61,16 @@ and `project_state/` (decisions, failures, open questions)._
 ## Todo
 
 ### In Progress (checked 2026-10-08)
-- [ ] APR-0006 (G1-6 safety review, delegated to claude-code) IN PROGRESS: candidate passes its 452 tests, but it
-      commits 59 `.scratch/` test-output files (224k lines) -> will be rejected back to the engineer unless the
-      kernel review finds more; fault injection not yet run. robolab now runs on preset claude-strengths.
+- [ ] APR-0006 REJECTED 2026-10-08 (claude-code): candidate committed 59 `.scratch/` files. Engineer patched
+      (5af4ad2); the cleaned candidate returns to the safety gate -> run the FULL kernel review there (fault
+      injection: Puck2D + Car2D MHS, latency 0-1 s, clamp/reject, adversarial policies, lying estimator, slippery
+      patches vs declared braking, liveness). robolab runs on preset claude-strengths.
+- [x] robolab autonomy_level = 5 set 2026-10-08 (queue stopped; delegation to claude-code verified).
+- [ ] robolab queue STOPPED 2026-10-08 by Claude Code (PC critically low on memory: 8 GB RAM, ~2 GB free while the
+      test suite, the queue and Claude agents ran together). Before that it had hit the Claude usage limit and was
+      waiting. G1-6 state: MERGE; engineer removed .scratch, tests passed, Sonnet re-verified, security review
+      passed (REV-0025); the performance review (TASK-0108) was interrupted. Restart only when the human asks:
+      `autolab queue labs/robolab docs/gates/gate1_queue.toml` (do not run it alongside the full test suite).
 - [ ] robolab Gate 1 in progress (D50): Codex kept as primary; Gemini (gemini-3.8-flash-high via
       gemini-cli / agy) configured as automatic backup on usage limit. G1-6 (PRJ-0013) redesign built
       (84f6a44) and tests passed; waiting at adversarial review. Resuming with
@@ -123,7 +132,11 @@ and `project_state/` (decisions, failures, open questions)._
 5d. [x] D52: agent registry + stage allocation + config-driven dashboard (see roadmap).
 5e. [x] D53: nine architecture docs (docs/ARCHITECTURE.md is the index) + K1 knowledge plane.
 5f. [x] D54: hierarchical coordination (ROADMAP phases 1 and 4).
-5h. [ ] Close PROMPT.txt gaps in docs/PROMPT_ALIGNMENT.md order: 1 research<->engineering feedback (s.12,
+5h. [x] PROMPT.txt gaps 1-6 closed (D55-D59): feedback loop, engineering workflow, modes, autonomy levels,
+       technology decisions, knowledge vocabulary. Remaining (PROMPT_ALIGNMENT.md): project manifest
+       (s.15/16), observability tokens/cost/GPU (s.20), containers/GPU execution (s.9), tool/sandbox
+       profiles (s.18/19), deployment plane.
+5h-old. Close PROMPT.txt gaps in docs/PROMPT_ALIGNMENT.md order: 1 research<->engineering feedback (s.12,
        mandatory), 2 engineering workflow stages (s.11/27/30), 3 slash workflows (s.26-30), 4 autonomy
        levels, 5 technology decision doc, 6 knowledge vocabulary, ...
 5g. [ ] Next ROADMAP phases: 2 agent scorecards, 3 release bundles, 5 verified external

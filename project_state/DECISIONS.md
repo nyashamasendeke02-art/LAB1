@@ -318,3 +318,22 @@
   Claude Code commands /research /engineer /project /director /build in .claude/commands/. Dashboard: agents
   that are allocated no stage no longer raise "blocked" alerts (a stale Codex usage-limit alert showed after
   verification moved to Claude). Audit of PROMPT.txt: docs/PROMPT_ALIGNMENT.md. Tests: tests/test_modes.py (6).
+- D58 (2026-10-08, human: "do both" -- reject APR-0006 with the hygiene finding and keep closing gaps): APR-0006
+  rejected by claude-code (delegate) for 59 committed `.scratch/` files (224k lines); full kernel fault injection
+  deferred to the cleaned candidate, the commit that would merge; robolab queue restarted (engineer patched as
+  5af4ad2). New controller guard: after every engineer commit, files matching [engineering] generated_paths or new
+  files over max_committed_file_kb (1024) are removed by a controller commit, recorded (generated_data_removed,
+  event GeneratedDataRemoved), not counted as a failed patch; engineers are told the rule up front.
+  Autonomy levels (master prompt s.21, src/autolab/autonomy.py): [lab] autonomy_level (default 3 for new labs)
+  caps every project; 0 = no agent called, 1 = plan-only research, 2 = every merge and experiment run gated,
+  3 = gates as configured, 4 = programmes allowed, 5 = gate delegation honoured (below 5 only the human decides).
+  ACTION: robolab relies on delegation (D35) -> set `autonomy_level = 5` in labs/robolab/lab.toml when its queue is
+  stopped (editing lab.toml during an agent call trips the tamper check). docs/TECHNOLOGY_DECISIONS.md (s.22).
+  Tests: tests/test_autonomy_levels.py (6), guard test.
+- D59 (2026-10-08): knowledge vocabulary (s.8): nodes carry entity types (ResearchQuestion, Hypothesis, Claim,
+  Method, Experiment, ExperimentRun, Result, Failure, Observation, Requirement, SoftwareComponent); derived entities
+  Agent (incl. pre-D52 tasks via role), Model, Dataset, Metric, Paper, CodeArtifact, Architecture; relations use the
+  prompt's vocabulary (a conclusion supports/contradicts its hypothesis by outcome, motivates follow-up questions;
+  protocol tested_by run; run uses dataset/code; agent produces records and uses a model). On the real ledgers:
+  pilot-004 CON-0001 supports HYP-0001 and motivates FQ-0001..4. Dashboard Knowledge view lists entities and
+  relationships. Not derived yet: Author, Simulation, Robot, Environment, Publication.

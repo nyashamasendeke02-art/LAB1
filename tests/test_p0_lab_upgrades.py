@@ -300,3 +300,27 @@ def test_redesign_after_review_revises_the_rejected_protocol(tmp_path):
     ctl.run(pid, max_steps=9)
     assert len(seen) >= 2 and seen[0] is None
     assert seen[1]["id"] == "PROT-0001" and seen[1]["seeds"] == [1, 2, 3, 4]
+
+
+def test_generated_data_never_reaches_a_branch(tmp_path):
+    """G1-6 committed 59 `.scratch/` telemetry files (224k lines): generated or oversized files
+    are removed by the controller, recorded, and not counted as a failed patch."""
+    def build(t):
+        wd = Path(t.workdir)
+        (wd / ".scratch" / "tmp1").mkdir(parents=True, exist_ok=True)
+        (wd / ".scratch" / "tmp1" / "telemetry.jsonl").write_text('{"x": 1}\n' * 50,
+                                                                  encoding="utf-8")
+        (wd / "src").mkdir(exist_ok=True)
+        (wd / "src" / "dump.bin").write_bytes(b"0" * (2 * 1024 * 1024))
+        return build_ok(t)
+
+    lab, ctl = make(tmp_path, eng__build=build, ver__verify=verify_spec)
+    pid = ctl.new_engineering_project("contract module", ["VERSION exists"])
+    assert ctl.run(pid)[-1].after == "COMPLETE"
+    files = lab.repo.git("ls-tree", "-r", "--name-only", "main").splitlines()
+    assert "src/contracts/msg.py" in files
+    assert not any(f.startswith(".scratch/") for f in files) and "src/dump.bin" not in files
+    fails = lab.store.query("failure", category="generated_data_removed")
+    assert fails and ".scratch/tmp1/telemetry.jsonl" in fails[0].data["summary"]
+    assert lab.store.query("eng_task")[0].data["patch_attempts"] == 0
+    assert any(e["type"] == "GeneratedDataRemoved" for e in lab.store.events())

@@ -37,6 +37,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from . import __version__
 from .controller import Controller, Lab
 from .gates import GateError, Gates
+from .autonomy import LEVELS, delegation, lab_level
 from .coordination import PROGRAMME_STATES, PROGRAMME_TRANSITIONS, Coordinator
 from .knowledge import INDEXED_KINDS, Knowledge
 from .registry import BACKENDS, ORGANISATION, ROLE_AGENTS, STAGES, Registry, RegistryError
@@ -380,7 +381,7 @@ class DashboardServer:
                 "cycle": d.get("cycle", 0), "blocked_on": d.get("blocked_on"),
                 "halt_reason": d.get("halt_reason"), "mandate_refs": d.get("mandate_refs", []),
                 "gate": gates[0] if gates else None, "eng": self._eng(rec),
-                "origin": d.get("origin"),
+                "origin": d.get("origin"), "autonomy_level": d.get("autonomy_level"),
                 "created_at": history[0].created_at if history else rec.created_at,
                 "updated_at": rec.created_at}
 
@@ -574,6 +575,8 @@ class DashboardServer:
                         "writable": st.writable, "reads_files": st.reads_files,
                         "label": st.label} for st in STAGES],
             "planes": list(dict.fromkeys(st.plane for st in STAGES)),
+            "autonomy": {"lab_level": lab_level(self.lab.config),
+                         "levels": [{"level": k, "label": v} for k, v in LEVELS.items()]},
             "programme_states": list(PROGRAMME_STATES),
             "programme_terminal": [s for s in PROGRAMME_STATES if not PROGRAMME_TRANSITIONS[s]],
             "specialties": list((self.lab.config.get("coordination") or {}).get("specialties", [])),
@@ -717,7 +720,7 @@ class DashboardServer:
         return {"id": project_id}
 
     def approvals(self) -> list[dict]:
-        gates = Gates(self.store, self.lab.config["gates"].get("delegation"))
+        gates = Gates(self.store, delegation(self.lab.config))
         return [{"id": r.id, "gate": r.data.get("gate"), "subject": r.data.get("subject"),
                  "summary": r.data.get("summary"), "project": r.data.get("project"),
                  "files": (r.data.get("details") or {}).get("files", []), "at": r.created_at}
@@ -806,7 +809,7 @@ class DashboardServer:
             raise ValueError("decision needs a boolean and a note of at most 2000 characters")
         if not note.strip():
             raise ValueError("a decision needs a note: say what you checked")
-        rec = Gates(self.store, self.lab.config["gates"].get("delegation")).decide(
+        rec = Gates(self.store, delegation(self.lab.config)).decide(
             approval_id, approved, by="human", note=note.strip())
         return {"id": rec.id, "status": rec.data["status"]}
 

@@ -315,7 +315,8 @@ async function projectDetail(id, tab) {
         p.acceptance_criteria.length ? card("Acceptance criteria", null, h("ol", {}, p.acceptance_criteria.map((a) => h("li", { class: "prose", text: a })))) : null),
       h("div", { class: "stack" },
         card("Facts", null, h("div", { class: "list" },
-          [["Kind", p.kind], ["Cycle", p.cycle], ["Created", absTime(p.created_at)], ["Updated", absTime(p.updated_at)], ["Branch", p.eng?.branch], ["Head", p.eng?.head?.slice(0, 12)]]
+          [["Kind", p.kind], ["Autonomy", p.autonomy_level === undefined || p.autonomy_level === null ? null
+            : `${p.autonomy_level} · ${(META.autonomy.levels.find((l) => l.level === p.autonomy_level) || {}).label || ""}`], ["Cycle", p.cycle], ["Created", absTime(p.created_at)], ["Updated", absTime(p.updated_at)], ["Branch", p.eng?.branch], ["Head", p.eng?.head?.slice(0, 12)]]
             .filter(([, v]) => v !== undefined && v !== null && v !== "")
             .map(([k, v]) => h("div", { class: "item" }, h("span", { class: "muted", text: k }), h("span", { class: "mono", text: v }), h("span"))))),
         p.mandate_refs.length ? card("Mandate references", null, h("div", { class: "tags" }, p.mandate_refs.map((m) => h("span", { class: "tag", text: m })))) : null,
@@ -606,7 +607,7 @@ function knowledgeLink(source) {
   return h("a", { href: "#", class: "mono", text: source.replace(/^lab:/, ""), onclick: (ev) => { ev.preventDefault(); openNode(source); } });
 }
 function nodeRow(n) {
-  return h("div", { class: "item" }, badge(n.kind, "plain"),
+  return h("div", { class: "item" }, badge(n.entity || n.kind, "plain"),
     h("div", {}, knowledgeLink(n.source), n.status ? [" ", badge(n.status)] : null, n.label ? h("span", { class: "muted small", text: ` ${n.label}` }) : null,
       h("div", { class: "prose small", text: n.text })),
     n.score !== undefined ? h("span", { class: "muted small mono", text: n.score.toFixed(2) }) : time(n.created_at));
@@ -644,7 +645,8 @@ VIEWS.knowledge = async () => {
       h("div", {}, h("div", { class: "prose small", text: q.question }), h("div", { class: "muted small" }, knowledgeLink(q.source), q.project ? ` · ${q.project}` : "")),
       h("button", { class: "small", onclick: () => spawnProject(q), text: "Start project" }))))
       : h("div", { class: "empty", text: "No open questions. They appear when a research cycle ends." })),
-    card("By kind", null, h("div", { class: "list" }, Object.entries(st.by_kind).map(([kind, n]) => h("div", { class: "item" }, badge(kind, "plain"), h("span", { text: "" }), h("b", { text: n }))))));
+    card("Entities", null, h("div", { class: "list" }, Object.entries(st.by_entity || st.by_kind).map(([kind, n]) => h("div", { class: "item" }, badge(kind, "plain"), h("span", { text: "" }), h("b", { text: n }))))),
+    card("Relationships", null, h("div", { class: "list" }, Object.entries(st.by_relation || {}).map(([rel, n]) => h("div", { class: "item" }, h("span", { class: "mono", text: rel }), h("span", { text: "" }), h("b", { text: n }))))));
   out.append(h("div", { class: "grid two" }, left, right));
   return out;
 };

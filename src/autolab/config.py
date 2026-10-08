@@ -13,6 +13,11 @@ name = "autolab"
 # Optional: a file in the research repo given to the scientist as the lab charter
 # (e.g. "docs/MANDATE.md").
 charter = ""
+# Highest autonomy level for this lab's agents (master prompt s.21; projects may use lower):
+# 0 human performs task, 1 agent suggests (plan-only), 2 executes with approval (every merge and
+# experiment run gated), 3 executes autonomously (gates as configured), 4 + programmes,
+# 5 + gate delegation ([gates.delegation]).
+autonomy_level = 3
 
 # Role -> backend. backends: "codex-cli", "claude-cli", "gemini-cli", "openai-api".
 # Optional backup_backend and backup_model provide automatic fallback when primary limits hit.
@@ -101,6 +106,10 @@ refresh_fallback_s = 30
 architecture_stage = true
 architecture_rounds = 2          # critique rounds before the project HALTs for a human
 pre_merge_reviews = ["security", "performance"]
+# Never committed by agents: removed from the branch by the controller after each engineer commit.
+generated_paths = [".scratch/*", ".pytest_tmp/*", ".pytest_cache/*", "__pycache__/*",
+                   "*/__pycache__/*", "*.pyc", ".coverage", "htmlcov/*"]
+max_committed_file_kb = 1024   # new files larger than this are treated as generated data
 test_command = "python -m pytest -q"
 protected_paths = ["protocols/*", "tests/verification/*"]
 verifier_allowed_paths = ["tests/verification/*"]

@@ -277,7 +277,9 @@ def test_knowledge_api_search_node_and_spawn(ui):
     hits = json.loads(call(server, "GET", "/api/knowledge/search?q=momentum&kind=conclusion")[1])
     assert [h["source"] for h in hits] == [f"lab:lab/{con.id}"]
     node = json.loads(call(server, "GET", f"/api/knowledge/node?id=lab:lab/{con.id}")[1])
-    assert node["out"][0]["relation"] == "hypothesis" and node["in"][0]["source"].endswith(fq.id)
+    assert node["out"][0]["relation"] == "supports"  # typed relations (D59)
+    assert node["out"][0]["source"].endswith(hyp.id)
+    assert any(e["relation"] == "motivates" and e["source"].endswith(fq.id) for e in node["out"])
     assert call(server, "GET", "/api/knowledge/node?id=lab:lab/CON-9999")[0] == 404
     assert call(server, "POST", "/api/knowledge/spawn", {"source": f"lab:lab/{fq.id}"})[0] == 403
     status, data = call(server, "POST", "/api/knowledge/spawn", {"source": f"lab:lab/{fq.id}"},

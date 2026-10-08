@@ -132,7 +132,8 @@ def _mode_cmd(lab: Lab, a) -> int:
     if a.cmd in ("research", "project"):
         text = a.problem if a.cmd == "research" else a.objective
         pid = ctl.new_project(text, _refs(getattr(a, "refs", "")),
-                              mode="plan" if a.cmd == "research" else "full")
+                              mode="plan" if a.cmd == "research" else "full",
+                              autonomy_level=a.autonomy)
         print(pid)
         if a.run:
             steps = ctl.run(pid, on_step=_print_step)
@@ -143,7 +144,8 @@ def _mode_cmd(lab: Lab, a) -> int:
             return 0 if state == "COMPLETE" else 2 if steps and steps[-1].blocked_on else 1
         return 0
     if a.cmd == "engineer":
-        pid = ctl.new_engineering_project(a.spec, a.accept, _refs(a.refs), specialty=a.specialty)
+        pid = ctl.new_engineering_project(a.spec, a.accept, _refs(a.refs), specialty=a.specialty,
+                                          autonomy_level=a.autonomy)
         print(pid)
         if a.run:
             steps = ctl.run(pid, on_step=_print_step)
@@ -390,6 +392,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--accept", action="append", required=True)
     p.add_argument("--refs", default="")
     p.add_argument("--run", action="store_true")
+    for name in ("research", "engineer", "project"):
+        sub.choices[name].add_argument("--autonomy", type=int, default=None,
+                                       help="autonomy level 0-5 for this project (<= lab max)")
     p = sub.add_parser("observe", help="engineering failures -> research observations -> questions")
     p.add_argument("lab")
     osub = p.add_subparsers(dest="observe_cmd")
@@ -482,7 +487,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{apr.id}: {apr.data['gate']} on {apr.data['subject']}\n  {apr.data['summary']}")
             print("  details:", json.dumps(apr.data["details"])[:2000])
     elif a.cmd in ("approve", "reject"):
-        rec = Gates(lab.store, lab.config["gates"].get("delegation")).decide(
+        from .autonomy import delegation
+        rec = Gates(lab.store, delegation(lab.config)).decide(
             a.approval, a.cmd == "approve", by=a.by, note=a.note)
         print(f"{rec.id}: {rec.data['status']}")
     elif a.cmd == "resume":

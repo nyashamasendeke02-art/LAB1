@@ -90,6 +90,9 @@ def test_cli_modes_submit_without_running(tmp_path, capsys):
     lab_dir = tmp_path / "lab"
     assert main(["init", str(lab_dir)]) == 0
     capsys.readouterr()
+    toml = lab_dir / "lab.toml"  # programmes need autonomy level >= 4 (new labs default to 3)
+    toml.write_text(toml.read_text(encoding="utf-8").replace(
+        "autonomy_level = 3", "autonomy_level = 4"), encoding="utf-8")
     assert main(["research", str(lab_dir), PROBLEM]) == 0
     pid = capsys.readouterr().out.strip()
     assert main(["engineer", str(lab_dir), "Contract module", "--accept", "VERSION exists",

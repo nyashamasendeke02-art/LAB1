@@ -14,6 +14,7 @@ ok = demo.ok
 FAST_CONFIG = """
 [lab]
 name = "test"
+autonomy_level = 5   # tests exercise every mechanism; levels are tested in test_autonomy_levels.py
 [agents.scientist]
 backend = "codex-cli"
 [agents.engineer]

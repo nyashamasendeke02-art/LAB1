@@ -56,12 +56,19 @@ def test_graph_nodes_edges_and_search(finished):
     node = g.nodes[f"lab:{con.id}"]
     assert node.kind == "conclusion" and node.status == "supported"
     assert "tested treat vs base on score" in node.text
-    rels = {r for r, _ in g.neighbours(node.id)["out"]}
-    assert {"result", "hypothesis", "protocol"} <= rels
+    out = set(g.neighbours(node.id)["out"])  # typed relations (D59)
+    con_refs = lab.store.get(con.id).data["refs"]
+    assert ("supports", f"lab:{con_refs['hypothesis']}") in out
+    assert ("derived_from", f"lab:{con_refs['result']}") in out
+    assert ("derived_from", f"lab:{con_refs['protocol']}") in out
     assert all(n.status != "stage_error" for n in g.nodes.values())  # noise not indexed
     hits = g.search("treat score", k=50)
     assert hits and any(n.kind == "conclusion" for _, n in hits)
-    assert g.search("treat score", exclude_project=("lab", pid)) == []
+    from autolab.knowledge import INDEXED_KINDS
+    # every record belongs to the one project; derived entities (metric:score, agents) do not
+    assert g.search("treat score", kinds=INDEXED_KINDS, exclude_project=("lab", pid)) == []
+    assert {n.entity for _, n in g.search("treat score", exclude_project=("lab", pid))} <= {
+        "Metric", "Agent", "Model", "Dataset", "Paper", "CodeArtifact", "Architecture"}
     assert g.resolve_source(f"lab:lab/{con.id}") is node
     assert g.resolve_source("lab:lab/CON-9999") is None
     assert [n.kind for n in g.open_questions()] == ["future_question"] * len(g.open_questions())
@@ -166,3 +173,36 @@ def test_knowledge_can_be_disabled(tmp_path):
     ctl.run(second)
     assert all("lab_knowledge" not in pk["context"]
                for pk in packets(lab, second, "define_problem"))
+
+
+def test_entity_types_and_typed_relations(finished):
+    """Master prompt s.8: entities and named relationships, derived from the records."""
+    lab, _, pid = finished
+    g = KnowledgeGraph({"lab": lab.store})
+    st = g.stats()
+    for entity in ("ResearchQuestion", "Hypothesis", "Claim", "Method", "Experiment",
+                   "ExperimentRun", "Result", "Requirement", "Metric", "Agent", "Model",
+                   "CodeArtifact"):
+        assert st["by_entity"].get(entity), entity
+    con = lab.store.query("conclusion")[0]
+    hyp = con.data["refs"]["hypothesis"]
+    assert (f"lab:{con.id}", "supports", f"lab:{hyp}") in g.edges
+    fq = lab.store.query("future_question")[0]
+    assert (f"lab:{con.id}", "motivates", f"lab:{fq.id}") in g.edges
+    prot, run = con.data["refs"]["protocol"], con.data["refs"]["run"]
+    assert (f"lab:{prot}", "tested_by", f"lab:{run}") in g.edges
+    assert (f"lab:{prot}", "uses", "lab:metric:score") in g.edges
+    assert ("lab:agent:scientist", "uses", "lab:model:s") in g.edges
+    assert any(s == "lab:agent:scientist" and r == "produces" for s, r, _ in g.edges)
+    assert set(st["by_relation"]) <= set(__import__("autolab.knowledge",
+                                                     fromlist=["RELATIONS"]).RELATIONS)
+
+
+def test_unsupported_conclusion_contradicts_its_hypothesis(tmp_path):
+    lab, ctl = make(tmp_path, sci__design=scenario.design(effect=0.0))
+    pid = ctl.new_project(OBJECTIVE)
+    ctl.run(pid)
+    con = lab.store.query("conclusion")[0]
+    assert con.data["outcome"] == "unsupported"
+    g = KnowledgeGraph({"lab": lab.store})
+    assert (f"lab:{con.id}", "contradicts", f"lab:{con.data['refs']['hypothesis']}") in g.edges

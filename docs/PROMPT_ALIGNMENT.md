@@ -1,6 +1,7 @@
 # Alignment with PROMPT.txt (master prompt)
 
-Audit of 2026-10-08 against the code at autolab 0.7.0 (D54), section by section. Labels:
+Audit of 2026-10-08 against the code at autolab 0.7.0 (D54), section by section; updated the
+same day after D55-D59 (closed gaps are marked **closed (Dnn)**). Labels:
 **aligned** (implemented and tested), **partial** (implemented with a named gap), **gap** (not
 built). Evidence names the code or test; nothing here is claimed from documentation alone.
 
@@ -10,19 +11,19 @@ built). Evidence names the code or test; nothing here is claimed from documentat
 |---|---|
 | Core method: vertical slice, provenance, research <-> engineering, replaceable agents (1-6, 14, 23-25, 31-33) | aligned |
 | Agent hierarchy (7) | aligned, two small gaps (programme time limit, configurable depth) |
-| Knowledge graph (8) | partial: graph exists, entity and relation vocabularies are much smaller than specified |
+| Knowledge graph (8) | **closed (D59)** for 16 of 24 entity types and the named relationships; Author, Simulation, Robot, Environment, Publication not yet |
 | Experiment engine (9) | partial: reproducible local/simulation runs; no container, GPU, distributed or hardware execution |
 | Evaluation engine (10) | partial: experiment evaluation is mechanical; no model/agent/algorithm/robot evaluation suites |
-| Engineering workflow (11) | partial: no architecture critique, implementation plan, security or performance review stages |
-| Research <-> engineering feedback (12, "mandatory") | **gap**: failures are stored and searchable, but nothing turns them into research questions |
+| Engineering workflow (11) | **closed (D56)** except deployment |
+| Research <-> engineering feedback (12, "mandatory") | **closed (D55)** |
 | Events (13) | partial: ledger events are generic; agents do not subscribe |
 | Project structure and manifest (15, 16) | **gap** |
 | Model abstraction (17) | partial: LLM backends only |
 | Tools, sandboxes (18, 19) | partial: per-stage permissions through CLI backends; no unified tool layer or per-call log |
 | Observability (20) | partial: no token, cost or GPU tracking |
-| Autonomy levels (21) | **gap** (gates approximate it) |
-| Technology decision document (22) | **gap** |
-| Slash workflows /research /engineer /project /director /build (26-30) | **gap** as commands; the underlying pipelines mostly exist |
+| Autonomy levels (21) | **closed (D58)** |
+| Technology decision document (22) | **closed** (docs/TECHNOLOGY_DECISIONS.md) |
+| Slash workflows /research /engineer /project /director /build (26-30) | **closed (D57)**; deployment steps remain a gap |
 
 ## Section by section
 
@@ -76,7 +77,19 @@ built). Evidence names the code or test; nothing here is claimed from documentat
 | 32 | Success criteria | aligned | ARCHITECTURE.md table |
 | 33 | Final objective; the nine documents | aligned | docs/ |
 
-## Priority order to close the gaps
+## Closed since the audit
+
+| Gap | Closed by | Evidence |
+|---|---|---|
+| 12 research <-> engineering feedback | D55: failures -> observations -> triage -> research questions | tests/test_feedback.py |
+| 11/27/30 engineering workflow | D56: architecture, critique, security and performance reviews, release manifest | tests/test_eng_workflow.py |
+| 26-30 workflow modes | D57: autolab research/engineer/project/director/build + .claude/commands | tests/test_modes.py |
+| 21 autonomy levels | D58: levels 0-5 enforced by gates, delegation and programme rules | tests/test_autonomy_levels.py |
+| 22 technology decisions | docs/TECHNOLOGY_DECISIONS.md | - |
+| 8 knowledge vocabulary | D59: entity types, derived Agent/Model/Dataset/Metric/Paper/CodeArtifact/Architecture, typed relations | tests/test_knowledge.py |
+| (found in review) generated data in branches | D58: controller removes generated/oversized files after engineer commits | test_generated_data_never_reaches_a_branch |
+
+## Priority order to close the gaps (as of the audit)
 
 Ordered by the prompt's own weight ("mandatory", "no major implementation without") and by
 value per effort:

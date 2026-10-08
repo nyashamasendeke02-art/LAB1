@@ -154,6 +154,10 @@ class Coordinator:
         planning step: the programme starts RUNNING with those validated items."""
         if not objective.strip():
             raise ValueError("a programme needs an objective")
+        from .autonomy import AutonomyError, lab_level
+        if lab_level(self.ctl.cfg) < 4:
+            raise AutonomyError("programmes (multi-step planning by directors) need autonomy "
+                                "level >= 4 ([lab] autonomy_level)")
         start: dict = {"state": PLANNING, "items": {}, "order": [], "decisions": []}
         if items:
             errs = validate_items(items, {}, self.max_items)

@@ -34,6 +34,7 @@ from xml.etree import ElementTree
 
 from . import __version__
 from .agents import Agent, AgentBackend, agent_wait_kind, make_backend
+from .autonomy import AutonomyError, delegation, project_level, resolve_level
 from .eng_workflow import EngineeringWorkflowMixin
 from .report import research_plan_markdown
 from .feedback import OBSERVED_FAILURES, record_observation
@@ -200,7 +201,7 @@ class Controller(EngineeringWorkflowMixin):
         self.cfg = lab.config
         self.limits = self.cfg["limits"]
         self.sleep: Callable[[float], None] = wall_sleep  # injectable for tests
-        self.gates = Gates(self.store, self.cfg["gates"].get("delegation"))
+        self.gates = Gates(self.store, delegation(self.cfg))  # D58: level 5 only
         # D52: who performs each stage comes from the agent registry (lab.toml [agents.*] and
         # [allocation], overlaid by agents.toml). Permissions stay fixed by the stage's role.
         self.registry = Registry(self.cfg, lab.root)
@@ -251,14 +252,19 @@ class Controller(EngineeringWorkflowMixin):
 
     # ------------------------------------------------------------ projects
     def new_project(self, objective: str, mandate_refs: list[str] | None = None,
-                    author: str = "human", mode: str = "full") -> str:
+                    author: str = "human", mode: str = "full",
+                    autonomy_level: int | None = None) -> str:
         """``mode='plan'`` (/research): problem -> literature -> knowledge -> gaps -> hypotheses
         -> experiment proposal reviewed by a critic -> saved research plan; nothing is built
         or run. ``mode='full'``: the whole research cycle."""
         if mode not in ("full", "plan"):
             raise ValueError("mode must be 'full' or 'plan'")
+        level = resolve_level(self.cfg, autonomy_level)
+        if level == 1 and mode != "plan":
+            raise AutonomyError("at autonomy level 1 agents only suggest: use plan-only "
+                                "research (mode='plan', /research)")
         rec = self.store.create("project", {
-            "kind": "research", "mode": mode, "objective": objective,
+            "kind": "research", "mode": mode, "autonomy_level": level, "objective": objective,
             "state": R.DEFINE_PROBLEM.value,
             "cycle": 1, "current": {}, "retries": {}, "design_iterations": 0, "feedback": [],
             "blocked_on": None, "halt_reason": None, "halted_from": None,
@@ -269,16 +275,21 @@ class Controller(EngineeringWorkflowMixin):
 
     def new_engineering_project(self, spec: str, acceptance: list[str],
                                 mandate_refs: list[str] | None = None,
-                                author: str = "human", specialty: str | None = None) -> str:
+                                author: str = "human", specialty: str | None = None,
+                                autonomy_level: int | None = None) -> str:
         """Engineering track: gate work with no hypothesis (contracts, simulator, safety).
         It goes through the same engineering machine (tests, adversarial review with
         hermetic independent tests, path policies, review gates, merge) and ends COMPLETE
         with a delivery record, without a research cycle."""
         if not spec.strip() or not acceptance:
             raise ValueError("an engineering task needs a spec and acceptance criteria")
+        level = resolve_level(self.cfg, autonomy_level)
+        if level < 2:
+            raise AutonomyError(f"engineering changes code: needs autonomy level >= 2 "
+                                f"(requested/lab level {level})")
         rec = self.store.create("project", {
             "kind": "engineering", "objective": spec, "acceptance_criteria": list(acceptance),
-            "specialty": specialty,
+            "specialty": specialty, "autonomy_level": level,
             "state": R.ENGINEERING.value, "cycle": 1, "current": {}, "retries": {},
             "design_iterations": 0, "feedback": [], "blocked_on": None, "halt_reason": None,
             "halted_from": None, "mandate_refs": list(mandate_refs or []), "refs": {},
@@ -438,6 +449,10 @@ class Controller(EngineeringWorkflowMixin):
         state = R(proj.data["state"])
         if state in TERMINAL:
             return StepResult(pid, state.value, state.value, "terminal state")
+        if project_level(self.cfg, proj.data) == 0:
+            return StepResult(pid, state.value, state.value,
+                              "autonomy level 0: the human performs this work; no agent is "
+                              "called", blocked_on="autonomy-level-0")
         blocked = proj.data.get("blocked_on")
         if blocked:
             apr = self.store.get(blocked)
@@ -526,7 +541,10 @@ class Controller(EngineeringWorkflowMixin):
         common = ["Do not run git commands; the controller commits.",
                   "Never fabricate sources, data or results."]
         if role == Role.ENGINEER:
-            return common + [f"Do not modify: {', '.join(eng['protected_paths'])}"]
+            return common + [f"Do not modify: {', '.join(eng['protected_paths'])}",
+                             "Never leave generated data in the worktree (test output, caches, "
+                             "telemetry dumps): tests write temporary files under pytest's "
+                             "tmp_path; the controller removes generated files before review."]
         if role == Role.VERIFIER:
             return common + [f"Only add/modify files matching: {', '.join(eng['verifier_allowed_paths'])}"]
         return common + ["Read-only role: do not modify files."]
@@ -1182,6 +1200,7 @@ class Controller(EngineeringWorkflowMixin):
             self._eng_to(eng, E.TESTING, f"{stage}: no code changes; re-verifying",
                          pending_redesign=False, last_engineer_task=tid)
             return "no changes"
+        sha = self._remove_generated_data(pid, eng, wt, sha, tid)
         protected = self.cfg["engineering"]["protected_paths"]
         bad = path_violations(self.repo.changed_files(eng.data["base"], sha), None, protected)
         if bad:
@@ -1193,6 +1212,30 @@ class Controller(EngineeringWorkflowMixin):
         self._eng_to(eng, E.TESTING, f"{stage} committed {sha[:10]}", head=sha,
                      pending_redesign=False, last_engineer_task=tid)
         return sha
+
+    def _remove_generated_data(self, pid: str, eng: Record, wt: Path, sha: str, tid: str) -> str:
+        """Generated data (test temp output, caches) and oversized new files never reach a
+        branch: they are removed by a controller commit and recorded, without counting as a
+        failed patch (found in G1-6: 59 `.scratch/` telemetry files, 224k lines)."""
+        e = self.cfg["engineering"]
+        patterns = e.get("generated_paths", [])
+        limit = float(e.get("max_committed_file_kb", 1024)) * 1024
+        base = eng.data["base"]
+        changed = self.repo.changed_files(base, sha)
+        added = set(self.repo.git("diff", "--name-only", "--diff-filter=A", f"{base}..{sha}",
+                                  cwd=wt).splitlines())
+        bad = [f for f in changed if any(fnmatch.fnmatch(f, p) for p in patterns)]
+        bad += [f for f in sorted(added) if f not in bad and (wt / f).is_file()
+                and (wt / f).stat().st_size > limit]
+        if not bad:
+            return sha
+        new = self._restore_paths(wt, base, bad, "generated data removed", tid)
+        self._failure(pid, "generated_data_removed",
+                      f"{len(bad)} generated or oversized files removed from the branch: "
+                      f"{bad[:8]}{' ...' if len(bad) > 8 else ''}", {"task": tid})
+        self.store.append_event("controller", "GeneratedDataRemoved", eng.id,
+                                {"task": tid, "files": bad[:50], "count": len(bad)})
+        return new
 
     def _run_tests(self, cwd: Path) -> tuple[bool, str, str]:
         cmd = shlex.split(self.cfg["engineering"]["test_command"])
@@ -1381,7 +1424,8 @@ class Controller(EngineeringWorkflowMixin):
             if status == "rejected":
                 return self._eng_fail(pid, eng, f"{rule['gate']} review rejected ({apr.id}): "
                                                 f"{apr.data.get('note', '')}", "review_rejected")
-        if self.cfg["gates"]["merge_to_main"]:
+        if self.cfg["gates"]["merge_to_main"] or project_level(
+                self.cfg, self.project(pid).data) <= 2:
             status, apr = self._gate(pid, MERGE_TO_MAIN, eng.id,
                                      f"Merge {eng.data['merge_candidate']} into main")
             if status == "pending":
@@ -1476,7 +1520,7 @@ class Controller(EngineeringWorkflowMixin):
         prot = self.store.get(cur["protocol"])
         p = prot.data["protocol"]
         subject = f"{prot.id}@v{prot.version}"
-        if p.get("protected"):
+        if p.get("protected") or project_level(self.cfg, self.project(pid).data) <= 2:
             status, apr = self._gate(pid, PROTECTED_EXPERIMENT, subject,
                                      f"Run protected experiment {prot.id}: {p['title']}",
                                      {"conditions": p["conditions"], "seeds": p["seeds"]})

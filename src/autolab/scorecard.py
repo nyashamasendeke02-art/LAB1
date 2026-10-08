@@ -32,7 +32,8 @@ def scorecards(store: Store) -> list[dict]:
         "calls": 0, "completed": 0, "errors": 0, "other": 0, "protocol_rejections": 0,
         "wall_s": 0.0, "timed_calls": 0, "usage_calls": 0, "input_tokens": 0,
         "output_tokens": 0, "cache_read_tokens": 0, "cache_write_tokens": 0, "cost_usd": 0.0,
-        "stages": Counter(), "models": Counter(),
+        "stages": Counter(), "models": Counter(), "tool_calls": 0, "tool_denied": 0,
+        "tool_logged_calls": 0,
         "reviews_of_my_code": {"passed": 0, "failed": 0},
         "findings_caused": Counter(), "findings_raised": Counter()})
     for t in tasks:
@@ -48,6 +49,11 @@ def scorecards(store: Store) -> list[dict]:
         if isinstance(d.get("wall_s"), (int, float)):
             c["wall_s"] += d["wall_s"]
             c["timed_calls"] += 1
+        tl = d.get("tools") or {}
+        if tl.get("logged"):
+            c["tool_logged_calls"] += 1
+            c["tool_calls"] += tl.get("count", 0)
+            c["tool_denied"] += len(tl.get("denied", []))
         u = d.get("usage")
         if u:
             c["usage_calls"] += 1
@@ -94,6 +100,8 @@ def scorecards(store: Store) -> list[dict]:
             "cache_read_tokens": c["cache_read_tokens"] if c["usage_calls"] else None,
             "cost_usd": round(c["cost_usd"], 4) if c["usage_calls"] else None,
             "stages": dict(c["stages"]), "models": dict(c["models"]),
+            "tool_calls": c["tool_calls"] if c["tool_logged_calls"] else None,
+            "tool_denied": c["tool_denied"] if c["tool_logged_calls"] else None,
             "reviews_of_my_code": c["reviews_of_my_code"],
             "findings_caused": {s: c["findings_caused"].get(s, 0) for s in SEVERITIES},
             "findings_raised": {s: c["findings_raised"].get(s, 0) for s in SEVERITIES},

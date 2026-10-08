@@ -872,9 +872,24 @@ async function openTask(id) {
       r.error ? card("Error", null, h("pre", { class: "code", text: r.error })) : null,
       (r.rejections || []).length ? card("Protocol rejections", null, h("pre", { class: "code", text: r.rejections.join("\n\n") })) : null,
       card("Task packet", null, h("pre", { class: "code", text: JSON.stringify(t.packet, null, 2) })),
+      toolTrail(t.tool_calls),
       t.completion ? card("Validated completion", null, h("pre", { class: "code", text: JSON.stringify(t.completion, null, 2) })) : null);
     drawer.querySelector("button")?.focus();
   } catch (err) { drawer.replaceChildren(h("p", { text: err.message }), h("button", { onclick: closeDrawer, text: "Close" })); }
+}
+function toolTrail(calls) {
+  // D64: every tool call the agent made, in order (attempt, tool, input, outcome).
+  if (calls === null || calls === undefined) return card("Tool calls", "not reported by this backend", h("p", { class: "muted small", text: "This backend does not report individual tool calls." }));
+  if (!calls.length) return card("Tool calls", "none", h("p", { class: "muted small", text: "The agent answered without using any tools." }));
+  const denied = calls.filter((c) => c.denied).length;
+  return card("Tool calls", `${calls.length} call(s)${denied ? ` · ${denied} denied` : ""}`, h("table", { class: "table" },
+    h("thead", {}, h("tr", {}, ["#", "Tool", "Input", "Outcome"].map((x) => h("th", { text: x })))),
+    h("tbody", {}, calls.map((c, i) => h("tr", {},
+      h("td", { class: "mono small", text: c.attempt > 1 ? `${i + 1} (try ${c.attempt})` : String(i + 1) }),
+      h("td", { class: "mono", text: c.tool || "?" }),
+      h("td", {}, h("span", { class: "mono small", text: typeof c.input === "string" ? c.input : JSON.stringify(c.input) })),
+      h("td", {}, c.denied ? h("span", { class: "badge b-bad", text: "denied" }) : c.ok === false ? h("span", { class: "badge b-warn", text: "error", title: c.error || "" })
+        : c.ok ? h("span", { class: "badge b-ok", text: `ok · ${c.result_chars ?? 0} chars` }) : h("span", { class: "muted small", text: "no result" })))))));
 }
 function closeDrawer() { $("drawer").hidden = true; }
 

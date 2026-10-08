@@ -373,3 +373,15 @@
   Live demo (workbench lab, plan-only /research on Nesterov vs heavy-ball, pilot-004 as read-only knowledge):
   8 calls, 757 s agent time, $2.53; claims citing pilot-004 verified against its ledger; Sonnet approved Opus's
   design with a major numerical caveat (validity check V6 likely unsatisfiable at ~1e-14 noise).
+- D64 (2026-10-08, human: "3" -- tool-call logging, master prompt s.18): the Claude backend now runs with
+  `--output-format stream-json --verbose`; ClaudeCLIBackend.parse_stream extracts every tool_use, its tool_result
+  (ok/error, result size) and permission denials, and hands the final "result" line to the unchanged json parser (a
+  plain-json stdout still parses; tool calls then stay unknown). Agent.run collects calls across protocol retries;
+  the controller writes them per task (handoffs/<TASK>/tool_calls.jsonl + content-addressed artifact) with a summary
+  on the task record (count, by tool, errors, denied) and a ToolPermissionDenied event; long inputs (file contents,
+  edits) are logged as their size, not copied. Scorecards count tool calls and denials; the dashboard's agent-call
+  drawer shows the tool trail. Format taken from a real capture (tests/data/claude_stream_tools.jsonl, anonymised).
+  Live checks with Haiku (~$0.03): in a normal lab folder Write ok, `python hello.py` ok, `git status` denied, answer
+  returned; in Claude Code's own temp folder Write was denied (that folder is protected -- worktrees never live there).
+  Codex and Gemini tool calls are not logged (their CLIs' event formats were not verified here); recorded as
+  `tools.logged = false`. Tests: tests/test_tool_logging.py (5).

@@ -17,6 +17,7 @@ HALTs for a human. A fresh Controller can resume any project from the DB.
 from __future__ import annotations
 
 import fnmatch
+from collections import Counter
 import hashlib
 import json
 import math
@@ -590,7 +591,8 @@ class Controller(EngineeringWorkflowMixin):
             self._check_integrity(before, f"{role.value}/{stage} ({task_id})")
             refs = {}
             extra = {"wall_s": round(time.perf_counter() - t0, 3),
-                     "usage": getattr(exc, "usage", None)}
+                     "usage": getattr(exc, "usage", None),
+                     "tools": self._log_tools(task_id, hdir, getattr(exc, "tool_calls", None))}
             raws = getattr(exc, "raw_responses", None)
             if raws:  # protocol violations: keep what the agent actually said
                 (hdir / "rejected_responses.md").write_text(
@@ -624,6 +626,7 @@ class Controller(EngineeringWorkflowMixin):
             "rejections": result.rejections, "agent": agent_name,
             "sandbox": profile_for(role, writable),
             "wall_s": round(time.perf_counter() - t0, 3), "usage": result.usage,
+            "tools": self._log_tools(task_id, hdir, result.tool_calls),
             "backend": agent.backend.describe(), "claims": ok_claims,
             "rejected_claims": rejected, "risks": comp.get("risks", []), "refs": refs,
         }, record_id=task_id, author=role.value, reason=f"{stage} completed")
@@ -633,6 +636,23 @@ class Controller(EngineeringWorkflowMixin):
             raise StageError(f"{role.value}/{stage} reported {comp['status']}: "
                              f"{comp.get('summary', '')}")
         return comp["payload"], task_id
+
+    def _log_tools(self, task_id: str, hdir: Path, calls: list | None) -> dict:
+        """D64 (master prompt s.18): every tool call an agent made is logged next to its task
+        (handoff tool_calls.jsonl + content-addressed artifact), attributable to the task and
+        agent; denied calls raise an event. ``calls is None``: the backend cannot report them."""
+        if calls is None:
+            return {"logged": False}
+        text = "".join(json.dumps(c, sort_keys=True, default=str) + "\n" for c in calls)
+        (hdir / "tool_calls.jsonl").write_text(text, encoding="utf-8")
+        denied = [{"tool": c.get("tool"), "input": c.get("input")} for c in calls if c.get("denied")]
+        if denied:
+            self.store.append_event("controller", "ToolPermissionDenied", task_id,
+                                    {"count": len(denied), "calls": denied[:10]})
+        return {"logged": True, "count": len(calls),
+                "by_tool": dict(Counter(c.get("tool") for c in calls)),
+                "errors": sum(1 for c in calls if c.get("ok") is False and not c.get("denied")),
+                "denied": denied[:20], "artifact": "sha256:" + self.lab.artifacts.put_text(text)}
 
     def _context(self, pid: str) -> dict:
         """Compact, explicit context for agents (no reliance on conversation)."""

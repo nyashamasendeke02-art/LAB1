@@ -65,6 +65,20 @@ def is_usage_limit(exc: BaseException) -> bool:
     return isinstance(exc, BackendError) and bool(_USAGE_LIMIT.search(str(exc)))
 
 
+def _clip_input(value, limit: int = 600) -> dict | str:
+    """A tool input for the log: long text fields (file contents, edits) are replaced by their
+    size so the log shows what was done without copying code into it."""
+    if not isinstance(value, dict):
+        return str(value)[:limit]
+    out = {}
+    for k, v in value.items():
+        if isinstance(v, str) and len(v) > 200:
+            out[k] = f"<{len(v)} chars>"
+        else:
+            out[k] = v if isinstance(v, (int, float, bool)) or v is None else str(v)[:200]
+    return out
+
+
 USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens",
                 "cost_usd", "api_duration_s", "turns")
 
@@ -88,6 +102,9 @@ class AgentBackend(ABC):
     # Usage reported by the last invoke() (tokens, cost, time), when the backend reports it;
     # None means the backend does not report usage (never estimated).
     last_usage: dict | None = None
+    # Tool calls made during the last invoke() (D64), or None when the backend cannot report
+    # them (never invented).
+    last_tool_calls: list | None = None
 
     @abstractmethod
     def invoke(self, task: TaskPacket, prompt: str) -> str:
@@ -117,6 +134,7 @@ class ScriptedBackend(AgentBackend):
         self.handlers = handlers
         self.model = model
         self.usage = usage  # reported per call, to test accounting
+        self.tool_calls: list | None = None  # reported per call, to test tool logging
         self.calls: list[tuple[str, str]] = []
         self._idx: dict[str, int] = {}
 
@@ -131,6 +149,7 @@ class ScriptedBackend(AgentBackend):
             h = h[min(i, len(h) - 1)]
         out = h(task)
         self.last_usage = dict(self.usage) if self.usage else None
+        self.last_tool_calls = list(self.tool_calls) if self.tool_calls is not None else None
         return out if isinstance(out, str) else json.dumps(out)
 
 
@@ -171,7 +190,9 @@ class ClaudeCLIBackend(AgentBackend):
         ]
 
     def command(self, task: TaskPacket) -> list[str]:
-        cmd = ["claude", "-p", "--output-format", "json", *self.HERMETIC]
+        # stream-json (needs --verbose with -p) carries every tool call and permission decision;
+        # its final "result" line is the same object the json format returns (D64).
+        cmd = ["claude", "-p", "--output-format", "stream-json", "--verbose", *self.HERMETIC]
         if task.writable:
             cmd += ["--permission-mode", "acceptEdits",
                     "--allowedTools", ",".join(self.allowed_tools)]
@@ -183,11 +204,64 @@ class ClaudeCLIBackend(AgentBackend):
         return cmd
 
     def invoke(self, task: TaskPacket, prompt: str) -> str:
-        self.last_usage = None
+        self.last_usage, self.last_tool_calls = None, None
         proc = _run(self.command(task), cwd=task.workdir, stdin=prompt, timeout=self.timeout,
                     env={**os.environ, **self.HERMETIC_ENV})
-        self.last_usage = self.usage_of(proc.stdout)
-        return self.parse_output(proc.returncode, proc.stdout, proc.stderr)
+        result, self.last_tool_calls = self.parse_stream(proc.stdout)
+        stdout = json.dumps(result) if result is not None else proc.stdout
+        self.last_usage = self.usage_of(stdout)
+        return self.parse_output(proc.returncode, stdout, proc.stderr)
+
+    @staticmethod
+    def parse_stream(stdout: str) -> tuple[dict | None, list | None]:
+        """(final result object, tool calls) from stream-json output. A single JSON object
+        (the plain json format) gives (that object, None): tool calls unknown, not empty."""
+        text = (stdout or "").strip()
+        try:
+            whole = json.loads(text)
+            if isinstance(whole, dict):
+                return whole, None
+        except json.JSONDecodeError:
+            pass
+        result, calls, by_id = None, [], {}
+        for line in text.splitlines():
+            try:
+                ev = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(ev, dict):
+                continue
+            kind = ev.get("type")
+            if kind == "result":
+                result = ev
+            elif kind in ("assistant", "user"):
+                for c in (ev.get("message") or {}).get("content") or []:
+                    if not isinstance(c, dict):
+                        continue
+                    if c.get("type") == "tool_use":
+                        call = {"id": c.get("id"), "tool": c.get("name"),
+                                "input": _clip_input(c.get("input")), "ok": None,
+                                "denied": False, "error": None, "result_chars": None}
+                        by_id[c.get("id")] = call
+                        calls.append(call)
+                    elif c.get("type") == "tool_result" and c.get("tool_use_id") in by_id:
+                        call = by_id[c["tool_use_id"]]
+                        content = c.get("content")
+                        body = content if isinstance(content, str) else json.dumps(content)
+                        call["ok"] = not c.get("is_error")
+                        call["result_chars"] = len(body or "")
+                        if c.get("is_error"):
+                            call["error"] = (body or "")[:300]
+            elif kind == "system" and ev.get("subtype") == "permission_denied":
+                call = by_id.get(ev.get("tool_use_id"))
+                if call:
+                    call["denied"] = True
+        if result is None and not calls:
+            return None, None
+        for d in (result or {}).get("permission_denials") or []:
+            if d.get("tool_use_id") in by_id:
+                by_id[d["tool_use_id"]]["denied"] = True
+        return result, calls
 
     @staticmethod
     def usage_of(stdout: str) -> dict | None:
@@ -422,12 +496,14 @@ class FallbackBackend(AgentBackend):
             self.active = self.backup
             out = self.backup.invoke(task, prompt)
             self.last_usage = self.backup.last_usage
+            self.last_tool_calls = self.backup.last_tool_calls
             return out
 
         try:
             self.active = self.primary
             out = self.primary.invoke(task, prompt)
             self.last_usage = self.primary.last_usage
+            self.last_tool_calls = self.primary.last_tool_calls
             return out
         except BackendError as exc:
             if is_usage_limit(exc) or any(phrase in str(exc).lower() for phrase in (
@@ -441,6 +517,7 @@ class FallbackBackend(AgentBackend):
                 self.active = self.backup
                 out = self.backup.invoke(task, prompt)
                 self.last_usage = self.backup.last_usage
+                self.last_tool_calls = self.backup.last_tool_calls
                 return out
             raise
 
@@ -470,6 +547,7 @@ class AgentResult:
     attempts: int
     rejections: list[str]
     usage: dict | None = None
+    tool_calls: list | None = None
 
 
 class Agent:
@@ -488,17 +566,28 @@ class Agent:
         raws: list[str] = []
         rejections: list[str] = []
         usage: dict | None = None
+        tools: list | None = None
+
+        def collect(attempt: int) -> list | None:
+            got = getattr(self.backend, "last_tool_calls", None)
+            if got is None:
+                return tools
+            return (tools or []) + [{**c, "attempt": attempt} for c in got]
+
         for attempt in range(1, self.max_protocol_retries + 2):
             try:
                 raw = self.backend.invoke(task, prompt)
             except Exception as exc:
                 exc.usage = add_usage(usage, getattr(self.backend, "last_usage", None))
+                exc.tool_calls = collect(attempt)
                 raise
             usage = add_usage(usage, getattr(self.backend, "last_usage", None))
+            tools = collect(attempt)
             raws.append(raw)
             try:
                 completion = validate_completion(task.stage, extract_json(raw))
-                return AgentResult(completion, base_prompt, raws, attempt, rejections, usage)
+                return AgentResult(completion, base_prompt, raws, attempt, rejections, usage,
+                                   tools)
             except ProtocolError as exc:
                 rejections.append(str(exc))
                 prompt = (base_prompt + "\n\nYOUR PREVIOUS ANSWER WAS REJECTED BY THE "
@@ -507,4 +596,5 @@ class Agent:
         # Keep the evidence: the controller stores rejected responses as artifacts.
         err.prompt, err.raw_responses, err.rejections = base_prompt, raws, rejections
         err.usage = usage
+        err.tool_calls = tools
         raise err

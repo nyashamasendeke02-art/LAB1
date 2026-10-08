@@ -59,6 +59,14 @@ frozen protocol lists in `secrets`. On the lab PC this removed CLAUDE_CODE_MESSA
 code the lab executes. Network access is not enforceable without OS firewall rules and is
 documented as not enforced.
 
+## Tool-call audit trail (D64)
+
+Every tool call a Claude agent makes (file reads and edits, commands, their results and any
+permission denial) is logged per task in `handoffs/<TASK>/tool_calls.jsonl`, hashed into the
+artifact store, summarised on the task record, and visible in the dashboard. Denied calls raise a
+`ToolPermissionDenied` ledger event, so attempts to step outside a stage's permissions are
+observable, not just refused. Codex and Gemini calls are not logged yet.
+
 ## Findings and residual risks
 
 - **F11 (2026-10-08, fixed):** the Gemini backend (D50) auto-approved every tool request on

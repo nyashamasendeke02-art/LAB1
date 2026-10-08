@@ -868,7 +868,11 @@ class DashboardServer:
                       "error_kind": classify_error(record.data.get("error"))}
         except KeyError:
             result = {"status": "working"}
-        return {"id": task_id, "packet": packet, "completion": completion, "result": result}
+        tools_path = handoff / "tool_calls.jsonl"
+        tool_calls = ([json.loads(line) for line in tools_path.read_text(encoding="utf-8").splitlines()
+                       if line.strip()] if tools_path.is_file() else None)
+        return {"id": task_id, "packet": packet, "completion": completion, "result": result,
+                "tool_calls": tool_calls}
 
     def activity(self, limit: int = 120, before: int | None = None) -> list[dict]:
         """Newest first; ``before`` = a sequence number to page further back (D63)."""

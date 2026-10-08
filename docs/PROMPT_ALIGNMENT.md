@@ -19,7 +19,7 @@ built). Evidence names the code or test; nothing here is claimed from documentat
 | Events (13) | partial: ledger events are generic; agents do not subscribe |
 | Project structure and manifest (15, 16) | **closed (D61)** |
 | Model abstraction (17) | partial: LLM backends only |
-| Tools, sandboxes (18, 19) | sandboxes **closed (D62)** (six named profiles, secrets scrubbed for executed code; network not enforceable on Windows); tool-call logging still a gap |
+| Tools, sandboxes (18, 19) | sandboxes **closed (D62)** (six named profiles, secrets scrubbed for executed code; network not enforceable on Windows); tool-call logging **closed (D64)** for Claude agents (Codex/Gemini not logged) |
 | Observability (20) | **closed (D60)** for tokens, cost and time per call (where backends report them) and agent scorecards; tool calls and GPU not tracked |
 | Autonomy levels (21) | **closed (D58)** |
 | Technology decision document (22) | **closed** (docs/TECHNOLOGY_DECISIONS.md) |
@@ -91,6 +91,7 @@ built). Evidence names the code or test; nothing here is claimed from documentat
 | 20 observability + 10 agent evaluation | D60: tokens/cost/time per call, agent scorecards (CLI + dashboard) | tests/test_scorecard.py |
 | 15/16 project manifest | D61: export project folder + project.yaml, import (incl. the s.16 example) | tests/test_manifest.py |
 | 19 sandbox profiles | D62: six profiles, secrets scrubbed for trials and test runs | tests/test_sandbox.py |
+| 18 tool-call logging | D64: every Claude tool call logged per task (handoff + artifact), denials raise events, dashboard trail | tests/test_tool_logging.py |
 
 ## Priority order to close the gaps (as of the audit)
 

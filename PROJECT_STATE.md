@@ -5,7 +5,9 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** autolab 0.11.0 (D63, 2026-10-08: dashboard upgrade -- research view, charts, agents page,
+- **Version:** autolab 0.12.0 (D64, 2026-10-08: tool-call logging for Claude agents -- audit trail per task,
+  denials as events, dashboard trail; verified live).
+  0.11.0 (D63, 2026-10-08: dashboard upgrade -- research view, charts, agents page,
   plain-language states, phone menu, caching/paging; live /research demo in labs/workbench: $2.53, plan saved).
   0.10.0 (D60-D62, 2026-10-08: tokens/cost/time per agent call + agent scorecards,
   project.yaml manifest export/import, sandbox profiles with secrets scrubbing; PyYAML dependency).
@@ -136,8 +138,8 @@ and `project_state/` (decisions, failures, open questions)._
 5d. [x] D52: agent registry + stage allocation + config-driven dashboard (see roadmap).
 5e. [x] D53: nine architecture docs (docs/ARCHITECTURE.md is the index) + K1 knowledge plane.
 5f. [x] D54: hierarchical coordination (ROADMAP phases 1 and 4).
-5i. [x] D60-D62: observability + scorecards, project manifest, sandbox profiles. Still open: per-tool-call
-       logging (s.18), containers/GPU (s.9; no Docker/GPU on this PC), deployment plane, Author/Robot/... entities.
+5i. [x] D60-D62: observability + scorecards, project manifest, sandbox profiles. Still open: tool-call logging
+       for Codex/Gemini (Claude done, D64), containers/GPU (s.9; no Docker/GPU on this PC), deployment plane, Author/Robot/... entities.
 5h. [x] PROMPT.txt gaps 1-6 closed (D55-D59): feedback loop, engineering workflow, modes, autonomy levels,
        technology decisions, knowledge vocabulary. Remaining (PROMPT_ALIGNMENT.md): project manifest
        (s.15/16), observability tokens/cost/GPU (s.20), containers/GPU execution (s.9), tool/sandbox

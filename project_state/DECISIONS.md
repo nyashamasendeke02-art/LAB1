@@ -225,3 +225,19 @@
   stepper, accessible markup. Still stdlib-only and loopback-only. 13 tests (tests/test_web.py); every view
   checked in headless Edge via the DevTools protocol with no page errors.
 - D50 (2026-10-06, human: "keep codex and let gemini bcome backup"): Gemini CLI backend (`gemini-cli` via `agy`) and `FallbackBackend` added to autolab (`src/autolab/agents.py`). The controller attempts the primary backend (Codex) first; upon detecting a quota or usage limit (`is_usage_limit` / "upgrade to plus" / 429), it sets a cooldown window and automatically falls back to Gemini (`gemini-3.8-flash-high`) without halting or charging a stage failure. Configured in `labs/robolab/lab.toml` for both verifier and scientist. Tests added to `tests/test_messages_and_agents.py`.
+- D51 (2026-10-08, human: "revise the autolab. can this lab do diverse research in AI, LLM, agents, software and
+  code"): autolab made domain-general for benchmark-style research. Before this, the only unit of analysis was the
+  seed (>= 3 seeds), trials ran one at a time, an API rate limit inside a trial counted as a failed trial, spend
+  was not tracked, and nothing pinned evaluation data. Added: decision_rule.unit = "item" (entrypoint writes
+  items.json; per-item values averaged over seeds, paired t interval over items; >= 1 seed; n_items frozen;
+  power counted in items); automatic validity checks AUTO-ITEM-COVERAGE (every trial reports all items) and
+  AUTO-FRESH-ITEMS (a confirmatory study cannot reuse items already analysed for that hypothesis);
+  trial exit code 75 = transient failure, retried with backoff (limits.max_trial_retries 6, trial_retry_wait_s
+  60); budget.max_parallel; budget.max_cost_usd with a required cost_usd metric, plus a compute_budget gate when
+  smoke-test cost x seeds > limits.max_cost_usd_without_approval (20 USD); protocol.data_paths hashed into the
+  run manifest (missing data fails the smoke test); raw trial files hashed recursively (transcripts in
+  subfolders). Prompts gained DOMAIN_GUIDANCE (models and decoding settings as frozen params, executable
+  graders preferred, blinded and validated LLM judges, contamination controls, sandboxed generated code).
+  Existing seed-unit protocols behave exactly as before. Tests: tests/test_domains.py (12).
+  Not solved: the scientist cannot browse the web, so background research is still unverified (todo 6); cost is
+  reported by the experiment code, not measured by the controller; there is no GPU scheduling.

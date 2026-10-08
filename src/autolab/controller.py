@@ -35,7 +35,8 @@ from xml.etree import ElementTree
 from . import __version__
 from .agents import Agent, AgentBackend, agent_wait_kind, make_backend
 from .config import DEFAULT_TOML, load_config
-from .experiments import (Trial, check_lock, contrasts, environment_snapshot, evaluate_rule,
+from .experiments import (COST_METRIC, Trial, analysed_items, check_lock, contrasts,
+                          environment_snapshot, evaluate_rule, hash_paths, item_validity,
                           required_seeds,
                           evaluate_requirements, run_protocol, summarize)
 from .gates import (COMPUTE_BUDGET, CONFIRMATORY_FREEZE, MERGE_TO_MAIN,
@@ -603,6 +604,18 @@ class Controller:
                                                     rule.get("alpha", 0.05), 0.8)
         return info
 
+    def _retry_kw(self) -> dict:
+        return {"max_retries": int(self.limits.get("max_trial_retries", 0)),
+                "retry_wait_s": float(self.limits.get("trial_retry_wait_s", 60))}
+
+    def _items_used_for(self, pid: str, hypothesis: str) -> set[str]:
+        """Evaluation items of every analysed run that tested ``hypothesis``."""
+        items: set[str] = set()
+        for res in self.store.query("result", project=pid):
+            if res.data["refs"].get("hypothesis") == hypothesis:
+                items.update(res.data.get("item_ids", []))
+        return items
+
     def _seeds_used_for(self, pid: str, hypothesis: str) -> set[int]:
         """Seeds of every analysed run that tested ``hypothesis`` (fresh data rule)."""
         seeds: set[int] = set()
@@ -758,10 +771,13 @@ class Controller:
             if self.limits.get("require_pilot_for_confirmatory") and not power["pilots"]:
                 errs.append("a confirmatory study needs an exploratory pilot of this hypothesis "
                             "first (pilot -> power analysis -> confirmatory)")
-            if power.get("required_seeds") and len(protocol["seeds"]) < power["required_seeds"]:
-                errs.append(f"underpowered: pilot per-seed SD {power['pilot_sd']:.4g} needs >= "
-                            f"{power['required_seeds']} seeds for 80% power at the "
-                            f"pre-registered effect; protocol has {len(protocol['seeds'])}")
+            by_item = protocol["decision_rule"].get("unit") == "item"
+            unit, have = (("items", protocol.get("n_items", 0)) if by_item
+                          else ("seeds", len(protocol["seeds"])))
+            if power.get("required_seeds") and have < power["required_seeds"]:
+                errs.append(f"underpowered: pilot per-{unit[:-1]} SD {power['pilot_sd']:.4g} "
+                            f"needs >= {power['required_seeds']} {unit} for 80% power at the "
+                            f"pre-registered effect; protocol has {have}")
         used = self._seeds_used_for(pid, cur["hypothesis"])
         reused = sorted(used & set(protocol["seeds"]))
         if reused:
@@ -1242,14 +1258,18 @@ class Controller:
             smoke_seed += 1
         wt = self._scratch_checkout(f"smoke-{eng.id}", commit)
         try:
+            _, missing_data = hash_paths(wt, p.get("data_paths", []))
             out = run_protocol(p, wt, self.lab.runs / "_smoke" / eng.id, seeds=[smoke_seed],
-                               output_cap_mb=self.limits["max_trial_output_mb"])
+                               output_cap_mb=self.limits["max_trial_output_mb"],
+                               **self._retry_kw())
         finally:
             self.repo.remove_worktree(wt)
         smoke = [{"condition": t.condition, "ok": t.ok, "error": t.error,
-                  "metrics": t.metrics} for t in out.trials]
-        if out.failed:
-            msg = "; ".join(f"{t.condition}: {t.error}" for t in out.failed)
+                  "metrics": t.metrics, "n_items": len(t.items)} for t in out.trials]
+        if out.failed or missing_data:
+            msg = "; ".join([f"{t.condition}: {t.error}" for t in out.failed]
+                            + [f"data_paths missing from the merged commit: {missing_data}"]
+                            * bool(missing_data))
             self._failure(pid, "smoke_test_failed", msg[:500], {"eng_task": eng.id})
             new = self._new_eng_task(pid, prot.id, [f"Smoke test of merged commit {commit[:10]} "
                                                     f"failed: {msg}"])
@@ -1326,6 +1346,23 @@ class Controller:
                 self._design_iteration(pid, "budget declined")
                 self._transition(pid, R.DESIGN, "compute budget declined")
                 return "declined"
+        projected = self._projected_cost(cur, p)
+        cost_limit = self.limits.get("max_cost_usd_without_approval")
+        if (self.cfg["gates"]["compute_budget"] and projected is not None
+                and cost_limit is not None and projected > cost_limit):
+            status, apr = self._gate(pid, COMPUTE_BUDGET, f"{subject}#cost",
+                                     f"projected spend ${projected:.2f} (smoke-test cost x "
+                                     f"seeds) exceeds ${cost_limit:.2f}",
+                                     {"projected_cost_usd": projected,
+                                      "max_cost_usd": p.get("budget", {}).get("max_cost_usd")})
+            if status == "pending":
+                return self._block(pid, apr)
+            if status == "rejected":
+                self._feedback(pid, f"Spend declined ({apr.id}); reduce items, seeds or "
+                                    f"model cost.")
+                self._design_iteration(pid, "cost budget declined")
+                self._transition(pid, R.DESIGN, "cost budget declined")
+                return "declined"
         commit = cur["commit"]
         run_id = self.store.next_id("RUN")
         out_root = self.lab.runs / run_id
@@ -1341,28 +1378,35 @@ class Controller:
                 self._halt(pid, "installed packages do not match requirements.lock: "
                                 + "; ".join(lock_problems)[:400])
                 return "environment mismatch"
+            data_hashes, missing_data = hash_paths(wt, p.get("data_paths", []))
+            if missing_data:
+                self._failure(pid, "data_missing", f"data_paths missing: {missing_data}")
+                self._halt(pid, f"data_paths missing from the validated commit: {missing_data}")
+                return "data missing"
             out = run_protocol(p, wt, out_root,
-                               output_cap_mb=self.limits["max_trial_output_mb"])
+                               output_cap_mb=self.limits["max_trial_output_mb"],
+                               **self._retry_kw())
         finally:
             self.repo.remove_worktree(wt)
         trials = []
         a = self.lab.artifacts
         for t in out.trials:
             d = Path(t.out_dir)
-            hashes = {f.name: "sha256:" + a.put_file(f) for f in sorted(d.iterdir()) if f.is_file()}
-            for f in d.iterdir():  # raw data is read-only from now on
-                if f.is_file():
-                    os.chmod(f, stat.S_IREAD)
+            files = sorted(f for f in d.rglob("*") if f.is_file()) if d.exists() else []
+            hashes = {f.relative_to(d).as_posix(): "sha256:" + a.put_file(f) for f in files}
+            for f in files:  # raw data (incl. transcripts in subfolders) is read-only now
+                os.chmod(f, stat.S_IREAD)
             trials.append({"condition": t.condition, "role": t.role, "seed": t.seed,
                            "returncode": t.returncode, "duration_s": t.duration_s,
                            "metrics": t.metrics, "error": t.error, "files": hashes,
-                           "resources": t.resources,
+                           "resources": t.resources, "items": t.items,
+                           "attempts": t.attempts,
                            "out_dir": str(d.relative_to(self.lab.root))})
         manifest = {"run_id": run_id, "protocol": prot.id, "protocol_version": prot.version,
                     "freeze_hash": prot.data["_freeze_hash"], "commit": commit,
                     "command_template": out.command_template, "env_hash": env_sha,
                     "requirements_lock": "sha256:" + lock_sha if lock_sha else None,
-                    "trials": trials}
+                    "data": data_hashes, "trials": trials}
         man_sha = a.put_text(canonical(manifest))
         n_failed = sum(1 for t in trials if t["error"] or t["returncode"] != 0)
         run = self.store.create("run", {
@@ -1371,6 +1415,8 @@ class Controller:
             "seeds": p["seeds"], "n_trials": len(trials), "n_failed": n_failed,
             "trials": trials, "command_template": out.command_template,
             "env_hash": env_sha, "run_dir": str(out_root.relative_to(self.lab.root)),
+            "data": data_hashes,
+            "cost_usd": sum(float(t["metrics"].get(COST_METRIC, 0) or 0) for t in trials),
             "project": pid,
             "refs": {"protocol": prot.id, "eng_task": cur["eng_task"],
                      "validation": cur.get("validation"), "env": "sha256:" + env_sha,
@@ -1389,8 +1435,20 @@ class Controller:
     @staticmethod
     def _trials(run: Record) -> list[Trial]:
         return [Trial(t["condition"], t["role"], t["seed"], t["returncode"], t["duration_s"],
-                      t["metrics"], t["out_dir"], t["error"], t.get("resources", {}))
+                      t["metrics"], t["out_dir"], t["error"], t.get("resources", {}),
+                      t.get("items", {}), t.get("attempts", 1))
                 for t in run.data["trials"]]
+
+    def _projected_cost(self, cur: dict, p: dict) -> float | None:
+        """Smoke-test spend (one seed of every condition) x number of seeds, or None."""
+        if not cur.get("validation"):
+            return None
+        smoke = self.store.get(cur["validation"]).data.get("smoke", [])
+        costs = [s["metrics"].get(COST_METRIC) for s in smoke]
+        if not any(isinstance(c, (int, float)) and not isinstance(c, bool) for c in costs):
+            return None
+        return sum(float(c) for c in costs
+                   if isinstance(c, (int, float)) and not isinstance(c, bool)) * len(p["seeds"])
 
     def _h_analyze(self, pid: str) -> str:
         cur = self._cur(pid)
@@ -1404,11 +1462,14 @@ class Controller:
             trials = self._trials(run)
             summary = summarize(trials)
             decision = evaluate_rule(p["decision_rule"], trials)
+            auto = item_validity(p, trials, self._items_used_for(pid, cur["hypothesis"]))
             res = self.store.create("result", {
                 "label": Evidence.EXPERIMENTAL_RESULT.value, "summary": summary,
                 "decision": decision,
                 "contrasts": contrasts(p, trials),
-                "validity": evaluate_requirements(p.get("validity_checks", []), summary, trials),
+                "validity": auto + evaluate_requirements(p.get("validity_checks", []),
+                                                         summary, trials),
+                "item_ids": analysed_items(trials),
                 "scientific": evaluate_requirements(p.get("success_checks", []), summary, trials),
                 "analysis_version": __version__,
                 "outcome": decision["outcome"], "project": pid,

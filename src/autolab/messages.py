@@ -113,12 +113,17 @@ PROTOCOL_SCHEMA = {
                         "margin": {"type": "number", "exclusiveMinimum": 0}}}},
                 "alpha": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
                 "pairing": {"enum": ["paired", "unpaired"]},
+                "unit": {"enum": ["seed", "item"]},
             },
         },
+        "n_items": {"type": "integer", "minimum": 2},
+        "data_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "budget": {
             "type": "object",
             "additionalProperties": False,
-            "properties": {"timeout_s": _num, "max_runs": {"type": "integer"}},
+            "properties": {"timeout_s": _num, "max_runs": {"type": "integer"},
+                           "max_parallel": {"type": "integer", "minimum": 1, "maximum": 64},
+                           "max_cost_usd": {"type": "number", "exclusiveMinimum": 0}},
         },
         "fixed_params": {"type": "object"},
         "validity_checks": {"type": "array", "items": REQUIREMENT_SCHEMA},
@@ -349,8 +354,22 @@ def validate_protocol(protocol: dict) -> list[str]:
                           f"is either fixed for all conditions or set per condition")
     if len(set(protocol["seeds"])) != len(protocol["seeds"]):
         errors.append("seeds must be unique")
-    if len(protocol["seeds"]) < 3:
+    if rule.get("unit", "seed") == "item":
+        # Replication comes from the evaluation items; seeds are repeated samples.
+        if rule.get("pairing") == "unpaired":
+            errors.append("decision_rule.unit='item' is always paired by item; remove "
+                          "pairing='unpaired'")
+        if "n_items" not in protocol:
+            errors.append("decision_rule.unit='item' needs n_items (the frozen number of "
+                          "evaluation items every trial reports in items.json)")
+    elif len(protocol["seeds"]) < 3:
         errors.append("protocols need >= 3 seeds (confidence intervals need replication)")
+    if protocol.get("budget", {}).get("max_cost_usd") is not None and "cost_usd" not in metrics:
+        errors.append("budget.max_cost_usd needs 'cost_usd' declared as a metric (each trial "
+                      "reports its spend in metrics.json)")
+    for dp in protocol.get("data_paths", []):
+        if dp.startswith(("/", "\\")) or ":" in dp or ".." in dp.replace("\\", "/").split("/"):
+            errors.append(f"data_paths entry {dp!r} must be a relative path inside the repo")
     return errors
 
 

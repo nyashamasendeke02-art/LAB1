@@ -5,7 +5,9 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** autolab 0.3.0 + statistics + design-convergence fixes + independent-reviewer
+- **Version:** autolab 0.4.0 (D51, 2026-10-08: domain-general research -- item-level analysis
+  for LLM/agent/code benchmarks, transient-failure retries, parallel trials, spend cap, pinned data;
+  see docs/ARCHITECTURE.md 8a). Before that: 0.3.0 + statistics + design-convergence fixes + independent-reviewer
   option (D29); 111/111 passed 2026-10-05 (14 min) + 2 reviewer tests. robolab: 223/223 tests pass on main 8d04f05 (2026-10-05 review).
 - **Phase:** carrying out the mandate in labs/robolab. Lab validation PASSED (pilot-004).
   Gate 0 PASSED (D26); Gate 1 in progress (G1-1 merged; G1-2 halted on a Claude usage limit).
@@ -41,7 +43,7 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Todo
 
-### In Progress (2026-10-06 03:55)
+### In Progress (checked 2026-10-08)
 - [ ] robolab Gate 1 in progress (D50): Codex kept as primary; Gemini (gemini-3.8-flash-high via
       gemini-cli / agy) configured as automatic backup on usage limit. G1-6 (PRJ-0013) redesign built
       (84f6a44) and tests passed; waiting at adversarial review. Resuming with
@@ -76,9 +78,9 @@ and `project_state/` (decisions, failures, open questions)._
        APR-0002 safety review by claude-code with fault injection). G0-4 runner DONE: PRJ-0005
        merged af95831 (DLV-0004). **GATE 0 PASSED (D26)**: 186 tests on robolab main; every
        actuation audited to pass the kernel. G1-1 Puck2D DONE: PRJ-0006 merged 8d04f05 (DLV-0005).
-       **G1-2 HALTED** 11:42 at implement: Claude session limit (resets 3:10pm PT); not a code
-       defect, re-submit as a fresh project once the limit resets. Then G1-3 (stopping-distance check, added from the
-       safety review: v1 is one-step lookahead with a zero-force safe action) (docs/gates/GATE0_GATE1_TASKS.md), in order.
+       G1-2 DONE (PRJ-0009), G1-3 kernel v1.1 DONE (PRJ-0010),
+       G1-4 ground-truth isolation DONE (PRJ-0011), G1-5 MHS v0 DONE (PRJ-0012). G1-6 Car2D (PRJ-0013)
+       built, waiting at adversarial review (status checked 2026-10-08; no queue process running).
 
 0d. [ ] robolab gaps vs the "Frontier Robotics Architecture" schematic (2026-10-05): add an
        episode visualiser (trajectory/telemetry plots) after G1-2; perception layer and a
@@ -100,9 +102,15 @@ and `project_state/` (decisions, failures, open questions)._
 5. [x] Ledger anchoring: commit the ledger head hash into the research repo
        at each merge/run.
 5b. [x] autolab: agent usage limits wait and retry instead of HALT (D35).
-6. [ ] Citation verification step for background research (mark as verified
+5c. [x] D51: autolab can run AI/LLM/agent/software research (item unit, retries, cost cap,
+       data pinning, domain prompts). Next: a first LLM pilot lab to validate it live (todo 8).
+6. [ ] Citation verification step (more important now: LLM/AI literature moves fast and the
+       scientist has no web access) for background research (mark as verified
        or unverified with the method used).
 7. [ ] Start the Developmental Intelligence EXP-001 project in a dedicated lab.
+8. [ ] LLM pilot lab (positive control, like pilot-004): e.g. "does few-shot prompting raise
+       exact-match accuracy over zero-shot on a fixed 50-item arithmetic set" with unit=item, run
+       through a CLI model. Needs a model the trials may call (see Human tasks).
 
 ### Done
 - [x] Project environment: LAB1/.venv (Python 3.13.4, git-ignored) with autolab 0.2.0
@@ -182,4 +190,7 @@ Residual risks the fixes do NOT remove:
 - Nothing blocking: the lab runs unattended (D35).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.
+- For LLM/agent research: decide which models experiments may call and who pays (an API key with
+  a spending limit, or the existing Claude/Codex/Gemini subscriptions, which share limits with the lab's
+  own agents). Default spend gate: 20 USD per run (limits.max_cost_usd_without_approval).
 - Any time: change the D32 requirement defaults (target compute, adaptation budget, task family).

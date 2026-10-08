@@ -5,7 +5,11 @@ Entrypoint contract (enforced): the protocol's ``entrypoint`` is invoked as
     <entrypoint> --condition NAME --seed N --out DIR --params JSON
 
 from a *detached checkout of the exact merged commit*, and must write
-``DIR/metrics.json`` (a flat object of numeric metrics). Each trial's
+``DIR/metrics.json`` (a flat object of numeric metrics). Benchmark-style studies
+(LLMs, agents, code) whose unit of analysis is the evaluation item also write
+``DIR/items.json`` (per-item metrics). Exit code 75 (EX_TEMPFAIL) marks a transient
+external failure (rate/usage limit, network): the trial is retried after a wait and
+is not counted as a failure. Each trial's
 stdout/stderr/metrics are hashed into the artifact store; the run manifest
 links protocol version + freeze hash, commit, environment and seeds.
 
@@ -16,15 +20,19 @@ not change the computed outcome.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.metadata
 import json
 import math
 import os
 import platform
 import shlex
+import shutil
 import statistics
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -43,10 +51,16 @@ class Trial:
     out_dir: str
     error: str | None = None
     resources: dict = field(default_factory=dict)
+    items: dict = field(default_factory=dict)      # item id -> {metric: value}
+    attempts: int = 1                              # > 1 after transient retries
 
     @property
     def ok(self) -> bool:
         return self.returncode == 0 and self.error is None
+
+    @property
+    def transient(self) -> bool:
+        return self.returncode == TRANSIENT_EXIT and self.error is not None
 
 
 @dataclass
@@ -91,6 +105,49 @@ def trial_params(protocol: dict, condition: dict) -> dict:
 # test cannot fake them: values it writes under these names are overwritten.
 RESOURCE_METRICS = ("autolab_wall_s", "autolab_cpu_s", "autolab_peak_mb")
 
+# Exit code an entrypoint uses for a transient external failure (EX_TEMPFAIL).
+TRANSIENT_EXIT = 75
+# Self-reported spend metric (e.g. API cost); required when budget.max_cost_usd is set.
+COST_METRIC = "cost_usd"
+ITEMS_FILE = "items.json"
+
+
+def load_items(path: Path, required_metrics: list[str]) -> dict:
+    """Parse ``items.json``: a list of {"id": str, <metric>: number, ...} with unique ids
+    and every required metric finite. Returns {id: {metric: value}} (required metrics only)."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, list) or not raw:
+        raise ValueError("items.json must be a non-empty list of objects")
+    out: dict = {}
+    for i, it in enumerate(raw):
+        if not isinstance(it, dict) or not isinstance(it.get("id"), (str, int)) \
+                or isinstance(it.get("id"), bool):
+            raise ValueError(f"items.json[{i}] needs a string or integer 'id'")
+        iid = str(it["id"])
+        if iid in out:
+            raise ValueError(f"items.json: duplicate id {iid!r}")
+        missing = [m for m in required_metrics if not _finite_number(it.get(m))]
+        if missing:
+            raise ValueError(f"items.json[{iid}]: missing/non-finite metrics {missing}")
+        out[iid] = {m: float(it[m]) for m in required_metrics}
+    return out
+
+
+def hash_paths(root: Path, paths: list[str]) -> tuple[dict, list[str]]:
+    """sha256 of every file under each repo-relative path ({relpath: hex}) and the
+    paths that do not exist. Used to pin evaluation data into the run manifest."""
+    hashes: dict = {}
+    missing = []
+    for rel in paths:
+        p = root / rel
+        if not p.exists():
+            missing.append(rel)
+            continue
+        files = [p] if p.is_file() else sorted(f for f in p.rglob("*") if f.is_file())
+        for f in files:
+            hashes[f.relative_to(root).as_posix()] = hashlib.sha256(f.read_bytes()).hexdigest()
+    return hashes, missing
+
 
 def dir_size_mb(path: Path) -> float:
     return sum(f.stat().st_size for f in path.rglob("*") if f.is_file()) / 2**20
@@ -116,7 +173,8 @@ def check_lock(lock_file: Path) -> list[str]:
 
 def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
               seed: int, required_metrics: list[str], timeout_s: float,
-              params: dict | None = None, output_cap_mb: float | None = None) -> Trial:
+              params: dict | None = None, output_cap_mb: float | None = None,
+              require_items: bool = False) -> Trial:
     out_dir.mkdir(parents=True, exist_ok=True)
     cmd = build_command(entrypoint) + [
         "--condition", condition["name"], "--seed", str(seed),
@@ -142,6 +200,7 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
     (out_dir / "stdout.txt").write_text(stdout, encoding="utf-8")
     (out_dir / "stderr.txt").write_text(stderr, encoding="utf-8")
     metrics: dict = {}
+    items: dict = {}
     mpath = out_dir / "metrics.json"
     if rc == 0 and error is None:
         try:
@@ -156,6 +215,20 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
             error = "entrypoint did not write metrics.json"
         except (ValueError, json.JSONDecodeError) as exc:
             error = f"invalid metrics.json: {exc}"
+        ipath = out_dir / ITEMS_FILE
+        if error is None and (require_items or ipath.exists()):
+            # Per-item metrics: only the decision metrics that are not run-level
+            # quantities (cost, controller resources) are required per item.
+            item_metrics = [m for m in required_metrics
+                            if m != COST_METRIC and m not in RESOURCE_METRICS]
+            try:
+                items = load_items(ipath, item_metrics)
+            except FileNotFoundError:
+                error = f"entrypoint did not write {ITEMS_FILE} (decision unit is the item)"
+            except (ValueError, json.JSONDecodeError) as exc:
+                error = f"invalid {ITEMS_FILE}: {exc}"
+    elif error is None and rc == TRANSIENT_EXIT:
+        error = f"transient external failure (exit {TRANSIENT_EXIT})"
     elif error is None:
         error = f"exit code {rc}"
     if output_cap_mb is not None:
@@ -163,26 +236,69 @@ def run_trial(entrypoint: str, workdir: Path, out_dir: Path, condition: dict,
         if size > output_cap_mb and error is None:
             error = f"trial output {size:.1f} MB exceeds the {output_cap_mb} MB cap"
     return Trial(condition["name"], condition["role"], seed, rc, round(dur, 4),
-                 metrics, str(out_dir), error, resources)
+                 metrics, str(out_dir), error, resources, items)
+
+
+def item_unit(protocol: dict) -> bool:
+    return protocol["decision_rule"].get("unit", "seed") == "item"
 
 
 def run_protocol(protocol: dict, workdir: Path, out_root: Path,
                  seeds: list[int] | None = None,
                  conditions: list[str] | None = None,
-                 output_cap_mb: float | None = None) -> RunOutput:
-    """Run every (condition x seed). ``seeds``/``conditions`` override only for smoke tests."""
-    timeout = float(protocol.get("budget", {}).get("timeout_s", 600))
+                 output_cap_mb: float | None = None,
+                 max_retries: int = 0, retry_wait_s: float = 60.0,
+                 sleep=time.sleep) -> RunOutput:
+    """Run every (condition x seed). ``seeds``/``conditions`` override only for smoke tests.
+
+    ``budget.max_parallel`` trials run concurrently (default 1). A trial that exits with
+    TRANSIENT_EXIT is re-run from an empty directory up to ``max_retries`` times, waiting
+    ``retry_wait_s`` doubled per attempt (capped at 16x). With ``budget.max_cost_usd``,
+    no trial starts once the reported ``cost_usd`` of finished trials reaches the cap
+    (trials already running may overshoot it by at most max_parallel - 1 trials).
+    """
+    budget = protocol.get("budget", {})
+    timeout = float(budget.get("timeout_s", 600))
+    max_cost = budget.get("max_cost_usd")
     required = [protocol["metrics"]["primary"], *protocol["metrics"].get("secondary", [])]
+    need_items = item_unit(protocol)
     out = RunOutput(command_template=build_command(protocol["entrypoint"]))
-    for cond in protocol["conditions"]:
-        if conditions and cond["name"] not in conditions:
-            continue
-        for seed in seeds if seeds is not None else protocol["seeds"]:
-            out.trials.append(run_trial(protocol["entrypoint"], workdir,
-                                        out_root / cond["name"] / f"seed-{seed}",
-                                        cond, seed, required, timeout,
-                                        params=trial_params(protocol, cond),
-                                        output_cap_mb=output_cap_mb))
+    jobs = [(cond, seed) for cond in protocol["conditions"]
+            if not conditions or cond["name"] in conditions
+            for seed in (seeds if seeds is not None else protocol["seeds"])]
+    lock = threading.Lock()
+    spent = [0.0]
+
+    def one(job) -> Trial:
+        cond, seed = job
+        d = out_root / cond["name"] / f"seed-{seed}"
+        with lock:
+            exhausted = max_cost is not None and spent[0] >= max_cost
+        if exhausted:
+            return Trial(cond["name"], cond["role"], seed, -1, 0.0, {}, str(d),
+                         f"cost budget exhausted: {spent[0]:.4g} >= max_cost_usd {max_cost}")
+        attempt = 1
+        while True:
+            t = run_trial(protocol["entrypoint"], workdir, d, cond, seed, required, timeout,
+                          params=trial_params(protocol, cond), output_cap_mb=output_cap_mb,
+                          require_items=need_items)
+            t.attempts = attempt
+            if not t.transient or attempt > max_retries:
+                break
+            sleep(retry_wait_s * min(16, 2 ** (attempt - 1)))
+            shutil.rmtree(d, ignore_errors=True)  # a retry starts from a clean directory
+            attempt += 1
+        if t.ok and _finite_number(t.metrics.get(COST_METRIC)):
+            with lock:
+                spent[0] += float(t.metrics[COST_METRIC])
+        return t
+
+    workers = max(1, int(budget.get("max_parallel", 1)))
+    if workers == 1:
+        out.trials = [one(j) for j in jobs]
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            out.trials = list(pool.map(one, jobs))  # results keep the job order
     return out
 
 
@@ -296,6 +412,25 @@ def paired_values(trials: list[Trial], treatment: str, control: str,
     return [(s, tv[s], cv[s]) for s in sorted(tv.keys() & cv.keys())]
 
 
+def item_means(trials: list[Trial], condition: str, metric: str) -> dict[str, float]:
+    """Per-item value for one condition: the mean over that condition's valid trials
+    (seeds = repeated samples of the same item)."""
+    acc: dict[str, list[float]] = {}
+    for t in trials:
+        if t.ok and t.condition == condition:
+            for iid, m in t.items.items():
+                if metric in m:
+                    acc.setdefault(iid, []).append(float(m[metric]))
+    return {iid: statistics.fmean(v) for iid, v in acc.items()}
+
+
+def paired_items(trials: list[Trial], treatment: str, control: str,
+                 metric: str) -> list[tuple[str, float, float]]:
+    """(item, treatment, control) for items measured in BOTH arms."""
+    tv, cv = item_means(trials, treatment, metric), item_means(trials, control, metric)
+    return [(i, tv[i], cv[i]) for i in sorted(tv.keys() & cv.keys())]
+
+
 def paired_t_ci(diffs: list[float], alpha: float) -> tuple[float, float, float, float]:
     """(mean per-seed difference, CI low, CI high, df) with a Student t interval."""
     mean = statistics.fmean(diffs)
@@ -317,7 +452,10 @@ def evaluate_decision(rule: dict, trials: list[Trial]) -> dict:
 
     The CI is a (1 - alpha) Student t interval: ``rule["pairing"] == "paired"``
     uses per-seed differences over seeds valid in both arms (seed-matched
-    designs); default "unpaired" uses Welch's interval. Fully deterministic.
+    designs); default "unpaired" uses Welch's interval. With ``rule["unit"] == "item"``
+    the unit of analysis is the evaluation item (benchmarks: LLM, agent and code
+    studies): each item's value is averaged over seeds within each arm and the paired
+    t interval is taken over per-item differences. Fully deterministic.
     """
     alpha = rule.get("alpha", 0.05)
     t = values(trials, rule["treatment"], rule["metric"])
@@ -325,9 +463,19 @@ def evaluate_decision(rule: dict, trials: list[Trial]) -> dict:
     base = {"metric": rule["metric"], "treatment": rule["treatment"],
             "control": rule["control"], "n_treatment": len(t), "n_control": len(c),
             "min_effect": rule.get("min_effect"), "alpha": alpha, "direction": rule["direction"]}
-    pairing = rule.get("pairing", "unpaired")
+    unit = rule.get("unit", "seed")
+    base["unit"] = unit
+    pairing = "paired" if unit == "item" else rule.get("pairing", "unpaired")
     base["pairing"] = pairing
-    if pairing == "paired":
+    if unit == "item":
+        pairs = paired_items(trials, rule["treatment"], rule["control"], rule["metric"])
+        base["n_pairs"] = len(pairs)
+        if len(pairs) < 2:
+            return {**base, "outcome": Outcome.INCONCLUSIVE.value,
+                    "reason": "fewer than 2 items measured in both arms"}
+        diff, lo, hi, df = paired_t_ci([a - b for _, a, b in pairs], alpha)
+        base["ci_method"] = "student_t_paired_items"
+    elif pairing == "paired":
         pairs = paired_values(trials, rule["treatment"], rule["control"], rule["metric"])
         base["n_pairs"] = len(pairs)
         if len(pairs) < 2:
@@ -386,7 +534,8 @@ def evaluate_rule(rule: dict, trials: list[Trial]) -> dict:
     subs = rule.get("co_primary") or []
     if not subs:
         return main
-    inherit = {k: rule[k] for k in ("treatment", "control", "alpha", "pairing") if k in rule}
+    inherit = {k: rule[k] for k in ("treatment", "control", "alpha", "pairing", "unit")
+               if k in rule}
     parts = [main] + [evaluate_decision({**inherit, **s}, trials) for s in subs]
     outs = [p["outcome"] for p in parts]
     if all(o == Outcome.SUPPORTED.value for o in outs):
@@ -464,6 +613,36 @@ def evaluate_requirements(reqs: list[dict], summary: dict,
                         "observed": observed,
                         "expected": f"{agg}({r['condition']}.{r['metric']}) {r['op']} {r['value']}"})
     return results
+
+
+def analysed_items(trials: list[Trial]) -> list[str]:
+    return sorted({iid for t in trials if t.ok for iid in t.items})
+
+
+def item_validity(protocol: dict, trials: list[Trial], earlier_items: set[str]) -> list[dict]:
+    """Controller-imposed validity checks for item-unit protocols (empty otherwise):
+    AUTO-ITEM-COVERAGE: every decision condition measured all ``n_items`` items in every
+    valid trial (an instrument that silently drops items biases the comparison);
+    AUTO-FRESH-ITEMS: a confirmatory study uses no item already analysed for this
+    hypothesis (pilots on a development split, confirmation on held-out items)."""
+    if not item_unit(protocol):
+        return []
+    rule = protocol["decision_rule"]
+    want = protocol["n_items"]
+    short = sorted({f"{t.condition}/seed-{t.seed}: {len(t.items)}" for t in trials
+                    if t.ok and t.condition in (rule["treatment"], rule["control"])
+                    and len(t.items) != want})
+    out = [{"id": "AUTO-ITEM-COVERAGE", "passed": not short, "observed": short or want,
+            "expected": f"every valid {rule['treatment']}/{rule['control']} trial reports "
+                        f"exactly n_items={want} items"}]
+    if protocol["kind"] == "confirmatory":
+        reused = sorted(set(analysed_items(trials)) & earlier_items)
+        out.append({"id": "AUTO-FRESH-ITEMS", "passed": not reused,
+                    "observed": f"{len(reused)} reused items" + (f", e.g. {reused[:5]}"
+                                                                  if reused else ""),
+                    "expected": "a confirmatory study uses items never analysed before for "
+                                "this hypothesis"})
+    return out
 
 
 def contrasts(protocol: dict, trials: list[Trial]) -> list[dict]:

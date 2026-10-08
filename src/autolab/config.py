@@ -52,6 +52,10 @@ usage_limit_wait_s = 900     # agent usage/rate limit: wait this long, then retr
 usage_limit_max_wait_s = 43200   # total wait per run before HALTED
 network_wait_s = 120        # API/network blip (no response, ECONNRESET, 5xx): wait, retry
 network_max_wait_s = 3600   # total network wait per run before HALTED
+max_trial_retries = 6       # trial exit 75 (transient: API rate/usage limit, network): re-run
+trial_retry_wait_s = 60     # first wait before a re-run; doubles per attempt (max 16x)
+max_cost_usd_without_approval = 20.0   # projected spend (smoke cost x seeds) needing the
+                                       # compute_budget gate
 
 [gates]
 # Human approval is ALWAYS required for protocols marked protected = true.

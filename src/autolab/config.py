@@ -71,6 +71,15 @@ review_paths = []   # e.g. [{pattern = "src/safety/*", gate = "safety"}]
 delegate = ""
 gates = []
 
+# Dashboard (autolab ui). Projects whose objective starts with a task key (e.g. "G1-6 ...")
+# and whose mandate_refs name a milestone (e.g. "Gate 1") appear on the milestone board.
+[ui]
+port = 8765
+task_key_pattern = '^\\s*(G\\d+-\\d+[a-z]?)\\b'
+milestone_ref_pattern = '^Gate (\\d+)$'
+milestone_label = "Gate"
+refresh_fallback_s = 30
+
 [engineering]
 test_command = "python -m pytest -q"
 protected_paths = ["protocols/*", "tests/verification/*"]

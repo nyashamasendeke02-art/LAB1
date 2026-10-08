@@ -9,9 +9,11 @@ Architecture (D49):
   delivered in a ``<meta>`` tag.
 * JSON API under ``/api`` and a Server-Sent Events stream (``/api/stream``) that announces
   ledger and queue-log changes, so the page updates without polling.
-* Read-mostly: the only writes are creating a project and recording a human gate decision,
-  both through the controller/Gates APIs, refused while an agent call is in flight (the
-  controller's tamper check would otherwise HALT the project).
+* Read-mostly: the writes are creating a project, recording a human gate decision and editing
+  the agent registry (agents.toml: agents, models, stage allocation, D52), all refused while an
+  agent call is in flight (the controller's tamper check would otherwise HALT the project).
+* No hardcoded lab vocabulary: states, pipelines, tones, stages, roles, backends, project kinds
+  and milestone patterns come from ``/api/meta`` (state machines, registry, lab config).
 * Security: binds to loopback only, checks the ``Host`` header (DNS rebinding), requires the
   token and a same-origin ``Origin`` for writes, no CORS.
 """
@@ -32,8 +34,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
 
+from . import __version__
 from .controller import Controller, Lab
 from .gates import GateError, Gates
+from .registry import BACKENDS, ORGANISATION, ROLE_AGENTS, STAGES, Registry, RegistryError
+from .state_machines import (ENGINEERING_PIPELINE, ENGINEERING_PIPELINE_ALIAS, RESEARCH_DONE,
+                             RESEARCH_TERMINAL, STATE_TONES, EngineeringState, ResearchState)
+from .taxonomy import Role
 
 WEB_DIR = Path(__file__).with_name("web")
 ASSETS = {"/assets/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -46,9 +53,18 @@ FAVICON = (b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><defs><
            b'stop-color="#b495ff"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#g)"/>'
            b'<text x="16" y="22" font-family="Segoe UI,Arial" font-size="17" font-weight="800" '
            b'text-anchor="middle" fill="#fff">A</text></svg>')
-ENG_PIPELINE = ["SPEC", "IMPLEMENTING", "TESTING", "ADVERSARIAL_REVIEW", "MERGE", "MERGED"]
-TASK_KEY = re.compile(r"^\s*(G\d+-\d+[a-z]?)\b")
-GATE_REF = re.compile(r"^Gate (\d+)$")
+ENG_PIPELINE = [s.value for s in ENGINEERING_PIPELINE]
+PROJECT_KINDS = [
+    {"value": "research", "label": "Research: investigate a question", "needs_acceptance": False},
+    {"value": "engineering", "label": "Engineering: build to a spec", "needs_acceptance": True},
+]
+# Tones of record statuses and verdicts (state-machine tones come from state_machines.py).
+STATUS_TONES = {"approved": "ok", "complete": "ok", "completed": "ok", "pass": "ok",
+                "upheld": "ok", "supported": "ok", "rejected": "bad", "error": "bad",
+                "fail": "bad", "failed": "bad", "timeout": "bad", "challenged": "warn",
+                "needs_review": "warn", "pending": "warn", "blocked": "warn",
+                "usage_limit": "warn", "network": "warn", "working": "info",
+                "inconclusive": "warn", "unsupported": "info"}
 _USAGE = re.compile(r"hit your (?:\w+ )?limit|usage limit|rate[ _-]?limit|quota|\b429\b", re.I)
 _NETWORK = re.compile(r"no response from api|econnreset|connection (?:dropped|reset|refused|"
                       r"aborted)|overloaded|service unavailable|\b50[0234]\b|\b529\b", re.I)
@@ -204,6 +220,10 @@ class DashboardServer:
                     elif route.startswith("/api/approvals/"):
                         self._json(HTTPStatus.OK, owner.approval(
                             unquote(route.removeprefix("/api/approvals/"))))
+                    elif route == "/api/meta":
+                        self._json(HTTPStatus.OK, owner.meta())
+                    elif route == "/api/registry":
+                        self._json(HTTPStatus.OK, owner.registry_state())
                     elif route == "/api/agents":
                         self._json(HTTPStatus.OK, owner.agents())
                     elif route.startswith("/api/tasks/"):
@@ -237,11 +257,21 @@ class DashboardServer:
                         result = owner.create_project(data)
                     elif route.startswith("/api/approvals/"):
                         result = owner.decide(unquote(route.removeprefix("/api/approvals/")), data)
+                    elif route == "/api/allocation":
+                        result = owner.allocate(data)
+                    elif route == "/api/agents/preset":
+                        result = owner.apply_preset(data)
+                    elif route.startswith("/api/agents/") and route.endswith("/remove"):
+                        result = owner.remove_agent(unquote(
+                            route.removeprefix("/api/agents/").removesuffix("/remove")))
+                    elif route.startswith("/api/agents/"):
+                        result = owner.save_agent(unquote(route.removeprefix("/api/agents/")),
+                                                  data)
                     else:
                         self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
                         return
                     self._json(HTTPStatus.OK, result)
-                except (ValueError, GateError) as exc:
+                except (ValueError, GateError, RegistryError) as exc:
                     self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 except KeyError:
                     self._json(HTTPStatus.NOT_FOUND, {"error": "record not found"})
@@ -312,12 +342,19 @@ class DashboardServer:
                 "test_runs": len(d.get("test_runs", [])), "branch": d.get("branch"),
                 "head": d.get("head")}
 
+    def _patterns(self) -> tuple[re.Pattern, re.Pattern]:
+        ui = self.lab.config.get("ui", {})
+        return (re.compile(ui.get("task_key_pattern") or r"(?!x)x"),
+                re.compile(ui.get("milestone_ref_pattern") or r"(?!x)x"))
+
     def _project_summary(self, rec) -> dict:
         d = rec.data
         objective = d.get("objective", "")
-        key = TASK_KEY.match(objective)
+        task_key, milestone_ref = self._patterns()
+        key = task_key.match(objective)
         history = self.store.history(rec.id)
-        gates = [int(m.group(1)) for r in d.get("mandate_refs", []) if (m := GATE_REF.match(r))]
+        gates = [int(m.group(1)) for r in d.get("mandate_refs", [])
+                 if (m := milestone_ref.match(r))]
         return {"id": rec.id, "kind": d.get("kind", "research"), "key": key.group(1) if key else None,
                 "title": _title(objective), "objective": objective, "state": d.get("state", "UNKNOWN"),
                 "cycle": d.get("cycle", 0), "blocked_on": d.get("blocked_on"),
@@ -352,29 +389,42 @@ class DashboardServer:
                                                       dt.timezone.utc).isoformat()}
 
     # ------------------------------------------------------------ API
+    def registry(self) -> Registry:
+        return Registry(self.lab.config, self.root)
+
     def agents(self) -> list[dict]:
         tasks = self._tasks()
         by_id = {rec.id: rec for rec in tasks}
+        # Tasks recorded before D52 carry no agent name: they belong to their role's agent.
+        agent_of = lambda d: d.get("agent") or d.get("role", "unknown")  # noqa: E731
         active = {}
         for event in self._open_dispatches(set(by_id)):
-            role = event["data"].get("role", "unknown")
-            if role not in active or event["seq"] > active[role]["seq"]:
-                active[role] = event
-        configured = self.lab.config.get("agents", {})
+            name = agent_of(event["data"])
+            if name not in active or event["seq"] > active[name]["seq"]:
+                active[name] = event
+        reg = self.registry()
+        effective = reg.describe()["effective"]
         out = []
-        for role in ("scientist", "engineer", "verifier", "reviewer"):
-            settings = configured.get(role) or {}
-            if role == "reviewer" and not settings.get("backend"):
-                continue
-            mine = sorted((r for r in tasks if r.data.get("role") == role),
+        for name, settings in sorted(reg.agents.items(),
+                                     key=lambda kv: (kv[0] not in ROLE_AGENTS, kv[0])):
+            role = next((s.role.value for s in STAGES if effective[s.name] == name),
+                        name if name in ROLE_AGENTS else None)
+            mine = sorted((r for r in tasks if agent_of(r.data) == name),
                           key=lambda r: r.created_at, reverse=True)
             latest = mine[0] if mine else None
             err = latest.data.get("error") if latest and latest.data.get("status") == "error" else None
             counts = Counter(r.data.get("status") for r in mine)
-            act = active.get(role)
+            act = active.get(name)
             out.append({
-                "role": role, "backend": settings.get("backend", "unknown"),
+                "name": name, "title": settings.get("title") or name.replace("_", " ").title(),
+                "charter": settings.get("charter", ""), "role": role,
+                "default_for_role": name if name in ROLE_AGENTS else None,
+                "stages": sorted(s for s, n in effective.items() if n == name),
+                "backend": settings.get("backend") or None,
                 "model": settings.get("model") or None,
+                "backup_backend": settings.get("backup_backend") or None,
+                "backup_model": settings.get("backup_model") or None,
+                "spec": {k: v for k, v in settings.items() if k != "stages"},
                 "status": "working" if act else ("blocked" if err else "idle"),
                 "error_kind": classify_error(err), "error": err[-600:] if err else None,
                 "error_message": readable_error(err),
@@ -413,30 +463,34 @@ class DashboardServer:
             for t in sorted(gates[g], key=lambda t: t["project"]):
                 latest[t["key"]] = t  # the newest project for each task key wins
             board.append({"gate": g, "tasks": sorted(latest.values(), key=lambda t: t["key"])})
-        superseded = {p["key"] for p in projects if p["key"] and p["state"] != "HALTED"}
+        superseded = {p["key"] for p in projects
+                      if p["key"] and p["state"] != ResearchState.HALTED.value}
         alerts = []
         for a in agents:
             if a["status"] == "blocked":
                 kind = a["error_kind"] or "error"
                 alerts.append({"level": "warn" if kind in ("usage_limit", "network") else "error",
-                               "title": f"{a['role'].title()} blocked: {kind.replace('_', ' ')}",
+                               "title": f"{a['title']} blocked: {kind.replace('_', ' ')}",
                                "detail": a["error_message"] or ""})
         for p in projects:
-            if p["state"] == "HALTED" and p["key"] not in superseded:
+            if p["state"] == ResearchState.HALTED.value and p["key"] not in superseded:
                 alerts.append({"level": "error", "title": f"{p['id']} halted",
                                "detail": (p["halt_reason"] or "")[:240], "project": p["id"]})
         if approvals:
             alerts.append({"level": "info",
                            "title": f"{len(approvals)} approval(s) awaiting a decision",
                            "detail": ", ".join(a["id"] for a in approvals)})
-        active = [p for p in projects if p["state"] not in ("COMPLETE", "HALTED")]
+        terminal = {s.value for s in RESEARCH_TERMINAL}
+        active = [p for p in projects if p["state"] not in terminal]
         states = Counter(p["state"] for p in projects)
-        unresolved_halts = [p for p in projects if p["state"] == "HALTED" and p["key"] not in superseded]
+        halted = ResearchState.HALTED.value
+        unresolved_halts = [p for p in projects if p["state"] == halted and p["key"] not in superseded]
         return {
             "lab": self.root.name, "generated_at": dt.datetime.now(dt.timezone.utc).isoformat(),
             "counts": {"projects": len(projects), "active": len(active),
-                       "complete": states.get("COMPLETE", 0), "halted": len(unresolved_halts),
-                       "halted_total": states.get("HALTED", 0),
+                       "complete": sum(states.get(s.value, 0) for s in RESEARCH_DONE),
+                       "halted": len(unresolved_halts),
+                       "halted_total": states.get(halted, 0),
                        "approvals": len(approvals),
                        "deliveries": len(self.store.query("delivery")),
                        "agents_working": sum(a["status"] == "working" for a in agents)},
@@ -464,6 +518,8 @@ class DashboardServer:
         failures = [{"id": r.id, "category": r.data.get("category"), "summary": r.data.get("summary"),
                      "state": r.data.get("state"), "at": r.created_at} for r in mine("failure")]
         tasks = [{"id": r.id, "role": r.data.get("role"), "stage": r.data.get("stage"),
+                  "agent": r.data.get("agent") or r.data.get("role"),
+                  "model": (r.data.get("backend") or {}).get("model"),
                   "status": r.data.get("status"), "at": r.created_at,
                   "summary": r.data.get("summary", ""),
                   "error_kind": classify_error(r.data.get("error"))} for r in mine("task")]
@@ -478,6 +534,66 @@ class DashboardServer:
                 "reviews": by_time(reviews), "failures": by_time(failures), "tasks": by_time(tasks),
                 "deliveries": deliveries, "approvals": approvals,
                 "events": self.store.events(subject=project_id)[-40:]}
+
+    def meta(self) -> dict:
+        """Everything the dashboard needs to know about this lab's vocabulary."""
+        ui = self.lab.config.get("ui", {})
+        tones = {**STATUS_TONES, **{k.value: v for k, v in STATE_TONES.items()}}
+        return {
+            "version": __version__, "lab": self.root.name,
+            "research_states": [s.value for s in ResearchState],
+            "engineering_states": [s.value for s in EngineeringState],
+            "research_terminal": [s.value for s in RESEARCH_TERMINAL],
+            "research_done": [s.value for s in RESEARCH_DONE],
+            "engineering_pipeline": ENG_PIPELINE,
+            "pipeline_alias": {k.value: v.value for k, v in ENGINEERING_PIPELINE_ALIAS.items()},
+            "tones": tones, "project_kinds": PROJECT_KINDS,
+            "roles": [{"value": r.value, "default_agent": r.value} for r in Role],
+            "stages": [{"name": st.name, "role": st.role.value, "plane": st.plane,
+                        "writable": st.writable, "reads_files": st.reads_files,
+                        "label": st.label} for st in STAGES],
+            "planes": list(dict.fromkeys(st.plane for st in STAGES)),
+            "backends": [{"name": n, **caps} for n, caps in BACKENDS.items()],
+            "presets": [{"name": "organisation",
+                         "agents": [{"name": n, "title": v[0], "role": v[1].value,
+                                     "stages": v[3]} for n, v in ORGANISATION.items()]}],
+            "ui": {"milestone_label": ui.get("milestone_label") or "Milestone",
+                   "milestones_enabled": bool(ui.get("milestone_ref_pattern")),
+                   "refresh_fallback_s": int(ui.get("refresh_fallback_s") or 30)},
+        }
+
+    def registry_state(self) -> dict:
+        reg = self.registry()
+        return {**reg.describe(), "known_models": sorted(
+            {m for spec in reg.agents.values() for m in (spec.get("model"), spec.get("backup_model"))
+             if m} | {t.data.get("backend", {}).get("model") for t in self._tasks()
+                      if (t.data.get("backend") or {}).get("model")} - {"script"})}
+
+    def save_agent(self, name: str, data: dict) -> dict:
+        self._ensure_idle()
+        spec = data.get("spec")
+        if not isinstance(spec, dict):
+            raise ValueError("body needs a spec object")
+        self.registry().upsert(name, {k: v for k, v in spec.items() if v not in (None, "")})
+        return self.registry_state()
+
+    def remove_agent(self, name: str) -> dict:
+        self._ensure_idle()
+        self.registry().remove(name)
+        return self.registry_state()
+
+    def allocate(self, data: dict) -> dict:
+        self._ensure_idle()
+        changes = data.get("allocation")
+        if not isinstance(changes, dict):
+            raise ValueError("body needs an allocation object {stage: agent}")
+        self.registry().allocate(changes)
+        return self.registry_state()
+
+    def apply_preset(self, data: dict) -> dict:
+        self._ensure_idle()
+        created = self.registry().apply_preset(str(data.get("name") or "organisation"))
+        return {**self.registry_state(), "created": created}
 
     def approvals(self) -> list[dict]:
         gates = Gates(self.store, self.lab.config["gates"].get("delegation"))
@@ -516,6 +632,7 @@ class DashboardServer:
                       "error": record.data.get("error"), "attempts": record.data.get("attempts"),
                       "rejections": record.data.get("rejections", []),
                       "backend": record.data.get("backend"),
+                      "agent": record.data.get("agent") or record.data.get("role"),
                       "error_kind": classify_error(record.data.get("error"))}
         except KeyError:
             result = {"status": "working"}
@@ -556,7 +673,8 @@ class DashboardServer:
             project_id = controller.new_engineering_project(
                 objective.strip(), [item.strip() for item in acceptance], refs)
         else:
-            raise ValueError("kind must be 'research' or 'engineering'")
+            raise ValueError("kind must be one of "
+                             + ", ".join(repr(k["value"]) for k in PROJECT_KINDS))
         return {"id": project_id}
 
     def decide(self, approval_id: str, data: dict) -> dict:
@@ -577,7 +695,8 @@ class DashboardServer:
         if self.run_log and self.run_log.exists():
             st = self.run_log.stat()
             log = (st.st_size, st.st_mtime_ns)
-        return (self.store.head(), log)
+        reg = self.root / "agents.toml"
+        return (self.store.head(), log, reg.stat().st_mtime_ns if reg.exists() else None)
 
     def _stream(self, handler: BaseHTTPRequestHandler, max_seconds: float = 3600,
                 interval: float = 1.0) -> None:

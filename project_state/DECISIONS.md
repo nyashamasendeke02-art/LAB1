@@ -241,3 +241,21 @@
   Existing seed-unit protocols behave exactly as before. Tests: tests/test_domains.py (12).
   Not solved: the scientist cannot browse the web, so background research is still unverified (todo 6); cost is
   reported by the experiment code, not measured by the controller; there is no GPU scheduling.
+- D52 (2026-10-08, human: "THE LAB SHOULD BE ABLE TO USE DIFFERENT AGENTS/MODELS ... ALLOCATING DIFFERENT AGENTS
+  TO THE PROCESS ... web ui ... no hardcoded values, models"): agent registry and stage allocation
+  (src/autolab/registry.py). Permissions stay with the stage (each of the 18 stages has a fixed role: scientist
+  read-only, engineer writable worktree, verifier tests only); WHO performs a stage is configuration: any number of
+  named agents (backend + model + optional title/charter/backup) in lab.toml [agents.*] or agents.toml, and
+  [allocation] stage -> agent. Unallocated stages use the role's agent, so existing labs are unchanged (robolab
+  verified). Backends with no file tools (openai-api) cannot be allocated writing stages. agents.toml is in the
+  controller's tamper check (an engineer cannot reallocate its own reviewer: test). Task records, dispatch events
+  and commit trailers (Autolab-Agent) name the agent. `autolab agents LAB [list|set|allocate|remove|preset]`.
+  Preset "organisation" creates the master prompt's research/engineering agents (Research Director, Literature,
+  Research Gap, Hypothesis, Requirements, Experiment Designer, Scientific Critic, Research Synthesizer, Systems
+  Architect, Implementation Engineer, Verification Engineer) on their role's current backend/model.
+  Dashboard: /api/meta publishes states, tones, pipelines, stages, roles, backends, project kinds and milestone
+  settings, so app.js hardcodes none of them; the Agents page creates/edits/removes agents (model is free text with
+  suggestions from models already in use) and edits the allocation; writes refused during agent calls. Lab-specific
+  task-key/milestone patterns and the port moved to lab.toml [ui]. Tests: tests/test_registry.py (11), 3 web tests.
+  The master prompt (Agent OS: research/knowledge/engineering/experimentation/deployment planes) arrived truncated;
+  docs/AGENT_OS_ROADMAP.md maps it onto what exists and the next phases.

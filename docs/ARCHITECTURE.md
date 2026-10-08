@@ -71,6 +71,37 @@ is unchanged, and HALTs on any change (the engineer runs Python outside an OS sa
   framing. OPEN_QUESTION: whether a different model should review (configure
   a different backend/model to test this).
 
+### 2a. Agent registry and stage allocation (D52)
+
+Roles are **permission classes** fixed per stage (`registry.STAGES`: 18 stages with role,
+plane, writable, reads-files). **Agents** are named configurations: backend (`claude-cli`,
+`codex-cli`, `gemini-cli`, `openai-api`; capabilities in `registry.BACKENDS`), model, optional
+title, charter, effort, timeout and backup backend/model. `[allocation]` maps a stage to an
+agent; an unallocated stage runs on the agent named after its role.
+
+```toml
+# agents.toml (lab root; written by `autolab agents` and the dashboard)
+[agents.scientific_critic]
+title = "Scientific Critic"
+backend = "gemini-cli"
+model = "..."
+charter = "Challenge assumptions, confounds and unsupported claims."
+
+[allocation]
+scientific_review = "scientific_critic"
+```
+
+* The controller resolves the agent at every call (`Controller.agent_for`), re-reading
+  `agents.toml` when it changes, so a new allocation applies from the next call.
+* The task packet (workdir, writable, blinding) still comes from the stage's role; each
+  backend enforces read-only vs writable itself. A backend without file tools cannot be
+  allocated a writing stage (`stage_fit`).
+* `agents.toml` is part of the integrity snapshot: an agent that edits it HALTs the project.
+* Task records, `task.dispatched` events and commit trailers (`Autolab-Agent`) name the agent.
+* The agent's title and charter are added to the role charter in the prompt.
+* Preset `organisation` maps the master prompt's research and engineering agents onto the
+  stages (`docs/AGENT_OS_ROADMAP.md`).
+
 ## 3. Research state machine
 
 ```text

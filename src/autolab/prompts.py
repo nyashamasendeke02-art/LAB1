@@ -139,11 +139,18 @@ STAGES = {
 }
 
 
-def build_prompt(role: Role, stage: str, task: dict) -> str:
+def build_prompt(role: Role, stage: str, task: dict, persona: dict | None = None) -> str:
     schema = task.get("output_schema")
     ctx = {k: v for k, v in task.items() if k != "output_schema"}
+    agent = ""
+    if persona:
+        agent = f"\nAGENT: {persona.get('title') or persona.get('name')}"
+        if persona.get("charter"):
+            agent += f"\n{persona['charter']}"
+        agent += ("\n(Your role's permissions and rules above still apply; this charter only "
+                  "focuses how you do this stage.)")
     return (
-        f"{COMMON}\n{CHARTERS[role]}\n\nSTAGE: {stage}\n{STAGES[stage]}\n\n"
+        f"{COMMON}\n{CHARTERS[role]}{agent}\n\nSTAGE: {stage}\n{STAGES[stage]}\n\n"
         f"TASK PACKET:\n```json\n{json.dumps(ctx, indent=2, default=str)}\n```\n\n"
         f"OUTPUT SCHEMA (your whole answer is one object of this shape):\n"
         f"```json\n{json.dumps(schema, indent=2)}\n```\n"

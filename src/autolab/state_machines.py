@@ -98,3 +98,18 @@ def check_research(current: ResearchState, target: ResearchState) -> None:
 
 def check_engineering(current: EngineeringState, target: EngineeringState) -> None:
     check(ENGINEERING_TRANSITIONS, current, target)
+
+
+# Display metadata for user interfaces (the dashboard reads it from /api/meta, so no client
+# hardcodes state names). Tones: ok | bad | warn | info | review.
+RESEARCH_TERMINAL = (R.COMPLETE, R.HALTED)
+RESEARCH_DONE = (R.COMPLETE,)
+ENGINEERING_PIPELINE = (E.SPEC, E.IMPLEMENTING, E.TESTING, E.ADVERSARIAL_REVIEW, E.MERGE,
+                        E.MERGED)
+# Off-pipeline states shown at the pipeline step they return to.
+ENGINEERING_PIPELINE_ALIAS = {E.REDESIGN: E.IMPLEMENTING}
+STATE_TONES = {
+    R.COMPLETE: "ok", R.HALTED: "bad", R.ENGINEERING: "info",
+    E.IMPLEMENTING: "info", E.TESTING: "info", E.ADVERSARIAL_REVIEW: "review",
+    E.REDESIGN: "warn", E.MERGED: "ok", E.ESCALATED: "bad",
+}

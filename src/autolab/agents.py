@@ -264,18 +264,29 @@ class OpenAIBackend(AgentBackend):
         return "\n".join(texts)
 
 
+# Backend factories by name; capabilities (for allocation checks and the UI) are declared in
+# registry.BACKENDS under the same names.
+BACKEND_ALIASES = {"gemini": "gemini-cli", "agy-cli": "gemini-cli"}
+BACKEND_FACTORIES: dict[str, Callable[[dict], "AgentBackend"]] = {
+    "claude-cli": lambda s: ClaudeCLIBackend(model=s.get("model") or None,
+                                             timeout=s.get("timeout", 1800)),
+    "codex-cli": lambda s: CodexCLIBackend(model=s.get("model") or None,
+                                           timeout=s.get("timeout", 1800)),
+    "gemini-cli": lambda s: GeminiCLIBackend(model=s.get("model") or None,
+                                             timeout=s.get("timeout", 1800),
+                                             effort=s.get("effort") or None),
+    "openai-api": lambda s: OpenAIBackend(model=s["model"],
+                                          api_key_env=s.get("api_key_env") or "OPENAI_API_KEY",
+                                          timeout=s.get("timeout", 600)),
+}
+
+
 def _make_single_backend(spec: dict) -> AgentBackend:
-    kind = spec.get("backend")
-    if kind == "claude-cli":
-        return ClaudeCLIBackend(model=spec.get("model"), timeout=spec.get("timeout", 1800))
-    if kind == "codex-cli":
-        return CodexCLIBackend(model=spec.get("model"), timeout=spec.get("timeout", 1800))
-    if kind in ("gemini-cli", "gemini", "agy-cli"):
-        return GeminiCLIBackend(model=spec.get("model"), timeout=spec.get("timeout", 1800),
-                                effort=spec.get("effort"))
-    if kind == "openai-api":
-        return OpenAIBackend(model=spec["model"], api_key_env=spec.get("api_key_env", "OPENAI_API_KEY"))
-    raise ValueError(f"unknown backend {kind!r}")
+    kind = BACKEND_ALIASES.get(spec.get("backend"), spec.get("backend"))
+    factory = BACKEND_FACTORIES.get(kind)
+    if factory is None:
+        raise ValueError(f"unknown backend {kind!r}")
+    return factory(spec)
 
 
 class GeminiCLIBackend(AgentBackend):
@@ -404,15 +415,17 @@ class AgentResult:
 
 
 class Agent:
-    def __init__(self, role: Role, backend: AgentBackend, max_protocol_retries: int = 2):
+    def __init__(self, role: Role, backend: AgentBackend, max_protocol_retries: int = 2,
+                 persona: dict | None = None):
         self.role = role
         self.backend = backend
         self.max_protocol_retries = max_protocol_retries
+        self.persona = persona  # {"name", "title", "charter"} of the allocated agent
 
     def run(self, task: TaskPacket) -> AgentResult:
         if task.role != self.role:
             raise ValueError(f"task for {task.role} sent to {self.role}")
-        base_prompt = build_prompt(self.role, task.stage, task.to_dict())
+        base_prompt = build_prompt(self.role, task.stage, task.to_dict(), self.persona)
         prompt = base_prompt
         raws: list[str] = []
         rejections: list[str] = []

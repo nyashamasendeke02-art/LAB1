@@ -287,3 +287,11 @@ dialog::backdrop { background: #05080d99; backdrop-filter: blur(3px) }
   main { padding: 18px 14px 50px }
   .gate-row { grid-template-columns: 1fr }
 }
+
+/* D52: agent registry and stage allocation */
+.av-custom { background: linear-gradient(135deg, #7c8798, #4d5666) }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px }
+@media (max-width: 640px) { .form-grid { grid-template-columns: 1fr } }
+.table.alloc tr.group th { padding-top: 18px; color: var(--text); font-size: 12px }
+.table.alloc select { width: 100%; max-width: 420px }
+#modal .modal-body { max-height: 78vh; overflow: auto }

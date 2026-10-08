@@ -204,3 +204,55 @@ def test_readable_error_and_favicon(ui):
     lab, server = ui
     status, body = call(server, "GET", "/favicon.ico")
     assert status == 200 and body.startswith(b"<svg")
+
+
+def test_meta_publishes_the_lab_vocabulary(ui):
+    lab, server = ui
+    meta = json.loads(call(server, "GET", "/api/meta")[1])
+    from autolab.registry import BACKENDS, STAGES
+    from autolab.state_machines import ResearchState
+    assert meta["research_states"] == [s.value for s in ResearchState]
+    assert {s["name"] for s in meta["stages"]} == {s.name for s in STAGES}
+    assert {b["name"] for b in meta["backends"]} == set(BACKENDS)
+    assert meta["tones"]["HALTED"] == "bad" and "COMPLETE" in meta["research_done"]
+    assert [k["value"] for k in meta["project_kinds"]] == ["research", "engineering"]
+    assert meta["ui"]["milestone_label"] == "Gate"
+
+
+def test_agents_and_allocation_are_editable_through_the_api(ui):
+    lab, server = ui
+    port = server.httpd.server_address[1]
+    origin = f"http://127.0.0.1:{port}"
+    spec = {"spec": {"backend": "gemini-cli", "model": "some-model", "title": "Critic"}}
+    assert call(server, "POST", "/api/agents/critic", spec)[0] == 403  # token required
+    status, data = call(server, "POST", "/api/agents/critic", spec, token=server.token,
+                        origin=origin)
+    assert status == 200 and "critic" in json.loads(data)["agents"]
+    status, data = call(server, "POST", "/api/allocation",
+                        {"allocation": {"scientific_review": "critic"}}, token=server.token)
+    assert status == 200 and json.loads(data)["effective"]["scientific_review"] == "critic"
+    agents = json.loads(call(server, "GET", "/api/agents")[1])
+    critic = next(a for a in agents if a["name"] == "critic")
+    assert critic["stages"] == ["scientific_review"] and critic["model"] == "some-model"
+    # an API-only backend cannot take a writing stage
+    call(server, "POST", "/api/agents/apionly", {"spec": {"backend": "openai-api", "model": "x"}},
+         token=server.token)
+    status, data = call(server, "POST", "/api/allocation", {"allocation": {"implement": "apionly"}},
+                        token=server.token)
+    assert status == 400 and b"writing stage" in data
+    status, data = call(server, "POST", "/api/agents/preset", {"name": "organisation"},
+                        token=server.token)
+    assert status == 200 and "literature" in json.loads(data)["created"]
+    assert (lab.root / "agents.toml").exists()
+    status, _ = call(server, "POST", "/api/agents/engineer/remove", {}, token=server.token)
+    assert status == 400
+
+
+def test_registry_edits_refused_while_an_agent_call_is_in_flight(ui):
+    lab, server = ui
+    lab.store.append_event("controller", "task.dispatched", "TASK-0001",
+                           {"role": "engineer", "stage": "build", "project": "PRJ-0001"})
+    status, data = call(server, "POST", "/api/agents/critic",
+                        {"spec": {"backend": "claude-cli"}}, token=server.token)
+    assert status == 400 and b"agent call is in progress" in data
+    assert not (lab.root / "agents.toml").exists()

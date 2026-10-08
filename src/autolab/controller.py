@@ -34,6 +34,7 @@ from xml.etree import ElementTree
 
 from . import __version__
 from .agents import Agent, AgentBackend, agent_wait_kind, make_backend
+from .registry import AGENTS_FILE, Registry
 from .config import DEFAULT_TOML, load_config
 from .experiments import (COST_METRIC, Trial, analysed_items, check_lock, contrasts,
                           environment_snapshot, evaluate_rule, hash_paths, item_validity,
@@ -183,18 +184,49 @@ class Controller:
         self.limits = self.cfg["limits"]
         self.sleep: Callable[[float], None] = wall_sleep  # injectable for tests
         self.gates = Gates(self.store, self.cfg["gates"].get("delegation"))
-        if agents is None:
-            agents = {role: Agent(role, make_backend(self.cfg["agents"][role.value]))
-                      for role in (Role.SCIENTIST, Role.ENGINEER, Role.VERIFIER)}
-        self.agents = agents
-        # Independent review: stages listed in [agents.reviewer] run on a different backend
-        # (ideally another model family) than the designer, so the design is not reviewed
-        # by the model that wrote it.
-        rv = self.cfg["agents"].get("reviewer") or {}
-        if reviewer is None and rv.get("backend"):
-            reviewer = make_backend(rv)
-        self.reviewer = reviewer
-        self.review_stages = set(rv.get("stages", ["scientific_review"])) if reviewer else set()
+        # D52: who performs each stage comes from the agent registry (lab.toml [agents.*] and
+        # [allocation], overlaid by agents.toml). Permissions stay fixed by the stage's role.
+        self.registry = Registry(self.cfg, lab.root)
+        # Injected agents/backends (tests, demo) take precedence over configured ones.
+        self.injected: dict[str, AgentBackend] = {}
+        if agents is not None:
+            self.injected.update({role.value: a.backend for role, a in agents.items()})
+        if reviewer is not None:
+            self.injected["reviewer"] = reviewer
+            if "reviewer" not in self.registry.agents:  # injected reviewer, legacy stage default
+                self.registry.agents["reviewer"] = {"backend": "", "title": "Reviewer"}
+                self.registry.allocation.setdefault("scientific_review", "reviewer")
+        self._backends: dict[str, tuple[str, AgentBackend]] = {}
+
+    def _backend_for(self, name: str) -> AgentBackend:
+        """The backend of a named agent, cached per spec (fallback cooldowns persist)."""
+        if name in self.injected:
+            return self.injected[name]
+        spec = self.registry.spec(name)
+        key = json.dumps(spec, sort_keys=True, default=str)
+        cached = self._backends.get(name)
+        if cached is None or cached[0] != key:
+            cached = (key, make_backend({k: v for k, v in spec.items()
+                                         if k not in ("title", "charter", "stages")}))
+            self._backends[name] = cached
+        return cached[1]
+
+    def agent_for(self, role: Role, stage: str) -> tuple[str, Agent]:
+        """(agent name, Agent) allocated to ``stage``; the Agent keeps the stage's role."""
+        self.registry.reload()
+        name = self.registry.resolve(stage, role)
+        spec = self.registry.spec(name)
+        persona = None
+        if spec.get("title") or spec.get("charter"):
+            persona = {"name": name, "title": spec.get("title", name),
+                       "charter": spec.get("charter", "")}
+        return name, Agent(role, self._backend_for(name), persona=persona)
+
+    @property
+    def agents(self) -> dict[Role, Agent]:
+        """Each role's default agent (compatibility view)."""
+        return {r: Agent(r, self._backend_for(r.value))
+                for r in (Role.SCIENTIST, Role.ENGINEER, Role.VERIFIER)}
 
     # ------------------------------------------------------------ projects
     def new_project(self, objective: str, mandate_refs: list[str] | None = None,
@@ -479,16 +511,14 @@ class Controller:
                             context={"project": pid, "cycle": proj.data["cycle"], **context},
                             constraints=self._constraints(role),
                             workdir=str(workdir) if workdir else None, writable=writable)
-        agent = self.agents[role]
-        if stage in self.review_stages:
-            agent = Agent(role, self.reviewer, agent.max_protocol_retries)
+        agent_name, agent = self.agent_for(role, stage)
         hdir = self.lab.handoffs / task_id
         hdir.mkdir(parents=True, exist_ok=True)
         (hdir / "task.json").write_text(json.dumps(packet.to_dict(), indent=2, default=str),
                                         encoding="utf-8")
         self.store.append_event("controller", "task.dispatched", task_id,
                                 {"role": role.value, "stage": stage, "project": pid,
-                                 **agent.backend.describe()})
+                                 "agent": agent_name, **agent.backend.describe()})
         before = self._integrity_snapshot()
         try:
             result = agent.run(packet)
@@ -506,7 +536,7 @@ class Controller:
             self.store.create("task", {
                 "project": pid, "role": role.value, "stage": stage, "status": "error",
                 "error": f"{type(exc).__name__}: {exc}"[:2000], **extra,
-                "backend": agent.backend.describe(), "refs": refs},
+                "agent": agent_name, "backend": agent.backend.describe(), "refs": refs},
                 record_id=task_id, author=role.value, reason=f"{stage} errored")
             raise
         self._check_integrity(before, f"{role.value}/{stage} ({task_id})")
@@ -525,7 +555,7 @@ class Controller:
         self.store.create("task", {
             "project": pid, "role": role.value, "stage": stage, "status": comp["status"],
             "summary": comp.get("summary", ""), "attempts": result.attempts,
-            "rejections": result.rejections,
+            "rejections": result.rejections, "agent": agent_name,
             "backend": agent.backend.describe(), "claims": ok_claims,
             "rejected_claims": rejected, "risks": comp.get("risks", []), "refs": refs,
         }, record_id=task_id, author=role.value, reason=f"{stage} completed")
@@ -627,7 +657,9 @@ class Controller:
     def _integrity_snapshot(self) -> dict:
         return {"main_head": self.repo.rev("main"), "main_clean": self.repo.is_clean(),
                 "ledger_head": self.store.head(),
-                "lab_toml": hashlib.sha256(self.lab.config_path.read_bytes()).hexdigest()}
+                "lab_toml": hashlib.sha256(self.lab.config_path.read_bytes()).hexdigest(),
+                "agents_toml": (hashlib.sha256(p.read_bytes()).hexdigest()
+                                if (p := self.lab.root / AGENTS_FILE).exists() else None)}
 
     def _check_integrity(self, before: dict, who: str) -> None:
         """Agents are not OS-sandboxed against everything (the engineer runs Python):
@@ -1018,10 +1050,12 @@ class Controller:
         if redesign:
             ctx["failure_history"] = eng.data["feedback"]
         payload, tid = self._call(pid, Role.ENGINEER, stage, ctx, workdir=wt, writable=True)
-        backend = self.agents[Role.ENGINEER].backend.describe()
+        task_rec = self.store.get(tid).data
+        backend = task_rec["backend"]
         sha = self.repo.commit_all(
             wt, f"[{eng.id}] {stage}: {payload['summary'][:72]}", IDENTITIES[Role.ENGINEER],
             {"Autolab-Task": tid, "Autolab-Eng": eng.id, "Autolab-Role": "engineer",
+             "Autolab-Agent": task_rec.get("agent", "engineer"),
              "Autolab-Backend": f"{backend['backend']}/{backend['model'] or 'default'}",
              **self._spec_trailer(eng)})
         if sha is None:
@@ -1137,10 +1171,12 @@ class Controller:
             ctx["engineer_summary"] = self.store.get(eng.data["last_engineer_task"]).data["summary"]
             payload, tid = self._call(pid, Role.VERIFIER, "verify", ctx, workdir=vwt,
                                       writable=True)
-            backend = self.agents[Role.VERIFIER].backend.describe()
+            task_rec = self.store.get(tid).data
+            backend = task_rec["backend"]
             vsha = self.repo.commit_all(
                 vwt, f"[{eng.id}] verification round {rnd}", IDENTITIES[Role.VERIFIER],
                 {"Autolab-Task": tid, "Autolab-Eng": eng.id, "Autolab-Role": "verifier",
+                 "Autolab-Agent": task_rec.get("agent", "verifier"),
                  "Autolab-Backend": f"{backend['backend']}/{backend['model'] or 'default'}"})
             findings = list(payload["findings"])
             if vsha:

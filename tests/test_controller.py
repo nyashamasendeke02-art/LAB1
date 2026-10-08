@@ -68,7 +68,9 @@ def test_independent_reviewer_runs_scientific_review(tmp_path):
 
 def test_reviewer_disabled_by_default(tmp_path):
     lab, ctl = make(tmp_path)
-    assert ctl.reviewer is None and ctl.review_stages == set()
+    from autolab.taxonomy import Role
+    assert "reviewer" not in ctl.registry.agents
+    assert ctl.agent_for(Role.SCIENTIST, "scientific_review")[0] == "scientist"
 
 
 def test_unsupported_hypothesis_is_a_result_not_a_failure(tmp_path):

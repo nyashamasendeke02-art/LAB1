@@ -5,7 +5,10 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** autolab 0.4.0 (D51, 2026-10-08: domain-general research -- item-level analysis
+- **Version:** autolab 0.5.0 (D52, 2026-10-08: agent registry -- any backend/model on any stage via
+  [allocation]/agents.toml, `autolab agents`, organisation preset from the master prompt; dashboard
+  vocabulary from /api/meta, Agents page edits agents and allocation; docs/AGENT_OS_ROADMAP.md).
+  0.4.0 (D51, 2026-10-08: domain-general research -- item-level analysis
   for LLM/agent/code benchmarks, transient-failure retries, parallel trials, spend cap, pinned data;
   see docs/ARCHITECTURE.md 8a). Before that: 0.3.0 + statistics + design-convergence fixes + independent-reviewer
   option (D29); 111/111 passed 2026-10-05 (14 min) + 2 reviewer tests. robolab: 223/223 tests pass on main 8d04f05 (2026-10-05 review).
@@ -102,6 +105,9 @@ and `project_state/` (decisions, failures, open questions)._
 5. [x] Ledger anchoring: commit the ledger head hash into the research repo
        at each merge/run.
 5b. [x] autolab: agent usage limits wait and retry instead of HALT (D35).
+5d. [x] D52: agent registry + stage allocation + config-driven dashboard (see roadmap).
+5e. [ ] Agent OS phases from docs/AGENT_OS_ROADMAP.md: specialist engineering agents, agent
+       scorecards, knowledge plane, programme-level director, verified literature access.
 5c. [x] D51: autolab can run AI/LLM/agent/software research (item unit, retries, cost cap,
        data pinning, domain prompts). Next: a first LLM pilot lab to validate it live (todo 8).
 6. [ ] Citation verification step (more important now: LLM/AI literature moves fast and the
@@ -187,6 +193,12 @@ Residual risks the fixes do NOT remove:
 ## Human tasks (only what Claude cannot do)
 
 - **Decide the verifier backend (F10):** ChatGPT Plus for Codex, a Claude-based verifier, or wait until 2026-11-03.
+  The verifier's last call (2026-10-07) failed on the Gemini backup too ("Individual quota reached", reset
+  ~16 h later), so both providers were exhausted then; the Gemini quota has probably reset by now. Since D52 a Claude verifier is one command:
+  `autolab agents labs/robolab set claude_verifier --backend claude-cli --title "Verification Engineer"`
+  then `autolab agents labs/robolab allocate verify claude_verifier` (same model family as the engineer, so
+  less independent; your call).
+- **Send the rest of the master prompt** (it arrived cut off after "Simulation Engineer").
 - Nothing blocking: the lab runs unattended (D35).
 - Before Gate 7 (hardware): a human safety review of the Safety Kernel.
 - By Gate 5: local vs cloud LLM for System 2.

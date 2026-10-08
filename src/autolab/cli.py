@@ -84,6 +84,39 @@ def _print_steps(steps) -> None:
         _print_step(s)
 
 
+def _agents_cmd(lab: Lab, a) -> int:
+    from .registry import STAGE_BY_NAME, STAGES, Registry, RegistryError
+    reg = Registry(lab.config, lab.root)
+    try:
+        if a.agents_cmd == "preset":
+            print("created: " + ", ".join(reg.apply_preset(a.name)))
+        elif a.agents_cmd == "set":
+            spec = {k: v for k, v in {
+                "backend": a.backend, "model": a.model, "title": a.title, "charter": a.charter,
+                "effort": a.effort, "backup_backend": a.backup_backend,
+                "backup_model": a.backup_model, "timeout": a.timeout}.items() if v is not None}
+            reg.upsert(a.name, spec)
+            print(f"agent {a.name} saved")
+        elif a.agents_cmd == "allocate":
+            reg.allocate({a.stage: a.agent})
+            print(f"{a.stage} -> {reg.resolve(a.stage, STAGE_BY_NAME[a.stage].role)}")
+        elif a.agents_cmd == "remove":
+            reg.remove(a.name)
+            print(f"agent {a.name} removed")
+    except RegistryError as exc:
+        print(f"error: {exc}")
+        return 1
+    for name, spec in sorted(reg.agents.items()):
+        print(f"{name:22} {spec.get('backend') or '-':12} {spec.get('model') or 'default':24} "
+              f"{spec.get('title', '')}")
+    print()
+    for st in STAGES:
+        print(f"  {st.plane:15} {st.name:22} [{st.role.value:9}] -> {reg.resolve(st.name, st.role)}")
+    for prob in reg.problems():
+        print(f"PROBLEM: {prob}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # User objectives may contain characters outside the active Windows code
     # page. Escape those characters instead of crashing the status command.
@@ -118,7 +151,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("ui", help="open a local web dashboard for a lab")
     p.add_argument("lab")
     p.add_argument("--host", default="127.0.0.1", help="loopback IP address (default: 127.0.0.1)")
-    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--port", type=int, default=None, help="default: [ui] port in lab.toml")
     for name in ("approve", "reject"):
         p = sub.add_parser(name)
         p.add_argument("lab")
@@ -151,6 +184,23 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("lab")
     p.add_argument("--json", dest="json_path")
     sub.add_parser("demo").add_argument("lab")
+    p = sub.add_parser("agents", help="list, create and allocate agents (models) to stages")
+    p.add_argument("lab")
+    asub = p.add_subparsers(dest="agents_cmd")
+    asub.add_parser("list")
+    q = asub.add_parser("preset", help="create the research/engineering organisation")
+    q.add_argument("name", nargs="?", default="organisation")
+    q = asub.add_parser("set", help="create or update an agent")
+    q.add_argument("name")
+    q.add_argument("--backend", required=True)
+    for opt in ("model", "title", "charter", "effort", "backup-backend", "backup-model"):
+        q.add_argument(f"--{opt}")
+    q.add_argument("--timeout", type=float)
+    q = asub.add_parser("allocate", help="assign a stage to an agent ('' = role default)")
+    q.add_argument("stage")
+    q.add_argument("agent")
+    q = asub.add_parser("remove")
+    q.add_argument("name")
     a = ap.parse_args(argv)
 
     if a.cmd == "init":
@@ -168,9 +218,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     lab = Lab(a.lab)
+    if a.cmd == "agents":
+        return _agents_cmd(lab, a)
     if a.cmd == "ui":
         from .web import DashboardServer
-        DashboardServer(lab, a.host, a.port).serve_forever()
+        port = a.port or int(lab.config.get("ui", {}).get("port") or 8765)
+        DashboardServer(lab, a.host, port).serve_forever()
     elif a.cmd == "new":
         pid = Controller(lab, agents={}).new_project(a.objective, _refs(a.refs))
         print(pid)

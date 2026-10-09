@@ -75,6 +75,8 @@ and `project_state/` (decisions, failures, open questions)._
 - [x] robolab autonomy_level = 5 set 2026-10-08 (queue stopped; delegation to claude-code verified).
 - [x] GATE 1 COMPLETE 2026-10-08: G1-6 merged (DLV-0010) after APR-0007. MVB-1 (S1 predictive controller, the
       minimum viable brain) merged (DLV-0011, PRJ-0014: built by Opus, reviewed by Sonnet).
+- [ ] HUMAN REVIEW of MVB-1 in progress (docs/MVB_REVIEW_GUIDE.md, scripts/mvb_demo.py). Informal demo: puck 7/8
+      (= PD), car 0/8 (one-step lookahead never steers). Decide before MVB-2: add multi-step lookahead first?
 - [ ] NEXT: MVB-2 = E1 experiment (MVB vs PD vs random on Puck2D and Car2D, pre-registered) as a research project in
       robolab. Before hardware: G1-9 disturbance margin + human Gate 7 review.
 - [ ] robolab Gate 1 in progress (D50): Codex kept as primary; Gemini (gemini-3.8-flash-high via

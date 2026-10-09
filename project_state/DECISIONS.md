@@ -410,3 +410,10 @@
   opens a record with its links), 5 Activity (ledger), 6 Queue (log); Enter on a project opens its research/
   engineering summary; auto-refresh on ledger or queue-log change. Tests: tests/test_tui.py (3, Textual pilot).
   Meanwhile robolab: G1-6 merged (DLV-0010) -> Gate 1 COMPLETE; MVB-1 submitted as PRJ-0014.
+- D68 (2026-10-09, human: "i want to manually review and see the code and its functionality"): review kit --
+  docs/MVB_REVIEW_GUIDE.md (reading order, what to check, how to run tests, provenance) and scripts/mvb_demo.py
+  (MVB-1 vs PD vs random on the same tasks, both bodies, real harness/runner/kernel, true paths drawn to
+  labs/robolab/review/mvb_demo.html; no agents, nothing recorded). Informal finding (seed 2026, 8 tasks/body, not
+  evidence): Puck2D brain 7/8 (PD 7/8, random 2/8) but loops while learning (116 vs 59 steps); Car2D brain 0/8 --
+  it never turns: one-step lookahead cannot see the benefit of steering on a non-holonomic body. First real test of
+  D28: safe operation transfers across bodies, competence does not yet. MVB-2 held until the human's review.

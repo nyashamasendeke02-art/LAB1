@@ -1,0 +1,23 @@
+# Deferred tasks (D65): not needed for the minimum viable brain. Run later with
+#   autolab queue labs/robolab docs/gates/deferred_queue.toml
+
+[[task]]
+id = "G1-7"
+refs = ["Gate 1", "SW-PKG", "SW-STATIC", "SW-SAFETY-CODE", "SW-TEST"]
+spec = """G1-7 Software baseline. Add a `pyproject.toml` that makes the repository installable (`pip install -e .`, packages under `src/`, Python >= 3.11, runtime dependency numpy only; dev extras for pytest, ruff, coverage). Configure ruff (pyflakes + pycodestyle errors + isort) and make the codebase pass it without changing behaviour. Add pytest markers `slow` (property tests and benchmarks) and register them, so `python -m pytest -q -m "not slow"` runs in under a minute. Measure branch coverage of `src/safety` with coverage.py and add tests until it reaches 100% branch coverage; do not change kernel behaviour, limits or safe actions to do so. Pin any new dev dependency in requirements.lock. Do not rename packages (the robobrain namespace move is a separate task)."""
+accept = [
+  "`pip install -e .` succeeds in a clean virtual environment and the full test suite passes.",
+  "`ruff check .` reports no errors.",
+  "`python -m pytest -q -m \"not slow\"` passes in under 60 seconds.",
+  "Branch coverage of src/safety is 100% and kernel behaviour is unchanged (all existing safety tests pass unmodified).",
+]
+
+[[task]]
+id = "G1-8"
+refs = ["SW-LICENSE"]
+spec = """G1-8 Licence. Add the Apache License 2.0 as `LICENSE` at the repository root (the exact, unmodified text from https://www.apache.org/licenses/LICENSE-2.0.txt; if a pyproject.toml exists, set `license = "Apache-2.0"`). Add a short "License" section to README.md: "Copyright 2026 Nyasha Msendeke. Licensed under the Apache License 2.0." Change nothing else."""
+accept = [
+  "LICENSE contains the full, unmodified Apache License 2.0 text.",
+  "README.md has a License section naming Apache-2.0 and the copyright holder.",
+  "The full test suite still passes.",
+]

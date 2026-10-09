@@ -385,3 +385,11 @@
   returned; in Claude Code's own temp folder Write was denied (that folder is protected -- worktrees never live there).
   Codex and Gemini tool calls are not logged (their CLIs' event formats were not verified here); recorded as
   `tools.logged = false`. Tests: tests/test_tool_logging.py (5).
+- D65 (2026-10-08, human: "remove unnecessary steps for g1-6; a minimum viable brain is enough"): the robot-brain
+  programme now targets the minimum viable brain (docs/MVB.md) = the mandate's E1 / first milestone: one MHS-driven
+  S1 predictive controller (online one-step forward model + lookahead) on Puck2D and Car2D, every action through the
+  Safety Kernel, measured against PD and random baselines. robolab process trimmed: architecture stage off,
+  security/performance pre-merge reviews off, contracts gate dropped (labs/robolab/lab.toml); kept: adversarial review
+  + tests on every change and the Safety Kernel gate (every brain action passes the kernel). G1-7 (packaging, ruff,
+  100% coverage) and G1-8 (licence) moved to docs/gates/deferred_queue.toml. Next: finish G1-6 (safety gate review,
+  proportionate fault injection), then docs/gates/mvb_queue.toml (MVB-1), then MVB-2 = the E1 experiment.

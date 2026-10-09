@@ -1,0 +1,16 @@
+# Minimum viable brain (D65, docs/MVB.md): run after Gate 1 completes.
+#   autolab queue labs/robolab docs/gates/mvb_queue.toml
+# MVB-2 (the E1 experiment: MVB vs PD vs random on both bodies) is a research project, started
+# after MVB-1 is merged.
+
+[[task]]
+id = "MVB-1"
+refs = ["E1", "MVB"]
+spec = """MVB-1 S1 predictive controller -- the minimum viable brain. In `src/system1/predictive.py` implement `PredictiveController`, a System1 module for the cycle runner: `propose(state, prediction, rng) -> ActionProposal` and `reset(task)` taking the harness TaskBrief (it may use only the task id and goal). Configure it ONLY from the body's MHS given at construction: the action vector layout and actuator limits, and the observation layout (identify the position channels from the MHS sensor layout). No body names, no body-specific branches, no imports from `simulation` (G1-4 isolation: the brain sees only noisy observations and its own actions). Forward model: online ridge regression in NumPy, deterministic, predicting the next observation from [current observation, action, 1], updated every cycle from the controller's own observed transitions. Action selection: score a fixed candidate set inside the MHS limits (per action dimension: min, -half, 0, +half, max; if the full grid exceeds 243 candidates, subsample it deterministically with the passed rng) by the model's predicted distance of the position channels to the goal plus a small action-magnitude penalty; until the model has seen `warmup_transitions` transitions (default 10), propose random candidates within the limits. Put every tunable number in a `PredictiveConfig` dataclass with `from_mapping`, like PDConfig. It must drive both Puck2D and Car2D unchanged, with every action passing the Safety Kernel."""
+accept = [
+  "src/system1/predictive.py provides PredictiveController satisfying the runner's System1 protocol, constructed only from an MHS; no body-specific code; no brain package imports simulation.",
+  "On a synthetic linear system the forward model's one-step prediction error decreases as it sees more transitions (unit test).",
+  "Every proposed action lies within the MHS actuator limits (property-style test over many seeds and states).",
+  "The harness runs at least 20 episodes each on Puck2D and Car2D with PredictiveController through the cycle runner and the Safety Kernel; results are identical for the same seeds (test).",
+  "The full test suite passes.",
+]

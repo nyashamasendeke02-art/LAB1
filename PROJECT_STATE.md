@@ -72,11 +72,10 @@ and `project_state/` (decisions, failures, open questions)._
       injection: Puck2D + Car2D MHS, latency 0-1 s, clamp/reject, adversarial policies, lying estimator, slippery
       patches vs declared braking, liveness). robolab runs on preset claude-strengths.
 - [x] robolab autonomy_level = 5 set 2026-10-08 (queue stopped; delegation to claude-code verified).
-- [ ] robolab queue STOPPED 2026-10-08 by Claude Code (PC critically low on memory: 8 GB RAM, ~2 GB free while the
-      test suite, the queue and Claude agents ran together). Before that it had hit the Claude usage limit and was
-      waiting. G1-6 state: MERGE; engineer removed .scratch, tests passed, Sonnet re-verified, security review
-      passed (REV-0025); the performance review (TASK-0108) was interrupted. Restart only when the human asks:
-      `autolab queue labs/robolab docs/gates/gate1_queue.toml` (do not run it alongside the full test suite).
+- [ ] D65 MINIMUM VIABLE BRAIN (docs/MVB.md): robolab trimmed (no architecture stage, no security/performance
+      reviews, no contracts gate; adversarial review + safety gate kept); G1-7/G1-8 deferred. Queue restarted
+      2026-10-08 to finish G1-6 -> safety gate (claude-code: proportionate kernel review with fault injection) ->
+      then `autolab queue labs/robolab docs/gates/mvb_queue.toml` (MVB-1) -> MVB-2 = E1 experiment.
 - [ ] robolab Gate 1 in progress (D50): Codex kept as primary; Gemini (gemini-3.8-flash-high via
       gemini-cli / agy) configured as automatic backup on usage limit. G1-6 (PRJ-0013) redesign built
       (84f6a44) and tests passed; waiting at adversarial review. Resuming with

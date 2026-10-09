@@ -21,3 +21,16 @@ accept = [
   "README.md has a License section naming Apache-2.0 and the copyright holder.",
   "The full test suite still passes.",
 ]
+
+# REQUIRED BEFORE ANY HARDWARE (APR-0007 safety review, 2026-10-08): a sustained full-force push
+# plus an undeclared external impulse took Puck2D 0.03-0.14 m past the workspace bound; without the
+# disturbance the kernel holds the bound.
+[[task]]
+id = "G1-9"
+refs = ["Gate 1", "REQ-SAFE+", "F9"]
+spec = """G1-9 Declared disturbance margin. Add to the MHS safety envelope a declared worst-case external disturbance (max impulse per axis in N s and/or max disturbance acceleration in m/s^2, default 0 = current behaviour) and make the Safety Kernel keep that margin: when bounding the next position and the stopping distance, include the worst displacement the declared disturbance can add before braking takes effect (from the MHS mass lower bound and braking deceleration), with no body-specific code. Puck2D and Car2D publish their configured disturbance limits in their MHS. Keep every existing kernel test passing; bump KERNEL_VERSION and MHS_VERSION; document in docs/mhs.md."""
+accept = [
+  "With the declared disturbance equal to the eval set's impulse_max, a sustained full-force push toward the wall plus that impulse never leaves the workspace (property test over seeds, Puck2D and Car2D).",
+  "With the declared disturbance 0, kernel behaviour is unchanged (existing tests pass).",
+  "src/safety contains no body-specific code; the full test suite passes.",
+]

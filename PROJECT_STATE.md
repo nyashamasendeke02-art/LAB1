@@ -72,10 +72,9 @@ and `project_state/` (decisions, failures, open questions)._
       injection: Puck2D + Car2D MHS, latency 0-1 s, clamp/reject, adversarial policies, lying estimator, slippery
       patches vs declared braking, liveness). robolab runs on preset claude-strengths.
 - [x] robolab autonomy_level = 5 set 2026-10-08 (queue stopped; delegation to claude-code verified).
-- [ ] D65 MINIMUM VIABLE BRAIN (docs/MVB.md): robolab trimmed (no architecture stage, no security/performance
-      reviews, no contracts gate; adversarial review + safety gate kept); G1-7/G1-8 deferred. Queue restarted
-      2026-10-08 to finish G1-6 -> safety gate (claude-code: proportionate kernel review with fault injection) ->
-      then `autolab queue labs/robolab docs/gates/mvb_queue.toml` (MVB-1) -> MVB-2 = E1 experiment.
+- [ ] D65/D66 MINIMUM VIABLE BRAIN (docs/MVB.md): APR-0007 approved (G1-6 safe in simulation; disturbance
+      margin G1-9 required before hardware). Queue running: merge G1-6 (= Gate 1 complete) then MVB-1 (S1 predictive
+      controller). Next: MVB-2 = E1 experiment (MVB vs PD vs random, both bodies).
 - [ ] robolab Gate 1 in progress (D50): Codex kept as primary; Gemini (gemini-3.8-flash-high via
       gemini-cli / agy) configured as automatic backup on usage limit. G1-6 (PRJ-0013) redesign built
       (84f6a44) and tests passed; waiting at adversarial review. Resuming with
@@ -242,7 +241,8 @@ Residual risks the fixes do NOT remove:
 - **Live-probe Gemini's sandbox (F11)** when its quota allows: one verifier call on robolab. If agy's
   `--sandbox` blocks worktree edits on Windows, the backup verifier will fail visibly.
 - Nothing blocking: the lab runs unattended (D35).
-- Before Gate 7 (hardware): a human safety review of the Safety Kernel.
+- Before Gate 7 (hardware): a human safety review of the Safety Kernel, and G1-9 (declared disturbance
+  margin; APR-0007 found a sustained push + external impulse can exceed the workspace by up to 0.14 m).
 - By Gate 5: local vs cloud LLM for System 2.
 - For LLM/agent research: decide which models experiments may call and who pays (an API key with
   a spending limit, or the existing Claude/Codex/Gemini subscriptions, which share limits with the lab's

@@ -393,3 +393,10 @@
   + tests on every change and the Safety Kernel gate (every brain action passes the kernel). G1-7 (packaging, ruff,
   100% coverage) and G1-8 (licence) moved to docs/gates/deferred_queue.toml. Next: finish G1-6 (safety gate review,
   proportionate fault injection), then docs/gates/mvb_queue.toml (MVB-1), then MVB-2 = the E1 experiment.
+- D66 (2026-10-08): APR-0007 (G1-6 safety gate) APPROVED by claude-code for simulation after fault injection (29
+  cases, true position per step): Car2D always inside; Puck2D inside except a sustained full-force push plus an
+  undeclared external impulse (2 of 6 tasks: 2.03 m, 2.14 m at 0.5 s lag; inside when the impulse is removed).
+  Kernel holds its declared envelope; the gap is undeclared disturbances (F9). Liveness fixed (PD 7/8 goals at
+  0.5 s lag). Follow-up G1-9 (declared disturbance margin) is REQUIRED before any hardware (deferred_queue.toml).
+  Review method note: an earlier batch of my bang-bang cases was invalid (malformed proposals from my own test
+  policy -> kernel correctly braked); caught from the kernel's telemetry reasons and rerun.

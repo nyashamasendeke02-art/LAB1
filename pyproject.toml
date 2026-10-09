@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autolab"
-version = "0.12.0"
+version = "0.13.0"
 license = "Apache-2.0"
 description = "Autonomous Research & Engineering Lab: controller-owned research and engineering loop with replaceable agents on any model provider"
 requires-python = ">=3.11"
@@ -12,6 +12,7 @@ dependencies = ["jsonschema>=4", "pyyaml>=6"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+tui = ["textual>=8"]   # autolab tui (D67): optional terminal UI
 
 [project.scripts]
 autolab = "autolab.cli:main"

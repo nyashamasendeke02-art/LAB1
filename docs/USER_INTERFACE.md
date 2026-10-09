@@ -67,3 +67,18 @@ result of a ledger hash-chain verification.
 - **Decisions made here are the human's** (`decided_by = "human"`) and need a note. Delegated
   reviews by Claude Code use the CLI with `--as claude-code`.
 - The dashboard never starts or stops agents or queues; use `autolab run` / `autolab queue`.
+
+## Terminal UI (D67)
+
+```powershell
+pip install -e .[tui]                      # once: installs Textual
+.venv\Scripts\autolab.exe tui labs\robolab
+obolab
+```
+
+Keys: **1-6** switch screens (Overview, Approvals, Agents, Knowledge, Activity, Queue), **Enter** opens
+details (a project's research and engineering summary, an approval's diff, a knowledge record's links),
+**/** search knowledge, **r** refresh, **Esc** close details, **q** quit. Approve/Reject needs a note and
+is recorded as the human's decision; it is refused while an agent call is running. The screen refreshes
+itself when the ledger or the queue log changes. It uses the web dashboard's data layer, so both show the
+same data.

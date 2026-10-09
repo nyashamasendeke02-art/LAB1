@@ -314,6 +314,23 @@ class DashboardServer:
         self.allowed_hosts = {f"127.0.0.1:{bound}", f"localhost:{bound}", f"[::1]:{bound}",
                               f"{host}:{bound}" if address.version == 4 else f"[{host}]:{bound}"}
 
+    @classmethod
+    def offline(cls, lab: Lab, run_log: str | Path | None = None) -> "DashboardServer":
+        """The dashboard's data layer without an HTTP server (D67: used by `autolab tui`,
+        so the terminal and web interfaces always show the same data)."""
+        self = cls.__new__(cls)
+        self.root = Path(lab.root)
+        self._local = threading.local()
+        self._local.lab = lab
+        if run_log is None:
+            guess = self.root.parent / f"{self.root.name}-run.log"
+            run_log = guess if guess.exists() else None
+        self.run_log = Path(run_log) if run_log else None
+        self._verify_cache = None
+        self.httpd = None
+        self.token = None
+        return self
+
     # ------------------------------------------------------------ lab access
     @property
     def lab(self) -> Lab:

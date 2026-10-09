@@ -317,6 +317,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--max-steps", type=int, default=500)
     sub.add_parser("status").add_argument("lab")
     sub.add_parser("approvals").add_argument("lab")
+    sub.add_parser("tui", help="interactive terminal UI for a lab (needs: pip install autolab[tui])"
+                   ).add_argument("lab")
     p = sub.add_parser("ui", help="open a local web dashboard for a lab")
     p.add_argument("lab")
     p.add_argument("--host", default="127.0.0.1", help="loopback IP address (default: 127.0.0.1)")
@@ -487,6 +489,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if a.cmd in ("research", "engineer", "project", "director", "build"):
         return _mode_cmd(lab, a)
+    if a.cmd == "tui":
+        try:
+            from .tui import run as run_tui
+        except ImportError:
+            print("The terminal UI needs Textual: pip install textual  (or pip install -e .[tui])")
+            return 1
+        run_tui(lab.root)
+        return 0
     if a.cmd == "ui":
         from .web import DashboardServer
         port = a.port or int(lab.config.get("ui", {}).get("port") or 8765)

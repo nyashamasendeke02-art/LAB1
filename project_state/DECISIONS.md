@@ -400,3 +400,13 @@
   0.5 s lag). Follow-up G1-9 (declared disturbance margin) is REQUIRED before any hardware (deferred_queue.toml).
   Review method note: an earlier batch of my bang-bang cases was invalid (malformed proposals from my own test
   policy -> kernel correctly braked); caught from the kernel's telemetry reasons and rerun.
+- D67 (2026-10-08, human: "is it possible to make an interactive terminal based ui ... minimal but very functional"):
+  `autolab tui LAB` (src/autolab/tui.py), built on Textual 8 as an OPTIONAL extra (`pip install autolab[tui]`; core
+  dependencies stay jsonschema + PyYAML). curses is unavailable on Windows and raw ANSI would be fragile; Textual has
+  tables, keyboard navigation and a headless test pilot. It reuses the web dashboard's data layer
+  (DashboardServer.offline), so both interfaces show the same data. Screens: 1 Overview (projects + one-line lab
+  summary incl. cost and ledger check), 2 Approvals (approve/reject with a required note, recorded as the human's
+  decision, refused during agent calls), 3 Agents (scorecards incl. tool calls/denials), 4 Knowledge (search, Enter
+  opens a record with its links), 5 Activity (ledger), 6 Queue (log); Enter on a project opens its research/
+  engineering summary; auto-refresh on ledger or queue-log change. Tests: tests/test_tui.py (3, Textual pilot).
+  Meanwhile robolab: G1-6 merged (DLV-0010) -> Gate 1 COMPLETE; MVB-1 submitted as PRJ-0014.

@@ -5,7 +5,8 @@ and `project_state/` (decisions, failures, open questions)._
 
 ## Status
 
-- **Version:** autolab 0.12.0 (D64, 2026-10-08: tool-call logging for Claude agents -- audit trail per task,
+- **Version:** autolab 0.13.0 (D67, 2026-10-08: `autolab tui` terminal UI, optional Textual extra).
+  0.12.0 (D64, 2026-10-08: tool-call logging for Claude agents -- audit trail per task,
   denials as events, dashboard trail; verified live).
   0.11.0 (D63, 2026-10-08: dashboard upgrade -- research view, charts, agents page,
   plain-language states, phone menu, caching/paging; live /research demo in labs/workbench: $2.53, plan saved).
@@ -72,9 +73,10 @@ and `project_state/` (decisions, failures, open questions)._
       injection: Puck2D + Car2D MHS, latency 0-1 s, clamp/reject, adversarial policies, lying estimator, slippery
       patches vs declared braking, liveness). robolab runs on preset claude-strengths.
 - [x] robolab autonomy_level = 5 set 2026-10-08 (queue stopped; delegation to claude-code verified).
-- [ ] D65/D66 MINIMUM VIABLE BRAIN (docs/MVB.md): APR-0007 approved (G1-6 safe in simulation; disturbance
-      margin G1-9 required before hardware). Queue running: merge G1-6 (= Gate 1 complete) then MVB-1 (S1 predictive
-      controller). Next: MVB-2 = E1 experiment (MVB vs PD vs random, both bodies).
+- [x] GATE 1 COMPLETE 2026-10-08: G1-6 merged (DLV-0010) after APR-0007. MVB-1 (S1 predictive controller, the
+      minimum viable brain) merged (DLV-0011, PRJ-0014: built by Opus, reviewed by Sonnet).
+- [ ] NEXT: MVB-2 = E1 experiment (MVB vs PD vs random on Puck2D and Car2D, pre-registered) as a research project in
+      robolab. Before hardware: G1-9 disturbance margin + human Gate 7 review.
 - [ ] robolab Gate 1 in progress (D50): Codex kept as primary; Gemini (gemini-3.8-flash-high via
       gemini-cli / agy) configured as automatic backup on usage limit. G1-6 (PRJ-0013) redesign built
       (84f6a44) and tests passed; waiting at adversarial review. Resuming with
